@@ -1,0 +1,137 @@
+@import "tailwindcss";
+@plugin "daisyui";
+
+@theme {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-navy: var(--primary);
+  --color-navy-hover: var(--primary-hover);
+  --color-gold: var(--accent);
+  --color-gold-hover: var(--accent-hover);
+  --color-txt-main: var(--text-primary);
+  --color-txt-sub: var(--text-secondary);
+  --color-divider: var(--border);
+}
+
+:root {
+  --bg: #F8F6F1;
+  --surface: #FFFFFF;
+  --primary: #1B2A4A;
+  --primary-hover: #0F2440;
+  --accent: #C9A227;
+  --accent-hover: #B8860B;
+  --text-primary: #1C1C1E;
+  --text-secondary: #5A5A5A;
+  --border: #E2DFD6;
+  --heading: #1B2A4A;
+  --code-bg: #EAE6DF;
+  --code-text: #1B2A4A;
+  --nav-text: #1B2A4A;
+}
+
+.dark {
+  --bg: #0B1220;
+  --surface: #141F35;
+  --primary: #1B2A4A;
+  --primary-hover: #2A3D63;
+  --accent: #E0B93A;
+  --accent-hover: #F0CC4D;
+  --text-primary: #F8FAFC;
+  --text-secondary: #94A3B8;
+  --border: #243047;
+  --heading: #FFFFFF;
+  --code-bg: #1E293B;
+  --code-text: #F8FAFC;
+  --nav-text: #F8FAFC;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--text-primary);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 0.3s ease, color 0.3s ease;
+  min-height: 100vh;
+}
+
+.ag-theme-quartz-dark .ag-cell:focus,
+.ag-theme-alpine .ag-cell:focus {
+  outline: none !important;
+  border: none !important;
+}
+
+.ag-theme-quartz-dark .ag-cell.ag-cell-focus,
+.ag-theme-alpine .ag-cell.ag-cell-focus {
+  border: none !important;
+}
+
+.ag-theme-alpine-dark {
+  --ag-background-color: #000000 !important;
+  /* Force black background */
+  --ag-header-background-color: #111827 !important;
+  /* Tailwind gray-900 */
+  --ag-odd-row-background-color: #0f172a !important;
+  /* Tailwind slate-900 */
+  --ag-row-hover-color: #1e293b !important;
+  /* Tailwind slate-800 */
+  --ag-foreground-color: #ffffff !important;
+  /* White text */
+  --ag-secondary-foreground-color: #d1d5db !important;
+  /* Tailwind gray-300 */
+  --ag-border-color: #374151 !important;
+  /* Tailwind gray-700 */
+}
+
+#nprogress .bar {
+  background: #3b82f6 !important;
+  height: 5px !important;
+}
+
+#nprogress .peg {
+  box-shadow:
+    0 0 10px #3b82f6,
+    0 0 5px #3b82f6 !important;
+}
+
+/* Keep your global hide as-is */
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+*::-webkit-scrollbar {
+  display: none;
+}
+
+/* Force restore ONLY ag-grid scrollbars */
+.ag-body-viewport,
+.ag-center-cols-viewport,
+.ag-body-horizontal-scroll-viewport,
+.ag-virtual-list-viewport {
+  scrollbar-width: thin !important;
+  -ms-overflow-style: auto !important;
+}
+
+.ag-body-viewport::-webkit-scrollbar,
+.ag-center-cols-viewport::-webkit-scrollbar,
+.ag-body-horizontal-scroll-viewport::-webkit-scrollbar,
+.ag-virtual-list-viewport::-webkit-scrollbar {
+  display: block !important;
+  width: 6px !important;
+  height: 6px !important;
+}
+
+.ag-body-viewport::-webkit-scrollbar-thumb,
+.ag-center-cols-viewport::-webkit-scrollbar-thumb,
+.ag-body-horizontal-scroll-viewport::-webkit-scrollbar-thumb,
+.ag-virtual-list-viewport::-webkit-scrollbar-thumb {
+  background-color: #4b5563;
+  border-radius: 4px;
+}
+
+.ag-body-viewport::-webkit-scrollbar-track,
+.ag-center-cols-viewport::-webkit-scrollbar-track,
+.ag-body-horizontal-scroll-viewport::-webkit-scrollbar-track,
+.ag-virtual-list-viewport::-webkit-scrollbar-track {
+  background: transparent;
+}
