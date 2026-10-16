@@ -89,6 +89,7 @@ function FieldWrap({
 
 // ─── SelectWithIcon ───────────────────────────────────────────────────────────
 
+
 function SelectWithIcon({
   value,
   onChange,
@@ -104,31 +105,110 @@ function SelectWithIcon({
   disabled?: boolean;
   icon?: React.ElementType;
 }) {
+  const [open, setOpen] = useState(false);
+  const [hoveredValue, setHoveredValue] = useState<string | number | null>(null);
+
+  const selectedOption = options.find(
+    (option) => String(option.value) === String(value)
+  );
+
   return (
     <div className="relative">
       {Icon && (
         <Icon className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--accent)] pointer-events-none z-10" />
       )}
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
+
+      <button
+        type="button"
         disabled={disabled}
-        className={`${SELECT} ${Icon ? 'pl-9' : 'pl-3'} pr-8 ${
-          disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'
-        }`}
+        onClick={() => setOpen((previous) => !previous)}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') setOpen(false);
+        }}
+        className={`${SELECT} flex items-center justify-between ${
+          Icon ? 'pl-9' : 'pl-3'
+        } pr-8 ${disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
+        aria-haspopup="listbox"
+        aria-expanded={open}
       >
-        {placeholder && (
-          <option value="" disabled>
-            {placeholder}
-          </option>
-        )}
-        {options.map((o) => (
-          <option key={o.value} value={o.value} className="bg-[var(--surface)]">
-            {o.label}
-          </option>
-        ))}
-      </select>
-      <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-txt-sub/60 pointer-events-none" />
+        <span className="truncate">
+          {selectedOption?.label ?? placeholder ?? 'Select option'}
+        </span>
+        <ChevronDown
+          className={`absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-txt-sub/60 transition-transform ${
+            open ? 'rotate-180' : ''
+          }`}
+        />
+      </button>
+
+      {open && !disabled && (
+        <>
+          <button
+            type="button"
+            aria-label="Close dropdown"
+            className="fixed inset-0 z-20 cursor-default"
+            onClick={() => setOpen(false)}
+          />
+
+          <ul
+            role="listbox"
+            className="absolute z-30 mt-1 w-full max-h-52 overflow-y-auto rounded-xl border border-[var(--border)] bg-[var(--surface)] p-1.5 shadow-xl"
+          >
+            {placeholder && (
+              <li>
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={!selectedOption}
+                  onClick={() => {
+                    onChange('');
+                    setOpen(false);
+                  }}
+                  onMouseEnter={() => setHoveredValue('__placeholder__')}
+                  onMouseLeave={() => setHoveredValue(null)}
+                  className={`w-full rounded-lg px-3 py-2 text-left text-sm transition-colors ${
+                    hoveredValue === '__placeholder__'
+                      ? 'bg-[var(--border)]/50'
+                      : ''
+                  } text-[var(--text-secondary)]`}
+                >
+                  {placeholder}
+                </button>
+              </li>
+            )}
+
+            {options.map((option) => {
+              const selected =
+                String(option.value) === String(value);
+
+              return (
+                <li key={option.value}>
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={selected}
+                    onClick={() => {
+                      onChange(String(option.value));
+                      setOpen(false);
+                    }}
+                    onMouseEnter={() => setHoveredValue(option.value)}
+                    onMouseLeave={() => setHoveredValue(null)}
+                    className={`w-full rounded-lg px-3 py-2 text-left text-sm transition-colors ${
+                      selected
+                        ? 'bg-[var(--accent)]/12 text-[var(--heading)] font-semibold'
+                        : hoveredValue === option.value
+                          ? 'bg-[var(--border)]/50 text-[var(--text-primary)]'
+                          : 'text-[var(--text-primary)]'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      )}
     </div>
   );
 }
