@@ -92,7 +92,9 @@ export default function LoginForm() {
         type="button"
         onClick={googleSignIn}
         disabled={googleLoading || loading}
-        className="btn btn-outline w-full h-[54px] min-h-[54px] rounded-[14px] border-[var(--border)] text-[15.5px] font-bold flex items-center justify-center gap-3 disabled:opacity-50"
+        
+        className="btn btn-outline w-full h-[54px] min-h-[54px] rounded-[14px] border-[var(--border)] !text-slate-900 hover:!text-slate-900 dark:!text-slate-100 dark:hover:!text-slate-100 bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700 text-[15.5px] font-bold flex items-center justify-center gap-3 disabled:opacity-50"
+
       >
         {googleLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <GoogleIcon />}
         <span>Continue with Google</span>

@@ -13,6 +13,7 @@
   --color-divider: var(--border);
   --font-sans: var(--font-manrope), "Manrope", system-ui, sans-serif;
 }
+@custom-variant dark (&:where(.dark, .dark *));
 
 :root {
   --bg: #f8f6f1;
@@ -154,8 +155,8 @@ body {
   --ag-font-family: inherit;
   --ag-borders: none;
   --ag-row-border-color: var(--border);
-  --ag-header-background-color: "#fff";
-  --ag-header-foreground-color: "#fff";
+  --ag-header-background-color: var(--surface);
+  --ag-header-foreground-color: var(--text-secondary);
   --ag-background-color: var(--surface);
   --ag-odd-row-background-color: var(--surface);
   --ag-row-hover-color: color-mix(in srgb, var(--primary) 4%, var(--surface));
