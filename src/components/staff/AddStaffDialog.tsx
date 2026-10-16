@@ -1,26 +1,11 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Button,
-  TextField,
-  Grid,
-  IconButton,
-  Alert,
-  CircularProgress,
-  FormControlLabel,
-  Checkbox,
-  MenuItem,
-} from "@mui/material";
-import { Close as CloseIcon } from "@mui/icons-material";
-import { CreateStaffDto } from "@/types/staff.types";
-import { createStaff } from "@/services/staffService";
-import PhoneInputField from "../common/PhoneInputField";
-import "react-phone-input-2/lib/plain.css";
+import { useState } from 'react';
+import { UserPlus, AlertCircle, Loader2 } from 'lucide-react';
+import Drawer from '@/components/common/Drawer';
+import { CreateStaffDto } from '@/types/staff.types';
+import { createStaff } from '@/services/staffService';
+import PhoneInputField from '../common/PhoneInputField';
 
 interface AddStaffDialogProps {
   open: boolean;
@@ -29,16 +14,28 @@ interface AddStaffDialogProps {
   onSuccess: () => void;
 }
 
-const ROLES = ["Accountant", "Owner", "Admin"];
+const ROLES = [
+  { value: 'Accountant', label: 'Accountant (Compliance & Bookkeeping)' },
+  { value: 'Manager', label: 'Manager (Practice & Task Supervisor)' },
+  { value: 'Admin', label: 'Admin (Full Workspace Control)' },
+];
+
+const DEPARTMENTS = [
+  'Taxation (GST & ITR)',
+  'Audit & Assurance',
+  'ROC & Corporate Law',
+  'Bookkeeping & Accounting',
+  'General Practice',
+];
 
 const DEFAULT_FORM: CreateStaffDto = {
-  userName: "",
-  firstName: "",
-  lastName: "",
-  email: "",
-  phone: "",
-  department: "",
-  roles: [],
+  userName: '',
+  firstName: '',
+  lastName: '',
+  email: '',
+  phone: '',
+  department: '',
+  roles: ['Accountant'],
   sendInvite: true,
 };
 
@@ -49,271 +46,255 @@ export default function AddStaffDialog({
   onSuccess,
 }: AddStaffDialogProps) {
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState('');
   const [formData, setFormData] = useState<CreateStaffDto>(DEFAULT_FORM);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // ✅ For text fields
-  const handleChange =
-    (field: keyof CreateStaffDto) =>
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      setFormData((prev) => ({ ...prev, [field]: e.target.value }));
-      if (errors[field]) setErrors((prev) => ({ ...prev, [field]: "" }));
-    };
-
-  // ✅ For role dropdown (single select → stored as array)
-  const handleRoleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData((prev) => ({ ...prev, roles: [e.target.value] }));
-    if (errors.roles) setErrors((prev) => ({ ...prev, roles: "" }));
+  const handleChange = (field: keyof CreateStaffDto, value: any) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+    if (errors[field]) {
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next[field];
+        return next;
+      });
+    }
   };
 
-  // ✅ For phone
-  const handlePhoneChange = (value: string) => {
-    setFormData((prev) => ({ ...prev, phone: value }));
-    if (errors.phone) setErrors((prev) => ({ ...prev, phone: "" }));
+  const validate = (): boolean => {
+    const errs: Record<string, string> = {};
+
+    if (!formData.firstName.trim()) {
+      errs.firstName = 'First name is required';
+    }
+    if (!formData.lastName.trim()) {
+      errs.lastName = 'Last name is required';
+    }
+    if (!formData.email.trim()) {
+      errs.email = 'Email address is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+      errs.email = 'Invalid email address format';
+    }
+    if (!formData.phone.trim()) {
+      errs.phone = 'Phone number is required';
+    } else if (formData.phone.replace(/[^0-9]/g, '').length < 10) {
+      errs.phone = 'Please enter a valid 10-digit mobile number';
+    }
+    if (!formData.roles || formData.roles.length === 0) {
+      errs.roles = 'Please select a role';
+    }
+
+    setErrors(errs);
+    return Object.keys(errs).length === 0;
   };
 
-  // ✅ For checkbox
-  const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData((prev) => ({ ...prev, sendInvite: e.target.checked }));
-  };
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!validate() || !businessId) return;
 
-  const validateForm = (): boolean => {
-    const e: Record<string, string> = {};
-
-    if (!formData.firstName.trim()) e.firstName = "First name is required";
-    if (!formData.lastName.trim()) e.lastName = "Last name is required";
-    if (!formData.email.trim()) e.email = "Email is required";
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email))
-      e.email = "Invalid email format";
-    if (!formData.phone.trim()) e.phone = "Phone is required";
-    else if (formData.phone.length < 10 || formData.phone.length > 15)
-      e.phone = "Please enter a valid phone number";
-    if (!formData.roles.length) e.roles = "Please select a role";
-
-    setErrors(e);
-    return Object.keys(e).length === 0;
-  };
-
-  const handleSubmit = async () => {
-    if (!validateForm()) return;
     try {
       setLoading(true);
-      setError("");
+      setError('');
 
-      console.log("📤 Staff payload:", JSON.stringify(formData, null, 2));
-      const result = await createStaff(businessId, formData);
-      console.log("✅ Staff created:", result);
+      const payload: CreateStaffDto = {
+        userName: formData.userName?.trim() || `${formData.firstName.toLowerCase()}.${formData.lastName.toLowerCase()}`,
+        firstName: formData.firstName.trim(),
+        lastName: formData.lastName.trim(),
+        email: formData.email.trim().toLowerCase(),
+        phone: formData.phone.trim(),
+        department: formData.department?.trim() || undefined,
+        roles: formData.roles,
+        sendInvite: formData.sendInvite,
+      };
 
-      alert(`Staff member "${formData.firstName} ${formData.lastName}" added successfully!`);
+      await createStaff(businessId, payload);
+      setFormData(DEFAULT_FORM);
       onSuccess();
-      handleClose();
+      onClose();
     } catch (err: unknown) {
-      console.error("❌ Create staff error:", err);
-      if (err instanceof Error) {
-        if (err.message.includes("E11000") || err.message.includes("duplicate key")) {
-          if (err.message.includes("phone"))
-            setError("A staff member with this phone number already exists");
-          else if (err.message.includes("email"))
-            setError("A staff member with this email already exists");
-          else setError("This staff member already exists");
-        } else {
-          setError(err.message);
-        }
-      } else {
-        setError("Failed to create staff member");
-      }
+      console.error('Create staff error:', err);
+      setError(
+        err instanceof Error ? err.message : 'Failed to add staff member. Please try again.'
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  const handleClose = () => {
-    setFormData(DEFAULT_FORM);
-    setErrors({});
-    setError("");
-    onClose();
-  };
-
-  // ✅ Reusable static label style
-  const staticLabelSx = {
-    "& .MuiInputLabel-root": {
-      position: "static",
-      transform: "none",
-      fontSize: "0.875rem",
-      fontWeight: 500,
-      color: "text.primary",
-      mb: 0.5,
-    },
-    "& .MuiInputLabel-asterisk": { color: "error.main" },
-    "& .MuiInputBase-root": { mt: 0 },
-  };
-
   return (
-    <Dialog
+    <Drawer
       open={open}
-      onClose={handleClose}
-      maxWidth="sm"
-      fullWidth
-      PaperProps={{ sx: { borderRadius: 2 } }}
+      onClose={() => !loading && onClose()}
+      eyebrow="Team Management"
+      title="Add Staff Member"
+      icon={<UserPlus className="h-5 w-5 text-white" />}
+      width="md"
+      submitLabel={loading ? 'Adding Member...' : 'Add Staff Member'}
+      submitting={loading}
+      onSubmit={() => {
+        const formEl = document.getElementById('add-staff-form') as HTMLFormElement;
+        if (formEl) formEl.requestSubmit();
+      }}
+      onCancel={() => !loading && onClose()}
+      cancelLabel="Cancel"
     >
-      <DialogTitle
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          py: 2,
-        }}
-      >
-        Add Staff Member
-        <IconButton onClick={handleClose} size="small">
-          <CloseIcon />
-        </IconButton>
-      </DialogTitle>
-
-      <DialogContent dividers>
+      <form id="add-staff-form" onSubmit={handleSubmit} className="space-y-4 p-6">
         {error && (
-          <Alert severity="error" onClose={() => setError("")} sx={{ mb: 2 }}>
-            {error}
-          </Alert>
+          <div className="flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50 p-3.5 text-xs text-red-800 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-300">
+            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+            <span>{error}</span>
+          </div>
         )}
 
-        <Grid container spacing={2} sx={{ pt: 1 }}>
-
-          {/* First Name + Last Name — side by side */}
-          <Grid size={{ xs: 12, sm: 6 }}>
-            <TextField
-              label="First Name"
-              fullWidth
+        {/* First & Last Name */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-bold text-[var(--heading)] mb-1">
+              First Name <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
               required
-              size="small"
               value={formData.firstName}
-              onChange={handleChange("firstName")}
-              error={!!errors.firstName}
-              helperText={errors.firstName}
-              placeholder="e.g., Bhavani"
-              InputLabelProps={{ shrink: true }}
-              sx={staticLabelSx}
+              onChange={(e) => handleChange('firstName', e.target.value)}
+              placeholder="e.g. Rahul"
+              className={`h-10 w-full rounded-xl border bg-[var(--bg)] px-3 text-xs text-[var(--text-primary)] outline-none focus:ring-2 focus:ring-[var(--primary)]/10 ${
+                errors.firstName
+                  ? 'border-red-500 focus:border-red-500'
+                  : 'border-[var(--border)] focus:border-[var(--primary)]'
+              }`}
             />
-          </Grid>
+            {errors.firstName && (
+              <p className="mt-1 text-[11px] text-red-500">{errors.firstName}</p>
+            )}
+          </div>
 
-          <Grid size={{ xs: 12, sm: 6 }}>
-            <TextField
-              label="Last Name"
-              fullWidth
+          <div>
+            <label className="block text-xs font-bold text-[var(--heading)] mb-1">
+              Last Name <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
               required
-              size="small"
               value={formData.lastName}
-              onChange={handleChange("lastName")}
-              error={!!errors.lastName}
-              helperText={errors.lastName}
-              placeholder="e.g., Sharma"
-              InputLabelProps={{ shrink: true }}
-              sx={staticLabelSx}
+              onChange={(e) => handleChange('lastName', e.target.value)}
+              placeholder="e.g. Sharma"
+              className={`h-10 w-full rounded-xl border bg-[var(--bg)] px-3 text-xs text-[var(--text-primary)] outline-none focus:ring-2 focus:ring-[var(--primary)]/10 ${
+                errors.lastName
+                  ? 'border-red-500 focus:border-red-500'
+                  : 'border-[var(--border)] focus:border-[var(--primary)]'
+              }`}
             />
-          </Grid>
+            {errors.lastName && (
+              <p className="mt-1 text-[11px] text-red-500">{errors.lastName}</p>
+            )}
+          </div>
+        </div>
 
-          {/* Phone */}
-          <Grid size={{ xs: 12 }}>
-            <PhoneInputField
-              value={formData.phone}
-              onChange={handlePhoneChange}
-              label="Phone"
-              required
-              error={!!errors.phone}
-              helperText={errors.phone}
-              defaultCountry="in"
+        {/* Username */}
+        <div>
+          <label className="block text-xs font-bold text-[var(--heading)] mb-1">
+            Username / Handle (Optional)
+          </label>
+          <input
+            type="text"
+            value={formData.userName || ''}
+            onChange={(e) => handleChange('userName', e.target.value)}
+            placeholder="e.g. rahul.sharma"
+            className="h-10 w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/10"
+          />
+        </div>
+
+        {/* Email */}
+        <div>
+          <label className="block text-xs font-bold text-[var(--heading)] mb-1">
+            Email Address <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="email"
+            required
+            value={formData.email}
+            onChange={(e) => handleChange('email', e.target.value)}
+            placeholder="rahul@example.com"
+            className={`h-10 w-full rounded-xl border bg-[var(--bg)] px-3 text-xs text-[var(--text-primary)] outline-none focus:ring-2 focus:ring-[var(--primary)]/10 ${
+              errors.email
+                ? 'border-red-500 focus:border-red-500'
+                : 'border-[var(--border)] focus:border-[var(--primary)]'
+            }`}
+          />
+          {errors.email && (
+            <p className="mt-1 text-[11px] text-red-500">{errors.email}</p>
+          )}
+        </div>
+
+        {/* Phone */}
+        <div>
+          <label className="block text-xs font-bold text-[var(--heading)] mb-1">
+            Mobile Number (for WhatsApp & SMS) <span className="text-red-500">*</span>
+          </label>
+          <PhoneInputField
+            value={formData.phone}
+            onChange={(phone) => handleChange('phone', phone)}
+            error={Boolean(errors.phone)}
+            helperText={errors.phone}
+          />
+        </div>
+
+        {/* Role Selection */}
+        <div>
+          <label className="block text-xs font-bold text-[var(--heading)] mb-1">
+            Assigned Role <span className="text-red-500">*</span>
+          </label>
+          <select
+            value={formData.roles[0] || 'Accountant'}
+            onChange={(e) => handleChange('roles', [e.target.value])}
+            className="h-10 w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--primary)]"
+          >
+            {ROLES.map((r) => (
+              <option key={r.value} value={r.value}>
+                {r.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Department */}
+        <div>
+          <label className="block text-xs font-bold text-[var(--heading)] mb-1">
+            Practice Department
+          </label>
+          <select
+            value={formData.department || ''}
+            onChange={(e) => handleChange('department', e.target.value)}
+            className="h-10 w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--primary)]"
+          >
+            <option value="">Select practice department (optional)</option>
+            {DEPARTMENTS.map((dept) => (
+              <option key={dept} value={dept}>
+                {dept}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Send Invitation Checkbox */}
+        <div className="pt-2">
+          <label className="flex items-start gap-2.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={formData.sendInvite}
+              onChange={(e) => handleChange('sendInvite', e.target.checked)}
+              className="checkbox checkbox-sm checkbox-primary mt-0.5 rounded"
             />
-          </Grid>
-
-          {/* Email */}
-          <Grid size={{ xs: 12 }}>
-            <TextField
-              label="Email"
-              fullWidth
-              required
-              type="email"
-              size="small"
-              value={formData.email}
-              onChange={handleChange("email")}
-              error={!!errors.email}
-              helperText={errors.email}
-              placeholder="bhavani@example.com"
-              InputLabelProps={{ shrink: true }}
-              sx={staticLabelSx}
-            />
-          </Grid>
-
-          {/* Department */}
-          <Grid size={{ xs: 12 }}>
-            <TextField
-              label="Department"
-              fullWidth
-              size="small"
-              value={formData.department}
-              onChange={handleChange("department")}
-              error={!!errors.department}
-              helperText={errors.department}
-              placeholder="e.g., Finance"
-              InputLabelProps={{ shrink: true }}
-              sx={staticLabelSx}
-            />
-          </Grid>
-
-          {/* Role Dropdown */}
-          <Grid size={{ xs: 12 }}>
-            <TextField
-              label="Role"
-              fullWidth
-              required
-              select
-              size="small"
-              value={formData.roles[0] ?? ""}
-              onChange={handleRoleChange}
-              error={!!errors.roles}
-              helperText={errors.roles}
-              InputLabelProps={{ shrink: true }}
-              sx={staticLabelSx}
-            >
-              {ROLES.map((role) => (
-                <MenuItem key={role} value={role}>
-                  {role}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Grid>
-
-          {/* Send Invite */}
-          <Grid size={{ xs: 12 }}>
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={formData.sendInvite}
-                  onChange={handleCheckboxChange}
-                />
-              }
-              label="Send invitation email to this staff member"
-            />
-          </Grid>
-
-        </Grid>
-      </DialogContent>
-
-      <DialogActions sx={{ p: 2, gap: 1 }}>
-        <Button variant="outlined" onClick={handleClose} disabled={loading}>
-          Cancel
-        </Button>
-        <Button
-          variant="contained"
-          onClick={handleSubmit}
-          disabled={loading}
-          startIcon={
-            loading ? <CircularProgress size={18} color="inherit" /> : null
-          }
-        >
-          {loading ? "Adding…" : "Add Staff Member"}
-        </Button>
-      </DialogActions>
-    </Dialog>
+            <div className="text-xs">
+              <span className="font-bold text-[var(--heading)]">Send login invitation</span>
+              <p className="text-[11px] text-[var(--text-secondary)]">
+                Email setup instructions and temporary login access to this staff member.
+              </p>
+            </div>
+          </label>
+        </div>
+      </form>
+    </Drawer>
   );
 }

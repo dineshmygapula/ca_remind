@@ -1,27 +1,26 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
-  Bell,
-  Calendar,
-  Clock,
-  Send,
   Loader2,
   AlertCircle,
-  Building2,
-  Layers,
-  MessageSquare,
   Mail,
   Smartphone,
-  Eye,
-  CheckCircle2,
-  Check,
-  X,
   Pencil,
   Plus,
   ChevronDown,
+  Eye,
+  Building2,
+  Check,
+  X,
+  Clock,
+  Calendar,
 } from 'lucide-react';
 import Drawer from '@/components/common/Drawer';
+import DrawerSection from '@/components/common/DrawerSection';
+import WhatsAppIcon from '@/components/common/WhatsAppIcon';
+import SearchableSelect from '@/components/common/SearchableSelect';
+import { useAsyncAction } from '@/hooks/useAnyAction';
 import {
   CreateReminderPayload,
   CreateReminderFormState,
@@ -46,8 +45,6 @@ import { TaskListItem, CreateTaskDto } from '@/types/task.types';
 import { V2ReminderDefinition } from '@/types/v2ReminderDefinition.types';
 import { MessageTemplateListItem } from '@/types/messageTemplate.types';
 import { replaceTemplatePlaceholders } from '@/utils/templatePlaceholders';
-import { useToast } from '@/context/ToastContext';
-import SearchableSelect from '@/components/common/SearchableSelect';
 
 interface ReminderFormDrawerProps {
   open: boolean;
@@ -58,15 +55,11 @@ interface ReminderFormDrawerProps {
   onSuccess: () => void;
 }
 
-const CHANNELS: {
-  value: ReminderChannel;
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-}[] = [
-  { value: 'WHATSAPP', label: 'WhatsApp', icon: MessageSquare },
-  { value: 'EMAIL', label: 'Email', icon: Mail },
-  { value: 'SMS', label: 'SMS', icon: Smartphone },
-];
+export interface ExtendedReminderFormState extends CreateReminderFormState {
+  dueDate?: string;
+  category?: string;
+  selectedTaskId?: string;
+}
 
 const STATUS_OPTIONS: { value: ReminderStatus; label: string }[] = [
   { value: 'SCHEDULED', label: 'Scheduled' },
@@ -93,20 +86,15 @@ export default function ReminderFormDrawer({
   organizationId,
   onSuccess,
 }: ReminderFormDrawerProps) {
-  const toast = useToast();
   const isEditMode = Boolean(reminderId);
 
   // ── Form State ──────────────────────────────────────────────────────────────
-  const [form, setForm] = useState<CreateReminderFormState>(DEFAULT_REMINDER_FORM);
+  const [form, setForm] = useState<ExtendedReminderFormState>(DEFAULT_REMINDER_FORM);
   const [editStatus, setEditStatus] = useState<ReminderStatus>('SCHEDULED');
   const [editScheduledAt, setEditScheduledAt] = useState('');
   const [editReminderTaskTitle, setEditReminderTaskTitle] = useState('');
 
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-  const [loadingInitial, setLoadingInitial] = useState(false);
-
-  // ── Master Data for Create Mode ─────────────────────────────────────────────
+  // ── Master Data Cache (prevent reloading & blinking) ───────────────────────
   const [clients, setClients] = useState<SubjectListItem[]>([]);
   const [taskDefinitions, setTaskDefinitions] = useState<TaskDefinitionListItem[]>([]);
   const [tasks, setTasks] = useState<TaskListItem[]>([]);
@@ -114,13 +102,20 @@ export default function ReminderFormDrawer({
   const [messageTemplates, setMessageTemplates] = useState<MessageTemplateListItem[]>([]);
   const [businessName, setBusinessName] = useState('');
   const [businessPhone, setBusinessPhone] = useState('');
+  const [loadingInitial, setLoadingInitial] = useState(false);
+  const [localError, setLocalError] = useState('');
 
-  // ── Load Data ───────────────────────────────────────────────────────────────
+  const masterDataLoadedRef = useRef(false);
+
+  // ── Async Actions Hook (useAsyncAction for submit loading & toasts) ─────────
+  const saveAction = useAsyncAction();
+
+  // ── Load Master Data (Only once or when businessId changes) ─────────────────
   const fetchMasterData = useCallback(async () => {
     if (!businessId) return;
     try {
       setLoadingInitial(true);
-      setError('');
+      setLocalError('');
 
       const [
         clientsRes,
@@ -151,19 +146,21 @@ export default function ReminderFormDrawer({
         setBusinessName(currentBiz.name || '');
         setBusinessPhone(currentBiz.phone || '');
       }
+
+      masterDataLoadedRef.current = true;
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to load form dependencies.');
+      setLocalError(err instanceof Error ? err.message : 'Failed to load form dependencies.');
     } finally {
       setLoadingInitial(false);
     }
   }, [businessId, organizationId]);
 
-  // Load single reminder when editing
+  // ── Load Single Reminder (Edit Mode) ────────────────────────────────────────
   const fetchSingleReminder = useCallback(async () => {
     if (!reminderId || !businessId) return;
     try {
       setLoadingInitial(true);
-      setError('');
+      setLocalError('');
       const rem = await getReminderById(businessId, reminderId);
       setEditStatus(rem.status);
       setEditReminderTaskTitle(rem.task?.title || 'Reminder Details');
@@ -178,27 +175,35 @@ export default function ReminderFormDrawer({
         setEditScheduledAt('');
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to load reminder.');
+      setLocalError(err instanceof Error ? err.message : 'Failed to load reminder.');
     } finally {
       setLoadingInitial(false);
     }
   }, [reminderId, businessId]);
 
+  // ── Open / Reset Trigger (Stable, no loops) ─────────────────────────────────
   useEffect(() => {
     if (open) {
+      setLocalError('');
       if (isEditMode) {
         fetchSingleReminder();
       } else {
-        setForm(DEFAULT_REMINDER_FORM);
-        fetchMasterData();
+        // Reset form for new reminder
+        setForm({
+          ...DEFAULT_REMINDER_FORM,
+          channel: 'WHATSAPP',
+        });
+        if (!masterDataLoadedRef.current) {
+          fetchMasterData();
+        }
       }
     } else {
-      setError('');
-      setSaving(false);
+      setLocalError('');
+      saveAction.reset();
     }
-  }, [open, isEditMode, fetchSingleReminder, fetchMasterData]);
+  }, [open, isEditMode, reminderId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Client selection logic ──────────────────────────────────────────────────
+  // ── Client Selection ────────────────────────────────────────────────────────
   const selectedClient = useMemo(
     () => clients.find((c) => c.id === form.targetUserId) || null,
     [clients, form.targetUserId]
@@ -216,7 +221,7 @@ export default function ReminderFormDrawer({
     }));
   };
 
-  // ── Task Definition selection logic ─────────────────────────────────────────
+  // ── Task Definition Selection & Synchronous Cascade ─────────────────────────
   const selectedTaskDef = useMemo(
     () => taskDefinitions.find((td) => td.id === form.selectedTaskDefinitionId) || null,
     [taskDefinitions, form.selectedTaskDefinitionId]
@@ -228,7 +233,7 @@ export default function ReminderFormDrawer({
 
     let autoTaskName = matchedDef.name;
     if (selectedClient) {
-      autoTaskName = `${selectedClient.displayName} - ${matchedDef.name}`;
+      autoTaskName = `${selectedClient.displayName || selectedClient.businessName} - ${matchedDef.name}`;
     }
 
     let nextDueDate = '';
@@ -240,63 +245,80 @@ export default function ReminderFormDrawer({
       nextDueDate = today.toISOString().slice(0, 10);
     }
 
+    // Match reminder definition if available
+    const matchedReminderDef = reminderDefinitions.find(
+      (rd) => rd.taskDefinitionId === taskDefinitionId
+    );
+
+    // Auto-match message template synchronously
+    const matchedTemplate = messageTemplates.find(
+      (t) =>
+        t.name?.toLowerCase().includes(matchedDef.taskType?.toLowerCase() || '') ||
+        t.name?.toLowerCase().includes(matchedDef.name?.toLowerCase() || '')
+    );
+
     setForm((prev) => ({
       ...prev,
       selectedTaskDefinitionId: taskDefinitionId,
       taskName: autoTaskName,
       dueDate: nextDueDate,
+      channel: (matchedReminderDef?.channel as ReminderChannel) || prev.channel || 'WHATSAPP',
+      reminderDefinitionId: matchedReminderDef?.id || prev.reminderDefinitionId,
+      messageTemplateId: matchedTemplate?.id || prev.messageTemplateId,
       category: (matchedDef as any).category || 'COMPLIANCE',
     }));
   };
 
-  // Template Auto-matching
-  useEffect(() => {
-    if (!form.selectedTaskDefinitionId || messageTemplates.length === 0) return;
-    const def = taskDefinitions.find((td) => td.id === form.selectedTaskDefinitionId);
-    if (!def) return;
-
-    const matchedTemplate = messageTemplates.find(
-      (t) =>
-        t.name?.toLowerCase().includes(def.taskType?.toLowerCase() || '') ||
-        t.name?.toLowerCase().includes(def.name?.toLowerCase() || '')
-    );
-
-    if (matchedTemplate && !form.messageTemplateId) {
-      setForm((prev) => ({ ...prev, messageTemplateId: matchedTemplate.id }));
-    }
-  }, [form.selectedTaskDefinitionId, messageTemplates, taskDefinitions, form.messageTemplateId]);
-
-  // Live message preview calculation
+  // ── Live Message Preview Calculation ────────────────────────────────────────
   const selectedTemplate = useMemo(
     () => messageTemplates.find((t) => t.id === form.messageTemplateId) || null,
     [messageTemplates, form.messageTemplateId]
   );
 
-  const previewBody = useMemo(() => {
-    if (!selectedTemplate) return '';
+  const previewContent = useMemo(() => {
+    if (!selectedTemplate) return null;
+
+    const isEmail = form.channel === 'EMAIL';
+    const isWhatsapp = form.channel === 'WHATSAPP';
+    const isSms = form.channel === 'SMS';
+
+    const rawSubject = selectedTemplate.templates?.email?.subject || '';
     const rawBody =
+      (isEmail ? selectedTemplate.templates?.email?.body : null) ||
+      (isWhatsapp ? selectedTemplate.templates?.whatsapp?.body : null) ||
+      (isSms ? selectedTemplate.templates?.sms?.body : null) ||
       selectedTemplate.templates?.email?.body ||
       selectedTemplate.templates?.whatsapp?.body ||
-      selectedTemplate.templates?.sms?.body ||
       (selectedTemplate as any).body ||
       '';
 
-    if (!rawBody) return '';
-
     const placeholderValues: Record<string, string> = {
-      CLIENTNAME: selectedClient?.displayName || 'Client',
+      CLIENTNAME: selectedClient?.displayName || selectedClient?.businessName || 'Client',
       BUSINESSNAME: selectedClient?.businessName || '',
       DUEDATE: form.scheduledAt
         ? new Date(form.scheduledAt).toLocaleDateString('en-IN')
-        : 'Due Date',
+        : form.dueDate || 'Due Date',
       SERVICETYPE: selectedTaskDef?.name || 'Compliance',
       YOURFIRMNAME: businessName || 'Our Firm',
       YOURCONTACTNUMBER: businessPhone || '',
     };
-    return replaceTemplatePlaceholders(rawBody, placeholderValues);
-  }, [selectedTemplate, selectedClient, selectedTaskDef, form.scheduledAt, businessName, businessPhone]);
 
-  // ── Validation & Submission ─────────────────────────────────────────────────
+    return {
+      subject: rawSubject ? replaceTemplatePlaceholders(rawSubject, placeholderValues) : '',
+      body: rawBody ? replaceTemplatePlaceholders(rawBody, placeholderValues) : '',
+    };
+  }, [
+    selectedTemplate,
+    form.channel,
+    selectedClient,
+    selectedTaskDef,
+    form.scheduledAt,
+    form.dueDate,
+    businessName,
+    businessPhone,
+  ]);
+
+  // ── Validation ──────────────────────────────────────────────────────────────
   const validateCreate = (): string | null => {
     if (!form.targetUserId) return 'Please select a client.';
     if (!form.selectedTaskDefinitionId) return 'Please select a task definition.';
@@ -307,400 +329,432 @@ export default function ReminderFormDrawer({
     return null;
   };
 
+  // ── Submit with useAsyncAction (handles loading & toasts) ────────────────────
   const handleSubmit = async () => {
-    try {
-      setSaving(true);
-      setError('');
+    await saveAction.run(
+      async () => {
+        if (isEditMode) {
+          if (!reminderId) return;
+          await updateReminder(businessId, reminderId, {
+            status: editStatus,
+            scheduledAt: editScheduledAt ? new Date(editScheduledAt).toISOString() : undefined,
+          });
+        } else {
+          const valErr = validateCreate();
+          if (valErr) {
+            throw new Error(valErr);
+          }
 
-      if (isEditMode) {
-        if (!reminderId) return;
-        await updateReminder(businessId, reminderId, {
-          status: editStatus,
-          scheduledAt: editScheduledAt ? new Date(editScheduledAt).toISOString() : undefined,
-        });
-        toast.success('Reminder updated successfully');
-        onSuccess();
-        onClose();
-      } else {
-        const valErr = validateCreate();
-        if (valErr) {
-          setError(valErr);
-          setSaving(false);
-          return;
-        }
+          let resolvedTaskId = form.selectedTaskId || form.taskId;
+          if (!resolvedTaskId && form.selectedTaskDefinitionId) {
+            const newTaskDto: CreateTaskDto = {
+              subjectId: form.targetUserId,
+              taskDefinitionId: form.selectedTaskDefinitionId,
+              title: form.taskName.trim(),
+              taskName: form.taskName.trim(),
+              dueDate: form.dueDate || new Date().toISOString().slice(0, 10),
+              category: form.category || 'COMPLIANCE',
+              priority: 'MEDIUM',
+            };
+            const createdTask = await createTask(businessId, newTaskDto);
+            resolvedTaskId = createdTask.id;
+          }
 
-        let resolvedTaskId = (form as any).selectedTaskId || form.taskId;
-        if (!resolvedTaskId && form.selectedTaskDefinitionId) {
-          const newTaskDto: CreateTaskDto = {
-            subjectId: form.targetUserId,
-            taskDefinitionId: form.selectedTaskDefinitionId,
-            title: form.taskName.trim(),
-            taskName: form.taskName.trim(),
-            dueDate: (form as any).dueDate || new Date().toISOString().slice(0, 10),
-            category: (form as any).category || 'COMPLIANCE',
-            priority: 'MEDIUM',
+          const payload: CreateReminderPayload = {
+            taskId: resolvedTaskId,
+            reminderDefinitionId: form.reminderDefinitionId,
+            reminderSource: form.reminderSource || 'MANUAL',
+            channel: form.channel as ReminderChannel,
+            targetUserId: form.targetUserId,
+            messageTemplateId: form.messageTemplateId,
+            sendNow: form.sendNow,
+            ...(!form.sendNow &&
+              form.scheduledAt && {
+                scheduledAt: new Date(form.scheduledAt).toISOString(),
+              }),
           };
-          const createdTask = await createTask(businessId, newTaskDto);
-          resolvedTaskId = createdTask.id;
+
+          await createReminder(businessId, payload);
         }
-
-        const payload: CreateReminderPayload = {
-          taskId: resolvedTaskId,
-          reminderDefinitionId: form.reminderDefinitionId,
-          reminderSource: form.reminderSource || 'MANUAL',
-          channel: form.channel as ReminderChannel,
-          targetUserId: form.targetUserId,
-          messageTemplateId: form.messageTemplateId,
-          sendNow: form.sendNow,
-          ...(!form.sendNow &&
-            form.scheduledAt && {
-              scheduledAt: new Date(form.scheduledAt).toISOString(),
-            }),
-        };
-
-        await createReminder(businessId, payload);
-        toast.success('Reminder created successfully');
-        onSuccess();
-        onClose();
+      },
+      {
+        successMessage: isEditMode
+          ? 'Reminder updated successfully'
+          : 'Reminder created successfully',
+        errorMessage: isEditMode
+          ? 'Failed to update reminder'
+          : 'Failed to create reminder',
+        showSuccessToast: true,
+        showErrorToast: true,
+        onSuccess: () => {
+          onSuccess();
+          onClose();
+        },
       }
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Operation failed. Please try again.');
-    } finally {
-      setSaving(false);
-    }
+    );
   };
+
+  // Reusable channel options
+  const channelList: {
+    id: ReminderChannel;
+    label: string;
+    icon: React.ReactNode;
+  }[] = [
+    {
+      id: 'WHATSAPP',
+      label: 'WhatsApp',
+      icon: <WhatsAppIcon className="w-5 h-5" />,
+    },
+    {
+      id: 'EMAIL',
+      label: 'Email',
+      icon: <Mail className="w-5 h-5" />,
+    },
+    {
+      id: 'SMS',
+      label: 'SMS',
+      icon: <Smartphone className="w-5 h-5" />,
+    },
+  ];
 
   return (
     <Drawer
       open={open}
       onClose={onClose}
-      title={isEditMode ? editReminderTaskTitle || 'Edit Reminder' : 'Create Reminder'}
+      title={isEditMode ? editReminderTaskTitle || 'Edit Reminder' : 'Create reminder'}
       width="lg"
+      submitVariant="gold"
+      onSubmit={handleSubmit}
+      onCancel={onClose}
+      cancelLabel="Cancel"
+      submitLabel={isEditMode ? 'Save changes' : 'Create reminder'}
+      submitting={saveAction.loading}
       customHeader={
-        <div className="bg-[#0B1528] px-6 py-5 flex items-center justify-between text-white shrink-0">
+        <div className="bg-[#0F1E36] px-6 py-5 flex items-center justify-between text-white shrink-0 border-b border-white/10 select-none">
           <div className="flex items-center gap-3.5 min-w-0">
-            <div className="w-10 h-10 rounded-xl bg-[#F59E0B] flex items-center justify-center text-slate-900 shadow-sm shrink-0">
+            <div className="w-10 h-10 rounded-2xl bg-[#F59E0B] flex items-center justify-center text-slate-950 font-bold shadow-sm shrink-0">
               {isEditMode ? (
-                <Pencil className="h-5 w-5 text-slate-900" />
+                <Pencil className="h-5 w-5 text-slate-950 stroke-[2.5]" />
               ) : (
-                <Plus className="h-5 w-5 text-slate-900" />
+                <Plus className="h-5 w-5 text-slate-950 stroke-[2.5]" />
               )}
             </div>
             <div className="min-w-0">
-              <p className="text-xs font-semibold text-[#F59E0B] uppercase tracking-wider mb-0.5">
-                {isEditMode ? 'Update Reminder' : 'New Reminder'}
+              <p className="text-xs font-bold text-[#F59E0B] uppercase tracking-wider mb-0.5">
+                {isEditMode ? 'Update reminder' : 'New reminder'}
               </p>
-              <h2 className="text-lg font-bold leading-tight text-white truncate">
-                {isEditMode
-                  ? editReminderTaskTitle || 'Edit Reminder'
-                  : 'Create Reminder'}
+              <h2 className="text-lg font-extrabold leading-tight text-white tracking-tight truncate">
+                {isEditMode ? editReminderTaskTitle || 'Edit Reminder' : 'Create reminder'}
               </h2>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            disabled={saving}
-            className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
+            disabled={saveAction.loading}
+            aria-label="Close"
+            className="rounded-xl bg-white/10 hover:bg-white/20 p-2 text-white/80 hover:text-white transition-colors cursor-pointer"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
       }
-      footer={
-        <div className="flex items-center justify-end gap-3 w-full">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={saving}
-            className="rounded-xl border border-divider py-2.5 px-6 text-sm font-semibold text-txt-main bg-surface transition-colors hover:bg-bg cursor-pointer disabled:opacity-50"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={saving || loadingInitial}
-            className="inline-flex items-center gap-2 rounded-xl bg-[#F59E0B] hover:bg-[#D97706] text-slate-900 py-2.5 px-6 text-sm font-semibold shadow-xs transition-colors cursor-pointer disabled:opacity-60"
-          >
-            {saving ? (
-              <Loader2 className="h-4 w-4 animate-spin text-slate-900" />
-            ) : (
-              <Check className="h-4 w-4 text-slate-900" />
-            )}
-            <span>{isEditMode ? 'Save changes' : 'Create reminder'}</span>
-          </button>
-        </div>
-      }
     >
-      {loadingInitial ? (
-        <div className="flex flex-col items-center justify-center py-20 text-txt-sub">
-          <Loader2 className="h-8 w-8 animate-spin text-[#F59E0B] mb-2" />
-          <span className="text-sm font-medium">Loading reminder data...</span>
-        </div>
-      ) : (
-        <div className="space-y-5 py-2">
-          {error && (
-            <div role="alert" className="alert alert-error flex items-center gap-2 text-sm rounded-xl">
-              <AlertCircle className="h-4 w-4 shrink-0" />
-              <span>{error}</span>
+      <div className="space-y-4 py-1">
+        {/* Subtle Non-blocking Loading Indicator */}
+        {loadingInitial && (
+          <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 text-xs">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            <span>Loading dependencies...</span>
+          </div>
+        )}
+
+        {/* Error Banner */}
+        {(localError || saveAction.error) && (
+          <div className="flex items-start gap-2.5 p-4 rounded-2xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-xs">
+            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+            <div>
+              <span className="font-bold">Error: </span>
+              <span>{localError || saveAction.error}</span>
             </div>
-          )}
+          </div>
+        )}
 
-          {isEditMode ? (
-            /* ──────────────── EDIT MODE ──────────────── */
-            <div className="rounded-2xl border border-divider bg-surface p-6 space-y-4 shadow-xs">
-              <div className="flex items-center gap-2.5 mb-2">
-                <span className="w-6 h-6 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 text-xs font-bold flex items-center justify-center">
-                  1
-                </span>
-                <h3 className="text-base font-bold text-txt-main">
-                  Reminder Configuration
-                </h3>
-              </div>
-
-              {/* Status select */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-txt-main">Status</label>
-                <div className="relative">
-                  <select
-                    value={editStatus}
-                    onChange={(e) => setEditStatus(e.target.value as ReminderStatus)}
-                    className={`${SELECT} pr-8`}
-                  >
-                    {STATUS_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value} className="bg-surface">
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-txt-sub" />
-                </div>
-              </div>
-
-              {/* Scheduled At datetime */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-txt-main">
-                  Scheduled Date &amp; Time
-                </label>
-                <input
-                  type="datetime-local"
-                  value={editScheduledAt}
-                  onChange={(e) => setEditScheduledAt(e.target.value)}
-                  className={INPUT}
-                />
-                <p className="text-[11px] text-txt-sub">
-                  Adjust when this reminder is queued to dispatch.
-                </p>
-              </div>
-            </div>
-          ) : (
-            /* ──────────────── CREATE MODE ──────────────── */
-            <div className="space-y-5">
-              {/* Step 1: Client Selection */}
-              <div className="rounded-2xl border border-divider bg-surface p-6 space-y-4 shadow-xs">
-                <div className="flex items-center gap-2.5 mb-2">
-                  <span className="w-6 h-6 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 text-xs font-bold flex items-center justify-center">
-                    1
-                  </span>
-                  <h3 className="text-base font-bold text-txt-main">Select Client *</h3>
+        {isEditMode ? (
+          /* ──────────────── EDIT MODE ──────────────── */
+          <div className="space-y-4">
+            <DrawerSection step={1} title="Reminder Configuration" required>
+              <div className="space-y-3.5">
+                <div>
+                  <label className="block text-xs font-bold text-txt-main mb-1.5">
+                    Status
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={editStatus}
+                      onChange={(e) => setEditStatus(e.target.value as ReminderStatus)}
+                      className={`${SELECT} pr-9`}
+                    >
+                      {STATUS_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value} className="bg-surface">
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-txt-sub" />
+                  </div>
                 </div>
 
+                <div>
+                  <label className="block text-xs font-bold text-txt-main mb-1.5">
+                    Scheduled Date &amp; Time
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={editScheduledAt}
+                    onChange={(e) => setEditScheduledAt(e.target.value)}
+                    className={INPUT}
+                  />
+                  <p className="text-[11px] text-txt-sub mt-1">
+                    Adjust when this reminder is queued to dispatch.
+                  </p>
+                </div>
+              </div>
+            </DrawerSection>
+          </div>
+        ) : (
+          /* ──────────────── CREATE MODE ──────────────── */
+          <div className="space-y-4">
+            {/* Step 1: Client Selection */}
+            <DrawerSection step={1} title="Client" required>
+              <div className="space-y-2">
                 <SearchableSelect<SubjectListItem>
                   options={clients}
                   value={selectedClient}
                   onChange={handleClientChange}
-                  getOptionLabel={(c) =>
-                    `${c.displayName} ${c.businessName ? `(${c.businessName})` : ''}`
-                  }
+                  getOptionLabel={(c) => c.displayName || c.businessName || 'Unnamed'}
                   getOptionKey={(c) => c.id}
-                  placeholder="Search and select client..."
+                  placeholder="Search and select client"
                   emptyMessage="No active clients found"
-                />
-              </div>
-
-              {/* Step 2: Task Details */}
-              <div className="rounded-2xl border border-divider bg-surface p-6 space-y-4 shadow-xs">
-                <div className="flex items-center gap-2.5 mb-2">
-                  <span className="w-6 h-6 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 text-xs font-bold flex items-center justify-center">
-                    2
-                  </span>
-                  <h3 className="text-base font-bold text-txt-main">
-                    Task &amp; Compliance *
-                  </h3>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-semibold text-txt-main">
-                      Task Definition *
-                    </label>
-                    <div className="relative">
-                      <select
-                        value={form.selectedTaskDefinitionId}
-                        onChange={(e) => handleTaskTypeChange(e.target.value)}
-                        disabled={!form.targetUserId}
-                        className={`${SELECT} pr-8 disabled:opacity-50`}
-                      >
-                        <option value="">Select task definition...</option>
-                        {taskDefinitions.map((td) => (
-                          <option key={td.id} value={td.id} className="bg-surface">
-                            {td.name} ({td.taskType})
-                          </option>
-                        ))}
-                      </select>
-                      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-txt-sub" />
+                  renderOption={(c) => (
+                    <div className="flex flex-col py-0.5">
+                      <span className="font-semibold text-txt-main text-sm">
+                        {c.displayName || c.businessName}
+                      </span>
+                      {c.email && (
+                        <span className="text-xs text-txt-sub">{c.email}</span>
+                      )}
                     </div>
-                  </div>
+                  )}
+                />
 
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-semibold text-txt-main">
-                      Task Name *
-                    </label>
-                    <input
-                      type="text"
-                      value={form.taskName}
-                      onChange={(e) =>
-                        setForm((p) => ({ ...p, taskName: e.target.value }))
-                      }
-                      disabled={!form.selectedTaskDefinitionId}
-                      placeholder="e.g. GST Filing for October"
-                      className={`${INPUT} disabled:opacity-50`}
-                    />
+                {selectedClient && (
+                  <div className="flex items-center justify-between px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-divider text-xs">
+                    <div className="flex items-center gap-2 text-txt-sub">
+                      <Building2 className="w-3.5 h-3.5 text-amber-500" />
+                      <span>
+                        Selected:{' '}
+                        <strong className="text-txt-main">
+                          {selectedClient.displayName || selectedClient.businessName}
+                        </strong>
+                      </span>
+                    </div>
+                    <span className="font-mono text-[11px] text-txt-sub">
+                      {selectedClient.phone || selectedClient.email || ''}
+                    </span>
                   </div>
+                )}
+              </div>
+            </DrawerSection>
+
+            {/* Step 2: Task Details */}
+            <DrawerSection step={2} title="Task and compliance" required>
+              <div className="space-y-3.5">
+                <div>
+                  <label className="block text-xs font-bold text-txt-main mb-1.5">
+                    Task definition <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={form.selectedTaskDefinitionId}
+                      onChange={(e) => handleTaskTypeChange(e.target.value)}
+                      disabled={!form.targetUserId}
+                      className={`${SELECT} pr-9 disabled:opacity-50`}
+                    >
+                      <option value="" disabled>
+                        {!form.targetUserId
+                          ? 'Select a client first'
+                          : 'Select task definition'}
+                      </option>
+                      {taskDefinitions.map((td) => (
+                        <option key={td.id} value={td.id} className="bg-surface">
+                          {td.name} ({td.taskType})
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-txt-sub" />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-txt-main mb-1.5">
+                    Task name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={form.taskName}
+                    onChange={(e) =>
+                      setForm((p) => ({ ...p, taskName: e.target.value }))
+                    }
+                    disabled={!form.selectedTaskDefinitionId}
+                    placeholder="e.g. GST filing for October"
+                    className={`${INPUT} disabled:opacity-50`}
+                  />
                 </div>
               </div>
+            </DrawerSection>
 
-              {/* Step 3: Channel Selection */}
-              <div className="rounded-2xl border border-divider bg-surface p-6 space-y-4 shadow-xs">
-                <div className="flex items-center gap-2.5 mb-2">
-                  <span className="w-6 h-6 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 text-xs font-bold flex items-center justify-center">
-                    3
-                  </span>
-                  <h3 className="text-base font-bold text-txt-main">
-                    Delivery Channel *
-                  </h3>
-                </div>
-
-                <div className="grid grid-cols-3 gap-3">
-                  {CHANNELS.map((ch) => {
-                    const Icon = ch.icon;
-                    const isSelected = form.channel === ch.value;
-                    return (
-                      <button
-                        type="button"
-                        key={ch.value}
-                        onClick={() => setForm((p) => ({ ...p, channel: ch.value }))}
-                        className={`flex items-center justify-center gap-2 py-3 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
-                          isSelected
-                            ? 'bg-[#0F1E36] dark:bg-navy text-white border-transparent shadow-xs'
-                            : 'border-divider bg-bg/50 text-txt-main hover:bg-bg'
+            {/* Step 3: Channel Selection */}
+            <DrawerSection
+              step={3}
+              title="Delivery channel"
+              required
+              subtitle="Pick one or more"
+            >
+              <div className="grid grid-cols-3 gap-3">
+                {channelList.map((ch) => {
+                  const isSelected = form.channel === ch.id;
+                  return (
+                    <button
+                      type="button"
+                      key={ch.id}
+                      onClick={() =>
+                        setForm((p) => ({ ...p, channel: ch.id }))
+                      }
+                      className={`flex flex-col items-center justify-center gap-2 py-4 px-3 rounded-2xl border transition-all text-center cursor-pointer ${
+                        isSelected
+                          ? 'bg-[#0F1E36] text-white border-[#0F1E36] shadow-md ring-2 ring-[#0F1E36]/20'
+                          : 'bg-surface text-txt-main border-divider hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50'
+                      }`}
+                    >
+                      <div
+                        className={`transition-transform duration-150 ${
+                          isSelected ? 'scale-110 text-white' : 'text-txt-sub'
                         }`}
                       >
-                        <Icon
-                          className={`h-4 w-4 ${
-                            isSelected ? 'text-[#F59E0B]' : 'text-txt-sub'
-                          }`}
-                        />
-                        <span>{ch.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
+                        {ch.icon}
+                      </div>
+                      <span
+                        className={`text-xs font-bold tracking-tight ${
+                          isSelected ? 'text-white' : 'text-txt-main'
+                        }`}
+                      >
+                        {ch.label}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
+            </DrawerSection>
 
-              {/* Step 4: Message Template & Preview */}
-              <div className="rounded-2xl border border-divider bg-surface p-6 space-y-4 shadow-xs">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2.5">
-                    <span className="w-6 h-6 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 text-xs font-bold flex items-center justify-center">
-                      4
-                    </span>
-                    <h3 className="text-base font-bold text-txt-main">
-                      Message Template
-                    </h3>
-                  </div>
-                  {selectedTemplate?.channels?.length ? (
-                    <span className="text-xs text-txt-sub">
-                      {selectedTemplate.channels.join(', ')}
-                    </span>
-                  ) : null}
-                </div>
-
+            {/* Step 4: Message Template & Preview */}
+            <DrawerSection step={4} title="Message template">
+              <div className="space-y-3">
                 <div className="relative">
                   <select
                     value={form.messageTemplateId}
                     onChange={(e) =>
                       setForm((p) => ({ ...p, messageTemplateId: e.target.value }))
                     }
-                    className={`${SELECT} pr-8`}
+                    className={`${SELECT} pr-9`}
                   >
-                    <option value="">Select template (or use auto-matched)...</option>
+                    <option value="">Auto-matched to the task definition</option>
                     {messageTemplates.map((t) => (
                       <option key={t.id} value={t.id} className="bg-surface">
                         {t.name}
                       </option>
                     ))}
                   </select>
-                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-txt-sub" />
+                  <ChevronDown className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-txt-sub" />
                 </div>
 
-                {previewBody && (
-                  <div className="mt-3 rounded-xl bg-bg/50 border border-divider p-4 space-y-1.5">
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-txt-main">
-                      <Eye className="h-3.5 w-3.5 text-[#F59E0B]" />
-                      <span>Live Message Preview</span>
+                {previewContent ? (
+                  <div className="rounded-xl border border-divider overflow-hidden bg-surface">
+                    <div className="flex items-center justify-between px-3.5 py-2 bg-slate-50 dark:bg-slate-800/60 border-b border-divider text-xs">
+                      <div className="flex items-center gap-1.5 font-bold text-txt-main">
+                        <Eye className="h-3.5 w-3.5 text-[#F59E0B]" />
+                        <span>Live Message Preview</span>
+                      </div>
+                      <span className="text-[11px] text-txt-sub font-medium">
+                        {form.channel}
+                      </span>
                     </div>
-                    <p className="text-xs text-txt-sub whitespace-pre-wrap leading-relaxed font-sans">
-                      {previewBody}
-                    </p>
+
+                    <div className="p-3.5 space-y-2 text-xs">
+                      {previewContent.subject && (
+                        <div className="pb-2 border-b border-divider/60">
+                          <span className="text-[10px] font-bold text-txt-sub uppercase tracking-wider block mb-0.5">
+                            Subject
+                          </span>
+                          <p className="font-semibold text-txt-main">
+                            {previewContent.subject}
+                          </p>
+                        </div>
+                      )}
+
+                      <div>
+                        <span className="text-[10px] font-bold text-txt-sub uppercase tracking-wider block mb-1">
+                          Message
+                        </span>
+                        <p className="text-txt-sub whitespace-pre-wrap leading-relaxed bg-slate-50/60 dark:bg-slate-900/40 p-3 rounded-lg border border-divider/50">
+                          {previewContent.body || 'Template loaded'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-dashed border-divider bg-slate-50/50 dark:bg-slate-900/20 p-4 text-center text-xs text-txt-sub">
+                    Select a client and task definition to automatically generate the personalized message preview.
                   </div>
                 )}
               </div>
+            </DrawerSection>
 
-              {/* Step 5: Schedule Timing */}
-              <div className="rounded-2xl border border-divider bg-surface p-6 space-y-4 shadow-xs">
-                <div className="flex items-center gap-2.5 mb-2">
-                  <span className="w-6 h-6 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 text-xs font-bold flex items-center justify-center">
-                    5
-                  </span>
-                  <h3 className="text-base font-bold text-txt-main">
-                    Dispatch Timing *
-                  </h3>
-                </div>
+            {/* Step 5: Schedule Timing */}
+            <DrawerSection step={5} title="Dispatch timing" required>
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setForm((p) => ({ ...p, sendNow: true }))}
+                    className={`h-11 rounded-xl border font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                      form.sendNow
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                        : 'bg-surface text-txt-main border-divider hover:bg-slate-50 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    <Clock className="w-4 h-4" />
+                    <span>Send Now</span>
+                  </button>
 
-                <div className="flex items-center gap-4">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="dispatchOption"
-                      checked={form.sendNow}
-                      onChange={() => setForm((p) => ({ ...p, sendNow: true }))}
-                      className="radio radio-primary radio-sm"
-                    />
-                    <span className="text-xs font-bold text-txt-main">
-                      Send Immediately
-                    </span>
-                  </label>
-
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="dispatchOption"
-                      checked={!form.sendNow}
-                      onChange={() => setForm((p) => ({ ...p, sendNow: false }))}
-                      className="radio radio-primary radio-sm"
-                    />
-                    <span className="text-xs font-bold text-txt-main">
-                      Schedule for Later
-                    </span>
-                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setForm((p) => ({ ...p, sendNow: false }))}
+                    className={`h-11 rounded-xl border font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                      !form.sendNow
+                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                        : 'bg-surface text-txt-main border-divider hover:bg-slate-50 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    <Calendar className="w-4 h-4" />
+                    <span>Schedule for later</span>
+                  </button>
                 </div>
 
                 {!form.sendNow && (
-                  <div className="mt-3 pt-3 border-t border-divider flex flex-col gap-1.5">
-                    <label className="text-xs font-semibold text-txt-main">
-                      Scheduled Date &amp; Time *
+                  <div className="pt-2">
+                    <label className="block text-xs font-bold text-txt-main mb-1.5">
+                      Scheduled Date &amp; Time <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="datetime-local"
@@ -708,15 +762,19 @@ export default function ReminderFormDrawer({
                       onChange={(e) =>
                         setForm((p) => ({ ...p, scheduledAt: e.target.value }))
                       }
+                      min={new Date().toISOString().slice(0, 16)}
                       className={INPUT}
                     />
+                    <p className="text-[11px] text-txt-sub mt-1">
+                      The reminder notification will be dispatched automatically at this time.
+                    </p>
                   </div>
                 )}
               </div>
-            </div>
-          )}
-        </div>
-      )}
+            </DrawerSection>
+          </div>
+        )}
+      </div>
     </Drawer>
   );
 }

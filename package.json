@@ -27,6 +27,7 @@
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "react-hook-form": "^7.62.0",
+    "react-hot-toast": "^2.6.1",
     "react-phone-input-2": "^2.15.1",
     "uuid": "^11.1.0",
     "zod": "^3.25.76",

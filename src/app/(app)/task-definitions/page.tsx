@@ -1,197 +1,65 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { X, Plus, AlertTriangle } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { TaskDefinitionListItem } from "@/types/taskDefinition.types";
-import {
-  getTaskDefinitions,
-  deleteTaskDefinition,
-} from "@/services/taskDefinitionService";
+import { getTaskDefinitions, deleteTaskDefinition } from "@/services/taskDefinitionService";
 import TaskDefinitionsTable from "@/components/task-definitions/TaskDefinitionsTable";
 import TaskDefinitionsFilter from "@/components/task-definitions/TaskDefinitionsFilter";
 import TaskDefinitionDetailsDrawer from "@/components/task-definitions/TaskDefinitionDetailsDrawer";
 import TaskDefinitionFormDrawer from "@/components/task-definitions/TaskDefinitionFormDrawer";
 import ConfirmDialog from "@/components/tasks/ConfirmDialog";
+import ResourcePageLayout from "@/components/common/ResourcePageLayout";
 import { useWorkspace } from "@/context/WorkspaceContext";
+import { useResourcePageState } from "@/hooks/useResourcePageState";
+import { useAsyncAction } from "@/hooks/useAnyAction";
+import { useTaskDefinitionFilters } from "@/hooks/task-definitions/useTaskDefinitions";
+import { getTaskDefinitionStats } from "@/lib/task-definitons/taskDefinitionStat";
+import StatCard from "@/components/task-definitions/StatCard";
+
 
 export default function TaskDefinitionsPage() {
   const { businessId } = useWorkspace();
 
-  // Data state
   const [definitions, setDefinitions] = useState<TaskDefinitionListItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  const [selectedDefinitionId, setSelectedDefinitionId] = useState<string | null>(null);
   const [drawerRefreshKey, setDrawerRefreshKey] = useState(0);
 
-  // Drawer and dialog state
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [formDrawerOpen, setFormDrawerOpen] = useState(false);
-  const [editingDefinitionId, setEditingDefinitionId] = useState<string | null>(null);
+  const fetchAction = useAsyncAction(true);
+  const deleteAction = useAsyncAction();
+  const page = useResourcePageState();
+  const filters = useTaskDefinitionFilters(definitions);
+  const stats = useMemo(() => getTaskDefinitionStats(definitions), [definitions]);
 
-  const [deleteTarget, setDeleteTarget] = useState<{
-    id: string;
-    name: string;
-  } | null>(null);
-  const [deleteLoading, setDeleteLoading] = useState(false);
-
-  // Filter state
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"ALL" | "ACTIVE" | "INACTIVE">("ALL");
-  const [scheduleFilter, setScheduleFilter] = useState("");
-  const [autoCreateFilter, setAutoCreateFilter] = useState<"ALL" | "ON" | "OFF">("ALL");
-  const [showPastDueOnly, setShowPastDueOnly] = useState(false);
+  const { run: runFetch } = fetchAction;
+  const { run: runDelete } = deleteAction;
 
   const fetchDefinitions = useCallback(async () => {
     if (!businessId) return;
-
-    try {
-      setLoading(true);
-      setError("");
-      const data = await getTaskDefinitions(businessId);
-      setDefinitions(data);
-      setDrawerRefreshKey((prev) => prev + 1);
-    } catch (err: unknown) {
-      setError(
-        err instanceof Error ? err.message : "Failed to load task definitions"
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [businessId]);
+    await runFetch(() => getTaskDefinitions(businessId), {
+      errorMessage: "Failed to load task definitions",
+      showErrorToast: false,
+      onSuccess: (data) => {
+        setDefinitions(data);
+        setDrawerRefreshKey((prev) => prev + 1);
+      },
+    });
+  }, [businessId, runFetch]);
 
   useEffect(() => {
-    if (businessId) fetchDefinitions();
-  }, [businessId, fetchDefinitions]);
-
-  // Derived stats
-  const pastDueCount = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return definitions.filter((d) => {
-      if (!d.dueDate) return false;
-      const due = new Date(d.dueDate);
-      due.setHours(0, 0, 0, 0);
-      return due.getTime() < today.getTime();
-    }).length;
-  }, [definitions]);
-
-  const dueThisWeekRules = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const weekLater = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
-    return definitions.filter((d) => {
-      if (!d.dueDate) return false;
-      const due = new Date(d.dueDate);
-      due.setHours(0, 0, 0, 0);
-      return due.getTime() >= today.getTime() && due.getTime() <= weekLater.getTime();
-    });
-  }, [definitions]);
-
-  const fullyAutomatedCount = useMemo(() => {
-    return definitions.filter((d) => d.autoCreateTasks && d.autoCreateReminders).length;
-  }, [definitions]);
-
-  const filteredDefinitions = useMemo(() => {
-    let result = [...definitions];
-
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      result = result.filter(
-        (def) =>
-          def.name?.toLowerCase().includes(q) ||
-          def.taskType?.toLowerCase().includes(q)
-      );
-    }
-
-    if (statusFilter === "ACTIVE") {
-      result = result.filter((def) => def.isActive);
-    }
-    if (statusFilter === "INACTIVE") {
-      result = result.filter((def) => !def.isActive);
-    }
-
-    if (scheduleFilter && scheduleFilter !== "ALL") {
-      result = result.filter(
-        (def) => def.schedulePattern?.toLowerCase() === scheduleFilter.toLowerCase()
-      );
-    }
-
-    if (autoCreateFilter === "ON") {
-      result = result.filter((def) => def.autoCreateTasks === true);
-    }
-    if (autoCreateFilter === "OFF") {
-      result = result.filter((def) => !def.autoCreateTasks);
-    }
-
-    if (showPastDueOnly) {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      result = result.filter((def) => {
-        if (!def.dueDate) return false;
-        const due = new Date(def.dueDate);
-        due.setHours(0, 0, 0, 0);
-        return due.getTime() < today.getTime();
-      });
-    }
-
-    return result;
-  }, [
-    definitions,
-    searchQuery,
-    statusFilter,
-    scheduleFilter,
-    autoCreateFilter,
-    showPastDueOnly,
-  ]);
-
-  const handleDeleteRequest = (definitionId: string, name: string) => {
-    setDeleteTarget({ id: definitionId, name });
-  };
+    fetchDefinitions();
+  }, []);
 
   const handleDeleteConfirm = async () => {
-    if (!businessId || !deleteTarget) return;
-
-    try {
-      setDeleteLoading(true);
-      setError("");
-      await deleteTaskDefinition(businessId, deleteTarget.id);
-      setDeleteTarget(null);
-      await fetchDefinitions();
-    } catch (err: unknown) {
-      setError(
-        err instanceof Error ? err.message : "Failed to delete task definition"
-      );
-    } finally {
-      setDeleteLoading(false);
-    }
-  };
-
-  const handleCreate = () => {
-    setDrawerOpen(false);
-    setSelectedDefinitionId(null);
-    setEditingDefinitionId(null);
-    setFormDrawerOpen(true);
-  };
-
-  const handleView = (definitionId: string) => {
-    setFormDrawerOpen(false);
-    setEditingDefinitionId(null);
-    setSelectedDefinitionId(definitionId);
-    setDrawerOpen(true);
-  };
-
-  const handleDrawerClose = () => {
-    setDrawerOpen(false);
-    setSelectedDefinitionId(null);
-  };
-
-  const handleEdit = (definitionId: string) => {
-    setDrawerOpen(false);
-    setSelectedDefinitionId(null);
-    setEditingDefinitionId(definitionId);
-    setFormDrawerOpen(true);
+    const target = page.deleteTarget;
+    if (!businessId || !target) return;
+    await runDelete(() => deleteTaskDefinition(businessId, target.id), {
+      successMessage: `"${target.label}" deleted`,
+      errorMessage: "Failed to delete task definition",
+      onSuccess: async () => {
+        page.cancelDelete();
+        await fetchDefinitions();
+      },
+    });
   };
 
   if (!businessId) {
@@ -203,192 +71,131 @@ export default function TaskDefinitionsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-bg py-8">
-      <div className="mx-auto max-w-7xl space-y-6 px-4">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-txt-main">
-              Automatic tasks &amp; reminders
-            </h1>
-            <p className="mt-1 text-sm text-txt-sub">
-              Rules that create recurring tasks and reminders for you, on schedule.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={handleCreate}
-            className="inline-flex items-center gap-2 rounded-xl bg-[#f59e0b] hover:bg-[#d97706] text-slate-900 font-semibold px-4 py-2.5 text-sm shadow-xs transition-colors cursor-pointer"
-          >
-            <Plus className="h-4 w-4 text-slate-900" />
-            <span>New rule</span>
-          </button>
-        </div>
-
-        {/* Error Alert */}
-        {error && (
-          <div role="alert" className="alert alert-error flex items-center justify-between text-sm">
-            <span>{error}</span>
-            <button
-              type="button"
-              className="btn btn-ghost btn-xs btn-circle"
-              aria-label="Dismiss error"
-              onClick={() => setError("")}
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        )}
-
-        {/* 4 Stat Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Total rules */}
-          <div className="rounded-2xl border border-divider bg-surface p-5 shadow-xs">
-            <span className="text-xs font-medium text-txt-sub">Total rules</span>
-            <div className="text-3xl font-bold text-txt-main mt-2 mb-1">
-              {definitions.length}
-            </div>
-            <span className="text-xs text-txt-sub">
-              {definitions.length > 0 && definitions.every((d) => d.isActive)
-                ? "All active"
-                : `${definitions.filter((d) => d.isActive).length} active`}
-            </span>
-          </div>
-
-          {/* Past due */}
-          <div className="rounded-2xl border border-divider bg-surface p-5 shadow-xs">
-            <span className="text-xs font-medium text-txt-sub">Past due</span>
-            <div
-              className={`text-3xl font-bold mt-2 mb-1 ${
-                pastDueCount > 0 ? "text-[#dc2626]" : "text-txt-main"
-              }`}
-            >
-              {pastDueCount}
-            </div>
-            <span className="text-xs text-txt-sub">Need your attention</span>
-          </div>
-
-          {/* Due this week */}
-          <div className="rounded-2xl border border-divider bg-surface p-5 shadow-xs">
-            <span className="text-xs font-medium text-txt-sub">Due this week</span>
-            <div className="text-3xl font-bold text-txt-main mt-2 mb-1">
-              {dueThisWeekRules.length}
-            </div>
-            <span className="text-xs text-txt-sub truncate block">
-              {dueThisWeekRules[0]?.name || "None"}
-            </span>
-          </div>
-
-          {/* Fully automated */}
-          <div className="rounded-2xl border border-divider bg-surface p-5 shadow-xs">
-            <span className="text-xs font-medium text-txt-sub">Fully automated</span>
-            <div className="text-3xl font-bold text-[#059669] dark:text-emerald-400 mt-2 mb-1">
-              {fullyAutomatedCount} of {definitions.length}
-            </div>
-            <span className="text-xs text-txt-sub">Task and reminder both on</span>
-          </div>
-        </div>
-
-        {/* Past Due Alert Banner */}
-        {pastDueCount > 0 && (
-          <div className="rounded-2xl border border-red-200 bg-red-50/60 dark:bg-rose-950/20 dark:border-rose-900/40 px-5 py-3.5 flex items-center justify-between">
+    <ResourcePageLayout
+      title="Automatic tasks & reminders"
+      description="Rules that create recurring tasks and reminders for you, on schedule."
+      actionLabel="New rule"
+      actionVariant="amber"
+      onAction={page.openCreate}
+      error={fetchAction.error || deleteAction.error}
+      onDismissError={() => {
+        fetchAction.clearError();
+        deleteAction.clearError();
+      }}
+      stats={
+        <>
+          <StatCard
+            label="Total rules"
+            value={stats.total}
+            hint={stats.allActive ? "All active" : `${stats.activeCount} active`}
+          />
+          <StatCard
+            label="Past due"
+            value={stats.pastDueCount}
+            hint="Need your attention"
+            valueClassName={stats.pastDueCount > 0 ? "text-[#dc2626]" : "text-txt-main"}
+          />
+          <StatCard
+            label="Due this week"
+            value={stats.dueThisWeekCount}
+            hint={stats.nextDueName}
+            truncateHint
+          />
+          <StatCard
+            label="Fully automated"
+            value={`${stats.fullyAutomatedCount} of ${stats.total}`}
+            hint="Task and reminder both on"
+            valueClassName="text-[#059669] dark:text-emerald-400"
+          />
+        </>
+      }
+      banner={
+        stats.pastDueCount > 0 && (
+          <div className="flex items-center justify-between rounded-2xl border border-red-200 bg-red-50/60 px-5 py-3.5 dark:border-rose-900/40 dark:bg-rose-950/20">
             <div className="flex items-center gap-3">
-              <AlertTriangle className="h-5 w-5 text-red-600 dark:text-rose-400 shrink-0" />
+              <AlertTriangle className="h-5 w-5 shrink-0 text-red-600 dark:text-rose-400" />
               <span className="text-sm font-semibold text-red-900 dark:text-rose-200">
-                {pastDueCount} rules are past their next due date.
+                {stats.pastDueCount} rules are past their next due date.
               </span>
             </div>
             <button
               type="button"
-              onClick={() => setShowPastDueOnly((prev) => !prev)}
-              className="rounded-xl border border-red-300 dark:border-rose-800 bg-surface hover:bg-red-50 dark:hover:bg-rose-950/40 text-xs font-semibold text-red-700 dark:text-rose-300 px-3.5 py-1.5 transition-colors shadow-xs cursor-pointer"
+              onClick={filters.togglePastDueOnly}
+              className="cursor-pointer rounded-xl border border-red-300 bg-surface px-3.5 py-1.5 text-xs font-semibold text-red-700 shadow-xs transition-colors hover:bg-red-50 dark:border-rose-800 dark:text-rose-300 dark:hover:bg-rose-950/40"
             >
-              {showPastDueOnly ? "Show all rules" : "Show past due"}
+              {filters.showPastDueOnly ? "Show all rules" : "Show past due"}
             </button>
           </div>
-        )}
-
-        {/* Filters */}
+        )
+      }
+      filters={
         <TaskDefinitionsFilter
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          statusFilter={statusFilter}
-          onStatusChange={setStatusFilter}
-          scheduleFilter={scheduleFilter}
-          onScheduleChange={setScheduleFilter}
-          autoCreateFilter={autoCreateFilter}
-          onAutoCreateChange={setAutoCreateFilter}
-          onReset={() => {
-            setSearchQuery("");
-            setStatusFilter("ALL");
-            setScheduleFilter("");
-            setAutoCreateFilter("ALL");
-            setShowPastDueOnly(false);
-          }}
+          searchQuery={filters.searchQuery}
+          onSearchChange={filters.setSearchQuery}
+          statusFilter={filters.statusFilter}
+          onStatusChange={filters.setStatusFilter}
+          scheduleFilter={filters.scheduleFilter}
+          onScheduleChange={filters.setScheduleFilter}
+          autoCreateFilter={filters.autoCreateFilter}
+          onAutoCreateChange={filters.setAutoCreateFilter}
+          onReset={filters.reset}
         />
-
-        {/* Results count */}
-        {!loading && (
+      }
+      summary={
+        !fetchAction.loading && (
           <p className="text-sm text-txt-sub">
-            Showing {filteredDefinitions.length} of {definitions.length} rules
+            Showing {filters.filtered.length} of {definitions.length} rules
           </p>
-        )}
-
-        {/* Table using CommonDataGrid */}
-        <TaskDefinitionsTable
-          definitions={filteredDefinitions}
-          loading={loading}
-          businessId={businessId}
-          onView={handleView}
-          onEdit={handleEdit}
-          onDelete={handleDeleteRequest}
-          onRefresh={fetchDefinitions}
-        />
-
-        {/* View Details Drawer */}
-        <TaskDefinitionDetailsDrawer
-          open={drawerOpen}
-          onClose={handleDrawerClose}
-          definitionId={selectedDefinitionId}
-          businessId={businessId}
-          onEdit={handleEdit}
-          onRefresh={fetchDefinitions}
-          refreshKey={drawerRefreshKey}
-        />
-
-        {/* Unified Right-Side Form Drawer (Edit / Create) */}
-        <TaskDefinitionFormDrawer
-          open={formDrawerOpen}
-          onClose={() => {
-            setFormDrawerOpen(false);
-            setEditingDefinitionId(null);
-          }}
-          definitionId={editingDefinitionId}
-          businessId={businessId}
-          onSuccess={() => {
-            fetchDefinitions();
-            setFormDrawerOpen(false);
-            setEditingDefinitionId(null);
-          }}
-        />
-
-        {/* Delete Confirmation Dialog */}
-        <ConfirmDialog
-          open={!!deleteTarget}
-          title="Delete Task Definition"
-          description={
-            <>
-              Are you sure you want to delete <strong>{deleteTarget?.name}</strong>? This
-              action cannot be undone.
-            </>
-          }
-          confirmLabel="Delete"
-          variant="danger"
-          loading={deleteLoading}
-          onConfirm={handleDeleteConfirm}
-          onCancel={() => setDeleteTarget(null)}
-        />
-      </div>
-    </div>
+        )
+      }
+      overlays={
+        <>
+          <TaskDefinitionDetailsDrawer
+            open={page.viewOpen}
+            onClose={page.close}
+            definitionId={page.viewId}
+            businessId={businessId}
+            onEdit={page.openEdit}
+            onRefresh={fetchDefinitions}
+            refreshKey={drawerRefreshKey}
+          />
+          <TaskDefinitionFormDrawer
+            open={page.formOpen}
+            onClose={page.close}
+            definitionId={page.formId}
+            businessId={businessId}
+            onSuccess={() => {
+              fetchDefinitions();
+              page.close();
+            }}
+          />
+          <ConfirmDialog
+            open={!!page.deleteTarget}
+            title="Delete Task Definition"
+            description={
+              <>
+                Are you sure you want to delete <strong>{page.deleteTarget?.label}</strong>? This
+                action cannot be undone.
+              </>
+            }
+            confirmLabel="Delete"
+            variant="danger"
+            loading={deleteAction.loading}
+            onConfirm={handleDeleteConfirm}
+            onCancel={page.cancelDelete}
+          />
+        </>
+      }
+    >
+      <TaskDefinitionsTable
+        definitions={filters.filtered}
+        loading={fetchAction.loading}
+        businessId={businessId}
+        onView={page.openView}
+        onEdit={page.openEdit}
+        onDelete={page.requestDelete}
+        onRefresh={fetchDefinitions}
+      />
+    </ResourcePageLayout>
   );
 }

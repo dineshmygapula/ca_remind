@@ -39,7 +39,7 @@ export interface DrawerProps {
   cancelLabel?: string;
   submitLabel?: string;
   submitting?: boolean;
-  submitVariant?: 'primary' | 'success' | 'danger';
+  submitVariant?: 'primary' | 'success' | 'danger' | 'gold';
 }
 
 // ─── Width map ────────────────────────────────────────────────────────────────
@@ -55,6 +55,7 @@ const WIDTH_CLASS: Record<NonNullable<DrawerProps['width']>, string> = {
 
 const SUBMIT_VARIANT_CLASS: Record<NonNullable<DrawerProps['submitVariant']>, string> = {
   primary: 'bg-navy hover:bg-navy-hover',
+  gold: 'bg-[#F59E0B] hover:bg-[#D97706] text-slate-950 font-bold',
   success: 'bg-emerald-600 hover:bg-emerald-700',
   danger: 'bg-red-600 hover:bg-red-700',
 };

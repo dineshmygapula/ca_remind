@@ -1,54 +1,55 @@
-"use client";
+'use client';
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from 'react';
 import {
-  Drawer,
-  Box,
-  IconButton,
-  Typography,
-  Chip,
-  CircularProgress,
-  Alert,
-  Avatar,
-  Divider,
-  Tab,
-  Tabs,
-} from "@mui/material";
-import {
-  Close as CloseIcon,
-  Phone as PhoneIcon,
-  Email as EmailIcon,
-  WhatsApp as WhatsAppIcon,
-  Work as WorkIcon,
-  People as PeopleIcon,
-  Assignment as AssignmentIcon,
-  Warning as WarningIcon,
-  CheckCircle as CheckCircleIcon,
-  Work as BriefcaseIcon,
-  MoreVert as MoreVertIcon,
-} from "@mui/icons-material";
+  Phone,
+  Mail,
+  MessageCircle,
+  Users,
+  Briefcase,
+  AlertTriangle,
+  CheckCircle2,
+  Clock,
+  Pencil,
+  Loader2,
+  AlertCircle,
+  ExternalLink,
+  Shield,
+  Calendar,
+} from 'lucide-react';
+import Drawer from '@/components/common/Drawer';
 import {
   StaffDetails,
   StaffDashboardResponse,
   StaffWorkSummary,
-} from "@/types/staff.types";
-import { getStaffById, getStaffDashboard } from "@/services/staffService";
+} from '@/types/staff.types';
+import { getStaffById, getStaffDashboard } from '@/services/staffService';
 
-// ── Compute summary from dashboard response ──
 function computeWorkSummary(dashboard: StaffDashboardResponse): StaffWorkSummary {
-  const tasks = dashboard.tasks.items;
+  const tasks = dashboard.tasks?.items ?? [];
   const now = new Date();
   return {
-    totalClients: dashboard.clients.items.length,
+    totalClients: dashboard.clients?.items?.length ?? 0,
     pendingTasks: tasks.filter(
-      (t) => t.status === "OPEN" && new Date(t.due_date) >= now
+      (t) => t.status === 'OPEN' && new Date(t.due_date) >= now
     ).length,
     overdueTasks: tasks.filter(
-      (t) => t.status === "OPEN" && new Date(t.due_date) < now
+      (t) => t.status === 'OPEN' && new Date(t.due_date) < now
     ).length,
-    completedTasks: tasks.filter((t) => t.status === "CLOSED").length,
+    completedTasks: tasks.filter((t) => t.status === 'CLOSED').length,
   };
 }
+
+const getInitials = (name?: string) => {
+  if (!name) return '??';
+  return name
+    .split(' ')
+    .filter(Boolean)
+    .map((n) => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+};
 
 interface StaffDetailsDrawerProps {
   open: boolean;
@@ -56,149 +57,6 @@ interface StaffDetailsDrawerProps {
   membershipId: string | null;
   businessId: string;
   onEdit: (membershipId: string) => void;
-}
-
-const getInitials = (name?: string) => {
-  if (!name) return "??";
-  return name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
-};
-
-// ── Contact Row ──
-function ContactRow({
-  icon,
-  value,
-  label,
-  actions,
-}: {
-  icon: React.ReactNode;
-  value: string;
-  label: string;
-  actions?: React.ReactNode;
-}) {
-  return (
-    <Box
-      sx={{
-        display: "flex",
-        alignItems: "center",
-        gap: 2,
-        py: 1.75,
-        px: 2.5,
-        borderBottom: "1px solid #E6F4FF",
-        bgcolor: "#FFFFFF",
-      }}
-    >
-      <Box
-        sx={{
-          width: 36,
-          height: 36,
-          borderRadius: 2,
-          bgcolor: "#E6F4FF",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          color: "#00A3FF",
-          flexShrink: 0,
-        }}
-      >
-        {icon}
-      </Box>
-      <Box sx={{ flex: 1, minWidth: 0 }}>
-        <Typography
-          variant="body1"
-          fontWeight={500}
-          noWrap
-          sx={{ color: "#001C3D" }}
-        >
-          {value}
-        </Typography>
-        <Typography variant="caption" sx={{ color: "#4A5568" }}>
-          {label}
-        </Typography>
-      </Box>
-      {actions && (
-        <Box sx={{ display: "flex", gap: 1, flexShrink: 0 }}>{actions}</Box>
-      )}
-    </Box>
-  );
-}
-
-// ── Work Summary Row ──
-function SummaryRow({
-  icon,
-  label,
-  count,
-  badgeColor,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  count: number;
-  badgeColor: string;
-}) {
-  return (
-    <Box
-      sx={{
-        display: "flex",
-        alignItems: "center",
-        gap: 2,
-        py: 1.5,
-      }}
-    >
-      <Box sx={{ color: "#4A5568", flexShrink: 0, display: "flex" }}>{icon}</Box>
-      <Typography variant="body2" sx={{ flex: 1, color: "#2D3748" }}>
-        {label}
-      </Typography>
-      <Box
-        sx={{
-          minWidth: 28,
-          height: 28,
-          borderRadius: "50%",
-          bgcolor: badgeColor,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <Typography
-          sx={{ fontSize: "0.75rem", fontWeight: 700, color: "#fff", lineHeight: 1 }}
-        >
-          {count}
-        </Typography>
-      </Box>
-    </Box>
-  );
-}
-
-// ── Action Icon Button ──
-function ActionIconButton({
-  href,
-  target,
-  children,
-}: {
-  href?: string;
-  target?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <IconButton
-      size="small"
-      href={href}
-      target={target}
-      sx={{
-        width: 34,
-        height: 34,
-        border: "1px solid #CBD5E0",
-        borderRadius: 2,
-        color: "#4A5568",
-        "&:hover": {
-          bgcolor: "#E6F4FF",
-          borderColor: "#00A3FF",
-          color: "#00A3FF",
-        },
-      }}
-    >
-      {children}
-    </IconButton>
-  );
 }
 
 export default function StaffDetailsDrawer({
@@ -209,311 +67,346 @@ export default function StaffDetailsDrawer({
   onEdit,
 }: StaffDetailsDrawerProps) {
   const [staff, setStaff] = useState<StaffDetails | null>(null);
+  const [dashboard, setDashboard] = useState<StaffDashboardResponse | null>(null);
   const [summary, setSummary] = useState<StaffWorkSummary | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [activeTab, setActiveTab] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [activeTab, setActiveTab] = useState<'workload' | 'clients' | 'tasks'>('workload');
 
-  const fetchStaff = useCallback(async () => {
-  if (!membershipId) return;
-  try {
-    setLoading(true);
-    setError("");
-    const [data, dashboard] = await Promise.all([
-      getStaffById(businessId, membershipId),
-      getStaffDashboard(businessId, membershipId),
-    ]);
-    console.log("✅ staff data:", data);        // ← check this in console
-    console.log("✅ dashboard data:", dashboard); // ← check this too
-    setStaff(data);
-    setSummary(computeWorkSummary(dashboard));
-  } catch (err: unknown) {
-    setError(err instanceof Error ? err.message : "Failed to load staff details");
-  } finally {
-    setLoading(false);
-  }
-}, [businessId, membershipId]);
+  const fetchData = useCallback(async () => {
+    if (!membershipId || !businessId) return;
+
+    try {
+      setLoading(true);
+      setError('');
+
+      const [staffData, dashData] = await Promise.all([
+        getStaffById(businessId, membershipId),
+        getStaffDashboard(businessId, membershipId).catch((err) => {
+          console.warn('Dashboard data not available for staff:', err);
+          return null;
+        }),
+      ]);
+
+      setStaff(staffData);
+
+      if (dashData) {
+        setDashboard(dashData);
+        setSummary(computeWorkSummary(dashData));
+      } else {
+        setDashboard(null);
+        setSummary({
+          totalClients: 0,
+          pendingTasks: 0,
+          overdueTasks: 0,
+          completedTasks: 0,
+        });
+      }
+    } catch (err: unknown) {
+      console.error('Fetch staff details error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load staff details');
+    } finally {
+      setLoading(false);
+    }
+  }, [businessId, membershipId]);
 
   useEffect(() => {
-    if (open && membershipId) fetchStaff();
-  }, [open, membershipId, fetchStaff]);
+    if (open && membershipId) {
+      fetchData();
+      setActiveTab('workload');
+    } else {
+      setStaff(null);
+      setDashboard(null);
+      setSummary(null);
+    }
+  }, [open, membershipId, fetchData]);
 
-  const phoneDisplay = staff?.contact?.phone
-    ? staff.contact.phone.startsWith("+")
-      ? staff.contact.phone
-      : `+${staff.contact.phone}`
-    : "—";
+  const fullName =
+    staff?.userName ||
+    `${staff?.contact?.firstName ?? ''} ${staff?.contact?.lastName ?? ''}`.trim() ||
+    'Staff Member';
 
-  const isActive = staff?.status === "ACTIVE";
+  const role = (staff?.roles?.[0] || staff?.role || 'Staff').toUpperCase();
+  const isActive = staff?.status === 'ACTIVE';
 
   return (
     <Drawer
-      anchor="right"
       open={open}
       onClose={onClose}
-      PaperProps={{
-        sx: {
-          width: { xs: "100vw", sm: 400 },
-          bgcolor: "#E6F4FF",   // ✅ matches background.default
-          borderTopLeftRadius: 24,
-          borderBottomLeftRadius: 24,
-          overflow: "hidden",
-        },
-      }}
-    >
-      <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
-
-        {/* ── Top Bar ── */}
-        <Box
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            px: 2,
-            py: 1.5,
-            bgcolor: "#FFFFFF",
-            borderBottom: "2px solid #00A3FF",  // ✅ theme primary accent
-          }}
+      eyebrow="Staff Directory"
+      title={fullName}
+      badge={
+        <span
+          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+            isActive
+              ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
+              : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
+          }`}
         >
-          <IconButton onClick={onClose} size="small" sx={{ color: "#001C3D" }}>
-            <CloseIcon />
-          </IconButton>
-          <Typography variant="h6" sx={{ color: "#001C3D", fontWeight: 700 }}>
-            Staff Details
-          </Typography>
-          <IconButton size="small" sx={{ color: "#001C3D" }}>
-            <MoreVertIcon />
-          </IconButton>
-        </Box>
+          <span
+            className={`h-1.5 w-1.5 rounded-full ${isActive ? 'bg-emerald-500' : 'bg-slate-400'}`}
+          />
+          {isActive ? 'Active' : 'Inactive'}
+        </span>
+      }
+      icon={<Users className="h-5 w-5 text-white" />}
+      width="lg"
+      headerActions={
+        membershipId && (
+          <button
+            type="button"
+            onClick={() => onEdit(membershipId)}
+            className="flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-xs font-semibold text-[var(--text-primary)] transition-all hover:border-[var(--primary)] hover:bg-[var(--primary)]/5"
+          >
+            <Pencil className="h-3.5 w-3.5 text-[var(--primary)]" />
+            <span>Edit Staff</span>
+          </button>
+        )
+      }
+    >
+      {loading ? (
+        <div className="flex h-72 flex-col items-center justify-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-[var(--primary)]" />
+          <span className="text-sm font-medium text-[var(--text-secondary)]">
+            Loading member profile...
+          </span>
+        </div>
+      ) : error ? (
+        <div className="p-6">
+          <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-red-800 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-300">
+            <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
+            <div className="text-sm">{error}</div>
+          </div>
+        </div>
+      ) : staff ? (
+        <div className="space-y-6 p-6">
+          {/* Member Profile Card */}
+          <div className="flex flex-col gap-4 rounded-2xl border border-[var(--border)] bg-[var(--bg)]/70 p-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-4">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[var(--primary)] text-white dark:bg-[var(--accent)] dark:text-[#0b1220] font-black text-lg shadow-sm">
+                {getInitials(fullName)}
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-[var(--heading)]">{fullName}</h3>
+                <div className="mt-1 flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1 rounded-md bg-[var(--primary)]/10 px-2 py-0.5 text-xs font-bold text-[var(--primary)] dark:bg-[var(--accent)]/15 dark:text-[var(--accent)]">
+                    <Shield className="h-3 w-3" />
+                    {role}
+                  </span>
+                  {staff.lastActiveAt && (
+                    <span className="text-[11px] text-[var(--text-secondary)]">
+                      Updated {new Date(staff.lastActiveAt).toLocaleDateString()}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
 
-        {/* ── Scrollable Body ── */}
-        <Box sx={{ flex: 1, overflowY: "auto" }}>
-          {loading ? (
-            <Box sx={{ display: "flex", justifyContent: "center", py: 10 }}>
-              <CircularProgress sx={{ color: "#00A3FF" }} />
-            </Box>
-          ) : error ? (
-            <Box sx={{ p: 3 }}>
-              <Alert severity="error">{error}</Alert>
-            </Box>
-          ) : staff ? (
-            <>
-              {/* ── Profile Card ── */}
-              <Box
-                sx={{
-                  mx: 2,
-                  mt: 2,
-                  p: 2.5,
-                  bgcolor: "#FFFFFF",
-                  borderRadius: 3,
-                  border: "1px solid #E6F4FF",
-                  boxShadow: "0 4px 20px rgba(0,28,61,0.06)",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 2,
-                }}
-              >
-                <Avatar
-                  src={staff.avatarUrl || undefined}
-                  sx={{
-                    width: 64,
-                    height: 64,
-                    bgcolor: "#E6F4FF",
-                    color: "#001C3D",
-                    fontSize: "1.4rem",
-                    fontWeight: 700,
-                    border: "2px solid #00A3FF",
-                  }}
+            {/* Quick Actions */}
+            <div className="flex items-center gap-2">
+              {staff.contact?.phone && (
+                <a
+                  href={`https://wa.me/${staff.contact.phone.replace(/[^0-9]/g, '')}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition-all hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300"
                 >
-                  {!staff.avatarUrl && getInitials(staff.userName)}
-                </Avatar>
-                <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Typography
-                    variant="h6"
-                    fontWeight={700}
-                    noWrap
-                    sx={{ color: "#001C3D" }}
-                  >
-                    {staff.userName || "Unknown"}
-                  </Typography>
-                  <Chip
-                    label={isActive ? "Active" : "Inactive"}
-                    size="small"
-                    variant="outlined"
-                    onClick={() => onEdit(staff.id)}
-                    sx={{
-                      mt: 0.5,
-                      fontWeight: 600,
-                      fontSize: "0.75rem",
-                      borderRadius: "20px",
-                      borderColor: isActive ? "#00A3FF" : "#CBD5E0",
-                      color: isActive ? "#00A3FF" : "#4A5568",
-                      bgcolor: isActive ? "#E6F4FF" : "transparent",
-                      cursor: "pointer",
-                    }}
-                  />
-                </Box>
-              </Box>
-
-              {/* ── Contact Rows ── */}
-              <Box
-                sx={{
-                  mx: 2,
-                  mt: 2,
-                  bgcolor: "#FFFFFF",
-                  borderRadius: 3,
-                  overflow: "hidden",
-                  boxShadow: "0 4px 20px rgba(0,28,61,0.06)",
-                }}
-              >
-                <ContactRow
-                  icon={<PhoneIcon fontSize="small" />}
-                  value={phoneDisplay}
-                  label="Phone"
-                  actions={
-                    <>
-                      <ActionIconButton href={`tel:${phoneDisplay}`}>
-                        <PhoneIcon sx={{ fontSize: 16 }} />
-                      </ActionIconButton>
-                      <ActionIconButton
-                        href={`https://wa.me/${staff.contact?.phone}`}
-                        target="_blank"
-                      >
-                        <WhatsAppIcon sx={{ fontSize: 16 }} />
-                      </ActionIconButton>
-                    </>
-                  }
-                />
-                <ContactRow
-                  icon={<EmailIcon fontSize="small" />}
-                  value={staff.contact?.email || "—"}
-                  label="Email"
-                  actions={
-                    <ActionIconButton href={`mailto:${staff.contact?.email}`}>
-                      <EmailIcon sx={{ fontSize: 16 }} />
-                    </ActionIconButton>
-                  }
-                />
-                <ContactRow
-                  icon={<WorkIcon fontSize="small" />}
-                  value={staff.role || "No Role"}
-                  label="Role"
-                />
-              </Box>
-
-              {/* ── Service Info ── */}
-              <Box sx={{ mt: 3, px: 2 }}>
-                <Typography
-                  variant="subtitle1"
-                  fontWeight={700}
-                  sx={{ color: "#001C3D", mb: 1.5 }}
-                >
-                  Service Info
-                </Typography>
-                <Tabs
-                  value={activeTab}
-                  onChange={(_, v) => setActiveTab(v)}
-                  variant="scrollable"
-                  scrollButtons="auto"
-                  sx={{
-                    minHeight: 40,
-                    "& .MuiTabs-flexContainer": { gap: 1 },
-                    "& .MuiTab-root": {
-                      textTransform: "none",
-                      fontWeight: 500,
-                      fontSize: "0.875rem",
-                      borderRadius: "20px",
-                      minHeight: 38,
-                      px: 2.5,
-                      border: "1px solid #CBD5E0",
-                      bgcolor: "#FFFFFF",
-                      color: "#4A5568",
-                    },
-                    "& .Mui-selected": {
-                      bgcolor: "#E6F4FF !important",
-                      color: "#00A3FF !important",
-                      borderColor: "#00A3FF !important",
-                      fontWeight: 600,
-                    },
-                    "& .MuiTabs-indicator": { display: "none" },
-                  }}
-                >
-                  <Tab label="Overview" />
-                  <Tab label="Clients" />
-                  <Tab label="Tasks" />
-                  <Tab label="Schedule" />
-                </Tabs>
-              </Box>
-
-              {/* ── Work Summary (Overview tab) ── */}
-              {activeTab === 0 && (
-                <Box
-                  sx={{
-                    mx: 2,
-                    mt: 2,
-                    mb: 3,
-                    p: 2.5,
-                    bgcolor: "#FFFFFF",
-                    borderRadius: 3,
-                    boxShadow: "0 4px 20px rgba(0,28,61,0.06)",
-                  }}
-                >
-                  {/* Card Header */}
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 1.5 }}>
-                    <Box
-                      sx={{
-                        width: 38,
-                        height: 38,
-                        borderRadius: 2,
-                        bgcolor: "#E6F4FF",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    >
-                      <BriefcaseIcon sx={{ fontSize: 20, color: "#00A3FF" }} />
-                    </Box>
-                    <Typography
-                      variant="subtitle1"
-                      fontWeight={700}
-                      sx={{ color: "#001C3D" }}
-                    >
-                      Work Summary
-                    </Typography>
-                  </Box>
-
-                  <Divider sx={{ borderColor: "#E6F4FF", mb: 1 }} />
-
-                  <SummaryRow
-                    icon={<PeopleIcon fontSize="small" />}
-                    label="Clients"
-                    count={summary?.totalClients ?? 0}
-                    badgeColor="#26a69a"
-                  />
-                  <SummaryRow
-                    icon={<AssignmentIcon fontSize="small" />}
-                    label="Pending Tasks"
-                    count={summary?.pendingTasks ?? 0}
-                    badgeColor="#ffa726"
-                  />
-                  <SummaryRow
-                    icon={<WarningIcon fontSize="small" />}
-                    label="Overdue Tasks"
-                    count={summary?.overdueTasks ?? 0}
-                    badgeColor="#ef5350"
-                  />
-                  <SummaryRow
-                    icon={<CheckCircleIcon fontSize="small" />}
-                    label="Completed Tasks"
-                    count={summary?.completedTasks ?? 0}
-                    badgeColor="#66bb6a"
-                  />
-                </Box>
+                  <MessageCircle className="h-3.5 w-3.5" />
+                  <span>WhatsApp</span>
+                </a>
               )}
-            </>
-          ) : null}
-        </Box>
-      </Box>
+            </div>
+          </div>
+
+          {/* Contact Details */}
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-sm space-y-3">
+            <div className="text-xs font-bold uppercase tracking-wider text-[var(--heading)]">
+              Contact Information
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 text-xs">
+              <div className="flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--bg)]/50 p-3">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--primary)]/10 text-[var(--primary)]">
+                  <Mail className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[11px] text-[var(--text-secondary)]">Email Address</div>
+                  <div className="font-semibold text-[var(--text-primary)] truncate">
+                    {staff.contact?.email || '—'}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--bg)]/50 p-3">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--primary)]/10 text-[var(--primary)]">
+                  <Phone className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[11px] text-[var(--text-secondary)]">Mobile Number</div>
+                  <div className="font-semibold text-[var(--text-primary)]">
+                    {staff.contact?.phone || staff.contact?.phoneMasked || '—'}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Workload Stats Grid */}
+          <div className="space-y-3">
+            <div className="text-xs font-bold uppercase tracking-wider text-[var(--heading)]">
+              Workload & Performance Overview
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-sm">
+                <div className="flex items-center justify-between text-blue-600">
+                  <Users className="h-4 w-4" />
+                  <span className="text-[11px] font-bold uppercase">Clients</span>
+                </div>
+                <div className="mt-2 text-2xl font-black text-[var(--heading)]">
+                  {summary?.totalClients ?? 0}
+                </div>
+                <div className="text-[11px] text-[var(--text-secondary)]">Assigned portfolio</div>
+              </div>
+
+              <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-sm">
+                <div className="flex items-center justify-between text-amber-600">
+                  <Clock className="h-4 w-4" />
+                  <span className="text-[11px] font-bold uppercase">Pending</span>
+                </div>
+                <div className="mt-2 text-2xl font-black text-amber-600">
+                  {summary?.pendingTasks ?? 0}
+                </div>
+                <div className="text-[11px] text-[var(--text-secondary)]">Open tasks</div>
+              </div>
+
+              <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-sm">
+                <div className="flex items-center justify-between text-red-600">
+                  <AlertTriangle className="h-4 w-4" />
+                  <span className="text-[11px] font-bold uppercase">Overdue</span>
+                </div>
+                <div className="mt-2 text-2xl font-black text-red-600">
+                  {summary?.overdueTasks ?? 0}
+                </div>
+                <div className="text-[11px] text-[var(--text-secondary)]">Requires action</div>
+              </div>
+
+              <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-sm">
+                <div className="flex items-center justify-between text-emerald-600">
+                  <CheckCircle2 className="h-4 w-4" />
+                  <span className="text-[11px] font-bold uppercase">Done</span>
+                </div>
+                <div className="mt-2 text-2xl font-black text-emerald-600">
+                  {summary?.completedTasks ?? 0}
+                </div>
+                <div className="text-[11px] text-[var(--text-secondary)]">Closed tasks</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Tab Selector */}
+          <div className="flex border-b border-[var(--border)] text-xs font-bold">
+            <button
+              type="button"
+              onClick={() => setActiveTab('workload')}
+              className={`pb-2.5 px-3 border-b-2 transition-colors ${
+                activeTab === 'workload'
+                  ? 'border-[var(--primary)] text-[var(--primary)] dark:border-[var(--accent)] dark:text-[var(--accent)]'
+                  : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--heading)]'
+              }`}
+            >
+              Assigned Tasks ({dashboard?.tasks?.items?.length ?? 0})
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('clients')}
+              className={`pb-2.5 px-3 border-b-2 transition-colors ${
+                activeTab === 'clients'
+                  ? 'border-[var(--primary)] text-[var(--primary)] dark:border-[var(--accent)] dark:text-[var(--accent)]'
+                  : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--heading)]'
+              }`}
+            >
+              Assigned Clients ({dashboard?.clients?.items?.length ?? 0})
+            </button>
+          </div>
+
+          {/* Tab Content */}
+          {activeTab === 'workload' ? (
+            <div className="space-y-2.5">
+              {!dashboard?.tasks?.items || dashboard.tasks.items.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-[var(--border)] p-6 text-center text-xs text-[var(--text-secondary)]">
+                  No compliance tasks currently assigned to this member.
+                </div>
+              ) : (
+                dashboard.tasks.items.map((task) => {
+                  const isClosed = task.status === 'CLOSED';
+                  return (
+                    <div
+                      key={task.task_id}
+                      className="flex items-center justify-between rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3.5 text-xs shadow-sm"
+                    >
+                      <div className="min-w-0 space-y-1">
+                        <div className="font-bold text-[var(--heading)] truncate">
+                          {task.title}
+                        </div>
+                        <div className="flex items-center gap-2 text-[11px] text-[var(--text-secondary)]">
+                          <span>Client: {task.subject?.name || '—'}</span>
+                          <span>•</span>
+                          <span className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            Due: {task.due_date ? new Date(task.due_date).toLocaleDateString() : '—'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <span
+                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          isClosed
+                            ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
+                            : 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300'
+                        }`}
+                      >
+                        {task.status}
+                      </span>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              {!dashboard?.clients?.items || dashboard.clients.items.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-[var(--border)] p-6 text-center text-xs text-[var(--text-secondary)]">
+                  No clients currently assigned to this member.
+                </div>
+              ) : (
+                dashboard.clients.items.map((client) => (
+                  <div
+                    key={client.subject_id}
+                    className="flex items-center justify-between rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3.5 text-xs shadow-sm"
+                  >
+                    <div>
+                      <div className="font-bold text-[var(--heading)]">
+                        {client.display_name}
+                      </div>
+                      {client.city && (
+                        <div className="text-[11px] text-[var(--text-secondary)]">
+                          {client.city}
+                        </div>
+                      )}
+                    </div>
+                    {client.next_due_hint && (
+                      <span className="rounded-md bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+                        {client.next_due_hint}
+                      </span>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+      ) : null}
     </Drawer>
   );
 }

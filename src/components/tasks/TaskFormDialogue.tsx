@@ -1,31 +1,30 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Plus,
   Pencil,
   ChevronDown,
   AlertCircle,
   X,
-  Bell,
-  Calendar,
-  AlignLeft,
-  Tag,
-  Repeat,
   Mail,
   Sparkles,
-  User2,
   Loader2,
   Check,
+  Building2,
+  Smartphone,
 } from 'lucide-react';
 import Drawer from '@/components/common/Drawer';
+import DrawerSection from '@/components/common/DrawerSection';
+import WhatsAppIcon from '@/components/common/WhatsAppIcon';
 import SearchableSelect from '@/components/common/SearchableSelect';
+import { useAsyncAction } from '@/hooks/useAnyAction';
 
 import { createTask, updateTask, getTaskById } from '@/services/taskService';
 import { SubjectListItem } from '@/types/subject';
 import { StaffMember } from '@/types/staff.types';
 import { MessageTemplateListItem } from '@/types/messageTemplate.types';
-import { TaskPriority } from '@/types/task.types';
+import { DeliveryChannel, TaskPriority } from '@/types/task.types';
 import { TASK_TYPES, FREQUENCY_OPTIONS, DELIVERY_CHANNELS } from '@/constants/taskConstants';
 import { useTaskFormData } from '@/hooks/tasks/useTasksFormData';
 import { TaskFormData, useTaskForm } from '@/hooks/tasks/useTaskForm';
@@ -56,8 +55,6 @@ const SELECT =
   'w-full h-11 rounded-xl border border-divider bg-bg/50 px-3.5 ' +
   'text-sm font-medium text-txt-main appearance-none cursor-pointer ' +
   'focus:bg-surface focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/15 transition-all';
-
-// ─── FieldWrap ────────────────────────────────────────────────────────────────
 
 function FieldWrap({
   label,
@@ -97,14 +94,16 @@ export default function TaskFormDialog({
 }: Props) {
   const mode: 'create' | 'edit' = taskId ? 'edit' : 'create';
 
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setLocalError] = useState('');
+  const [localError, setLocalError] = useState('');
   const [loadingTask, setLoadingTask] = useState(false);
   const [initialForm, setInitialForm] = useState<TaskFormData | undefined>(undefined);
 
   const [selectedClient, setSelectedClient] = useState<SubjectListItem | null>(null);
   const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState<MessageTemplateListItem | null>(null);
+
+  // Hook for async submit loading & toasts
+  const saveAction = useAsyncAction();
 
   const {
     clients,
@@ -195,7 +194,7 @@ export default function TaskFormDialog({
             deliveryChannel:
               ((firstReminder?.channel ??
                 (firstReminder as any)?.deliveryChannel ??
-                'EMAIL').toUpperCase() as import('@/types/task.types').DeliveryChannel),
+                'EMAIL').toUpperCase() as DeliveryChannel),
             daysBeforeDueDate: firstReminder?.daysBeforeDueDate ?? 1,
           },
         });
@@ -230,17 +229,18 @@ export default function TaskFormDialog({
   }, [form.templateId, templates]);
 
   const handleClose = () => {
-    if (submitting) return;
+    if (saveAction.loading) return;
     reset();
     setSelectedClient(null);
     setSelectedStaff(null);
     setSelectedTemplate(null);
     setLocalError('');
     setFetchError('');
+    saveAction.reset();
     onClose();
   };
 
-  const combinedError = error || fetchError;
+  const combinedError = localError || fetchError || saveAction.error;
 
   const handleSubmit = async () => {
     const validationError = validate();
@@ -249,26 +249,52 @@ export default function TaskFormDialog({
       return;
     }
 
-    setSubmitting(true);
-    setLocalError('');
-
-    try {
-      const dto = toDto();
-      if (mode === 'edit' && taskId) {
-        await updateTask(businessId, taskId, dto);
-      } else {
-        await createTask(businessId, dto);
+    await saveAction.run(
+      async () => {
+        const dto = toDto();
+        if (mode === 'edit' && taskId) {
+          await updateTask(businessId, taskId, dto);
+        } else {
+          await createTask(businessId, dto);
+        }
+      },
+      {
+        successMessage: mode === 'edit' ? 'Task updated successfully' : 'Task created successfully',
+        errorMessage: mode === 'edit' ? 'Failed to update task' : 'Failed to create task',
+        showSuccessToast: true,
+        showErrorToast: true,
+        onSuccess: () => {
+          onSuccess?.();
+          handleClose();
+        },
       }
-      onSuccess?.();
-      handleClose();
-    } catch (err: unknown) {
-      setLocalError(err instanceof Error ? err.message : `Failed to ${mode} task`);
-    } finally {
-      setSubmitting(false);
-    }
+    );
   };
 
   const validDaysBeforeOptions = getValidDaysBeforeOptions(form.dueDate);
+
+  // Reusable channel options
+  const channelList: {
+    id: DeliveryChannel;
+    label: string;
+    icon: React.ReactNode;
+  }[] = [
+    {
+      id: 'WHATSAPP',
+      label: 'WhatsApp',
+      icon: <WhatsAppIcon className="w-5 h-5" />,
+    },
+    {
+      id: 'EMAIL',
+      label: 'Email',
+      icon: <Mail className="w-5 h-5" />,
+    },
+    {
+      id: 'SMS',
+      label: 'SMS',
+      icon: <Smartphone className="w-5 h-5" />,
+    },
+  ];
 
   return (
     <Drawer
@@ -276,21 +302,27 @@ export default function TaskFormDialog({
       onClose={handleClose}
       title={mode === 'edit' ? generatedTaskTitle || 'Edit Task' : 'Create Task'}
       width="lg"
+      submitVariant="gold"
+      onSubmit={handleSubmit}
+      onCancel={handleClose}
+      cancelLabel="Cancel"
+      submitLabel={mode === 'edit' ? 'Save changes' : 'Create task'}
+      submitting={saveAction.loading}
       customHeader={
-        <div className="bg-[#0B1528] px-6 py-5 flex items-center justify-between text-white shrink-0">
+        <div className="bg-[#0F1E36] px-6 py-5 flex items-center justify-between text-white shrink-0 border-b border-white/10 select-none">
           <div className="flex items-center gap-3.5 min-w-0">
-            <div className="w-10 h-10 rounded-xl bg-[#F59E0B] flex items-center justify-center text-slate-900 shadow-sm shrink-0">
+            <div className="w-10 h-10 rounded-2xl bg-[#F59E0B] flex items-center justify-center text-slate-950 font-bold shadow-sm shrink-0">
               {mode === 'edit' ? (
-                <Pencil className="h-5 w-5 text-slate-900" />
+                <Pencil className="h-5 w-5 text-slate-950 stroke-[2.5]" />
               ) : (
-                <Plus className="h-5 w-5 text-slate-900" />
+                <Plus className="h-5 w-5 text-slate-950 stroke-[2.5]" />
               )}
             </div>
             <div className="min-w-0">
-              <p className="text-xs font-semibold text-[#F59E0B] uppercase tracking-wider mb-0.5">
-                {mode === 'edit' ? 'Edit Task' : 'New Task'}
+              <p className="text-xs font-bold text-[#F59E0B] uppercase tracking-wider mb-0.5">
+                {mode === 'edit' ? 'Update task' : 'New task'}
               </p>
-              <h2 className="text-lg font-bold leading-tight text-white truncate">
+              <h2 className="text-lg font-extrabold leading-tight text-white tracking-tight truncate">
                 {mode === 'edit'
                   ? generatedTaskTitle || 'Update Task Details'
                   : 'Create New Task'}
@@ -300,408 +332,401 @@ export default function TaskFormDialog({
           <button
             type="button"
             onClick={handleClose}
-            disabled={submitting}
-            className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
+            disabled={saveAction.loading}
+            aria-label="Close"
+            className="rounded-xl bg-white/10 hover:bg-white/20 p-2 text-white/80 hover:text-white transition-colors cursor-pointer"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
       }
-      footer={
-        <div className="flex items-center justify-end gap-3 w-full">
-          <button
-            type="button"
-            onClick={handleClose}
-            disabled={submitting}
-            className="rounded-xl border border-divider py-2.5 px-6 text-sm font-semibold text-txt-main bg-surface transition-colors hover:bg-bg cursor-pointer disabled:opacity-50"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={submitting || loadingTask}
-            className="inline-flex items-center gap-2 rounded-xl bg-[#F59E0B] hover:bg-[#D97706] text-slate-900 py-2.5 px-6 text-sm font-semibold shadow-xs transition-colors cursor-pointer disabled:opacity-60"
-          >
-            {submitting ? (
-              <Loader2 className="h-4 w-4 animate-spin text-slate-900" />
-            ) : (
-              <Check className="h-4 w-4 text-slate-900" />
-            )}
-            <span>{mode === 'edit' ? 'Save changes' : 'Create task'}</span>
-          </button>
-        </div>
-      }
     >
-      {loadingTask ? (
-        <div className="flex flex-col items-center justify-center py-24 gap-3">
-          <Loader2 className="h-8 w-8 animate-spin text-[#F59E0B]" />
-          <p className="text-sm font-semibold text-txt-main">Loading task details...</p>
-          <p className="text-xs text-txt-sub">
-            Please wait while we retrieve the task information.
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-5 py-2">
-          {/* ── Error banner ─────────────────────────────────────────────── */}
-          {combinedError && (
-            <div role="alert" className="alert alert-error rounded-xl py-3 px-4 text-sm flex gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <span className="flex-1 font-medium">{combinedError}</span>
-              <button
-                type="button"
-                onClick={() => {
-                  setLocalError('');
-                  setFetchError('');
-                }}
-                className="btn btn-ghost btn-xs btn-circle"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
+      <div className="space-y-4 py-1">
+        {/* Subtle Non-blocking Loading Indicator */}
+        {loadingTask && (
+          <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 text-xs">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            <span>Loading task details...</span>
+          </div>
+        )}
+
+        {/* ── Error banner ─────────────────────────────────────────────── */}
+        {combinedError && (
+          <div role="alert" className="alert alert-error rounded-xl py-3 px-4 text-xs flex gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+            <span className="flex-1 font-medium">{combinedError}</span>
+            <button
+              type="button"
+              onClick={() => {
+                setLocalError('');
+                setFetchError('');
+                saveAction.clearError();
+              }}
+              className="btn btn-ghost btn-xs btn-circle"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+
+        {/* ── Section 1: Client ────────────────────────────────────────── */}
+        <DrawerSection step={1} title="Client" required>
+          <FieldWrap label="Select Client" required>
+            <SearchableSelect
+              options={clients}
+              value={selectedClient}
+              onChange={(client) => {
+                setSelectedClient(client);
+                set('subjectId', client?.id ?? '');
+              }}
+              getOptionLabel={(c) => c.displayName || c.businessName || 'Unnamed'}
+              getOptionKey={(c) => c.id}
+              loading={clientsLoading}
+              placeholder="Search and select client"
+              emptyMessage={
+                clients.length === 0
+                  ? 'No clients found. Create a client first.'
+                  : 'No matching clients'
+              }
+            />
+          </FieldWrap>
+
+          {selectedClient && (
+            <div className="flex items-center justify-between px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-divider text-xs">
+              <div className="flex items-center gap-2 text-txt-sub">
+                <Building2 className="w-3.5 h-3.5 text-amber-500" />
+                <span>
+                  Selected:{' '}
+                  <strong className="text-txt-main">
+                    {selectedClient.displayName || selectedClient.businessName}
+                  </strong>
+                </span>
+              </div>
+              <span className="font-mono text-[11px] text-txt-sub">
+                {selectedClient.phone || selectedClient.email || ''}
+              </span>
             </div>
           )}
+        </DrawerSection>
 
-          {/* ── Section 1: Client ────────────────────────────────────────── */}
-          <div className="rounded-2xl border border-divider bg-surface p-6 space-y-4 shadow-xs">
-            <div className="flex items-center gap-2.5 mb-2">
-              <span className="w-6 h-6 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 text-xs font-bold flex items-center justify-center">
-                1
-              </span>
-              <h3 className="text-base font-bold text-txt-main">Client</h3>
-            </div>
-
-            <FieldWrap label="Select Client" required>
-              <SearchableSelect
-                options={clients}
-                value={selectedClient}
-                onChange={(client) => {
-                  setSelectedClient(client);
-                  set('subjectId', client?.id ?? '');
-                }}
-                getOptionLabel={(c) => c.displayName}
-                getOptionKey={(c) => c.id}
-                loading={clientsLoading}
-                placeholder="Search and select client..."
-                emptyMessage={
-                  clients.length === 0
-                    ? 'No clients found. Create a client first.'
-                    : 'No matching clients'
-                }
-              />
-            </FieldWrap>
-          </div>
-
-          {/* ── Section 2: Task Details ──────────────────────────────────── */}
-          <div className="rounded-2xl border border-divider bg-surface p-6 space-y-4 shadow-xs">
-            <div className="flex items-center gap-2.5 mb-2">
-              <span className="w-6 h-6 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 text-xs font-bold flex items-center justify-center">
-                2
-              </span>
-              <h3 className="text-base font-bold text-txt-main">Task Details</h3>
-            </div>
-
-            {/* Task Type & Frequency */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <FieldWrap label="Task Type" required>
-                <div className="relative">
-                  <select
-                    value={form.taskType}
-                    onChange={(e) => set('taskType', e.target.value)}
-                    className={`${SELECT} pr-8`}
-                  >
-                    <option value="" disabled>
-                      Select type
+        {/* ── Section 2: Task Details ──────────────────────────────────── */}
+        <DrawerSection step={2} title="Task and compliance" required>
+          {/* Task Type & Frequency */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <FieldWrap label="Task Type" required>
+              <div className="relative">
+                <select
+                  value={form.taskType}
+                  onChange={(e) => set('taskType', e.target.value)}
+                  className={`${SELECT} pr-9`}
+                >
+                  <option value="" disabled>
+                    Select type
+                  </option>
+                  {TASK_TYPES.map((t) => (
+                    <option key={t.value} value={t.value} className="bg-surface">
+                      {t.label}
                     </option>
-                    {TASK_TYPES.map((t) => (
-                      <option key={t.value} value={t.value} className="bg-surface">
-                        {t.label}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-txt-sub" />
-                </div>
-              </FieldWrap>
-
-              <FieldWrap label="Frequency" required>
-                <div className="relative">
-                  <select
-                    value={form.frequency}
-                    onChange={(e) => set('frequency', e.target.value)}
-                    className={`${SELECT} pr-8`}
-                  >
-                    {FREQUENCY_OPTIONS.map((f) => (
-                      <option key={f.value} value={f.value} className="bg-surface">
-                        {f.label}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-txt-sub" />
-                </div>
-              </FieldWrap>
-            </div>
-
-            {/* Due Date & Priority Dropdown */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <FieldWrap label="Due Date" required>
-                <div className="relative">
-                  <input
-                    type="date"
-                    value={form.dueDate}
-                    onChange={(e) => {
-                      const d = e.target.value;
-                      set('dueDate', d);
-                      const opts = getValidDaysBeforeOptions(d);
-                      if (
-                        !opts.some((o) => o.value === form.reminder.daysBeforeDueDate) &&
-                        opts.length > 0
-                      ) {
-                        setReminder('daysBeforeDueDate', opts[0].value);
-                      }
-                    }}
-                    className={INPUT}
-                  />
-                </div>
-              </FieldWrap>
-
-              {/* Priority as a dropdown */}
-              <FieldWrap label="Priority">
-                <div className="relative">
-                  <select
-                    value={form.taskPriority}
-                    onChange={(e) => set('taskPriority', e.target.value as TaskPriority)}
-                    className={`${SELECT} pr-8`}
-                  >
-                    <option value="LOW" className="bg-surface">● Low</option>
-                    <option value="MEDIUM" className="bg-surface">● Medium</option>
-                    <option value="HIGH" className="bg-surface">● High</option>
-                    <option value="URGENT" className="bg-surface">● Urgent</option>
-                  </select>
-                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-txt-sub" />
-                </div>
-              </FieldWrap>
-            </div>
-
-            {/* Task Title */}
-            <FieldWrap label="Task Title">
-              <input
-                readOnly
-                value={generatedTaskTitle}
-                placeholder="Auto-generated based on client & type"
-                className={`${INPUT} cursor-default bg-bg/70 ${
-                  generatedTaskTitle ? 'text-txt-main' : 'text-txt-sub/50'
-                }`}
-              />
+                  ))}
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-txt-sub" />
+              </div>
             </FieldWrap>
 
-            {/* Assigned To */}
-            <FieldWrap label="Assigned To">
-              <SearchableSelect
-                options={staff}
-                value={selectedStaff}
-                onChange={(member) => {
-                  setSelectedStaff(member);
-                  set('assignedStaffId', member?.id ?? '');
-                }}
-                getOptionLabel={(m) =>
-                  [m.firstName, m.lastName].filter(Boolean).join(' ') || m.email || m.id
-                }
-                getOptionKey={(m) => m.id}
-                loading={staffLoading}
-                placeholder="Search and select employee..."
-                emptyMessage={
-                  staff.length === 0
-                    ? 'No staff found. Add a staff member first.'
-                    : 'No matching staff'
-                }
-              />
-            </FieldWrap>
-
-            {/* Notes */}
-            <FieldWrap label="Notes">
-              <textarea
-                rows={3}
-                value={form.notes}
-                onChange={(e) => set('notes', e.target.value)}
-                placeholder="Add any relevant notes or instructions..."
-                className={TEXTAREA}
-              />
+            <FieldWrap label="Frequency" required>
+              <div className="relative">
+                <select
+                  value={form.frequency}
+                  onChange={(e) => set('frequency', e.target.value)}
+                  className={`${SELECT} pr-9`}
+                >
+                  {FREQUENCY_OPTIONS.map((f) => (
+                    <option key={f.value} value={f.value} className="bg-surface">
+                      {f.label}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-txt-sub" />
+              </div>
             </FieldWrap>
           </div>
 
-          {/* ── Section 3: Reminders ─────────────────────────────────────── */}
-          <div className="rounded-2xl border border-divider bg-surface p-6 space-y-4 shadow-xs">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2.5">
-                <span className="w-6 h-6 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 text-xs font-bold flex items-center justify-center">
-                  3
-                </span>
-                <h3 className="text-base font-bold text-txt-main">Reminders</h3>
-              </div>
+          {/* Due Date & Priority Dropdown */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <FieldWrap label="Due Date" required>
+              <input
+                type="date"
+                value={form.dueDate}
+                onChange={(e) => {
+                  const d = e.target.value;
+                  set('dueDate', d);
+                  const opts = getValidDaysBeforeOptions(d);
+                  if (
+                    !opts.some((o) => o.value === form.reminder.daysBeforeDueDate) &&
+                    opts.length > 0
+                  ) {
+                    setReminder('daysBeforeDueDate', opts[0].value);
+                  }
+                }}
+                className={INPUT}
+              />
+            </FieldWrap>
 
-              {/* Styled toggle switch matching task definitions */}
+            {/* Priority as a dropdown */}
+            <FieldWrap label="Priority">
+              <div className="relative">
+                <select
+                  value={form.taskPriority}
+                  onChange={(e) => set('taskPriority', e.target.value as TaskPriority)}
+                  className={`${SELECT} pr-9`}
+                >
+                  <option value="LOW" className="bg-surface">● Low</option>
+                  <option value="MEDIUM" className="bg-surface">● Medium</option>
+                  <option value="HIGH" className="bg-surface">● High</option>
+                  <option value="URGENT" className="bg-surface">● Urgent</option>
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-txt-sub" />
+              </div>
+            </FieldWrap>
+          </div>
+
+          {/* Task Title */}
+          <FieldWrap label="Task Title">
+            <input
+              readOnly
+              value={generatedTaskTitle}
+              placeholder="Auto-generated based on client & type"
+              className={`${INPUT} cursor-default bg-bg/70 ${
+                generatedTaskTitle ? 'text-txt-main' : 'text-txt-sub/50'
+              }`}
+            />
+          </FieldWrap>
+
+          {/* Assigned To */}
+          <FieldWrap label="Assigned To">
+            <SearchableSelect
+              options={staff}
+              value={selectedStaff}
+              onChange={(member) => {
+                setSelectedStaff(member);
+                set('assignedStaffId', member?.id ?? '');
+              }}
+              getOptionLabel={(m) =>
+                [m.firstName, m.lastName].filter(Boolean).join(' ') || m.email || m.id
+              }
+              getOptionKey={(m) => m.id}
+              loading={staffLoading}
+              placeholder="Search and select employee"
+              emptyMessage={
+                staff.length === 0
+                  ? 'No staff found. Add a staff member first.'
+                  : 'No matching staff'
+              }
+            />
+          </FieldWrap>
+
+          {/* Notes */}
+          <FieldWrap label="Notes">
+            <textarea
+              rows={3}
+              value={form.notes}
+              onChange={(e) => set('notes', e.target.value)}
+              placeholder="Add any relevant notes or instructions..."
+              className={TEXTAREA}
+            />
+          </FieldWrap>
+        </DrawerSection>
+
+        {/* ── Section 3: Reminders ─────────────────────────────────────── */}
+        <DrawerSection
+          step={3}
+          title="Automated Reminders"
+          action={
+            <div
+              className="flex items-center gap-2 cursor-pointer select-none"
+              onClick={() => set('remindersEnabled', !form.remindersEnabled)}
+            >
               <div
-                className="flex items-center gap-2 cursor-pointer select-none"
-                onClick={() => set('remindersEnabled', !form.remindersEnabled)}
+                className={`w-9 h-5 rounded-full p-0.5 flex items-center transition-colors relative ${
+                  form.remindersEnabled ? 'bg-[#0F1E36] dark:bg-navy' : 'bg-slate-300 dark:bg-slate-700'
+                }`}
               >
                 <div
-                  className={`w-9 h-5 rounded-full p-0.5 flex items-center transition-colors relative ${
-                    form.remindersEnabled ? 'bg-[#0F1E36] dark:bg-navy' : 'bg-slate-300 dark:bg-slate-700'
+                  className={`w-4 h-4 bg-white rounded-full shadow-xs transition-transform ${
+                    form.remindersEnabled ? 'translate-x-4' : 'translate-x-0'
                   }`}
-                >
-                  <div
-                    className={`w-4 h-4 bg-white rounded-full shadow-xs transition-transform ${
-                      form.remindersEnabled ? 'translate-x-4' : 'translate-x-0'
-                    }`}
-                  />
-                </div>
-                <span
-                  className={`text-xs font-semibold ${
-                    form.remindersEnabled ? 'text-txt-main' : 'text-txt-sub'
-                  }`}
-                >
-                  {form.remindersEnabled ? 'On' : 'Off'}
-                </span>
+                />
               </div>
+              <span
+                className={`text-xs font-semibold ${
+                  form.remindersEnabled ? 'text-txt-main' : 'text-txt-sub'
+                }`}
+              >
+                {form.remindersEnabled ? 'On' : 'Off'}
+              </span>
             </div>
-
-            {form.remindersEnabled && (
-              <div className="space-y-4 pt-2">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <FieldWrap label="Delivery Channel" helper="Primary channel">
-                    <div className="relative">
-                      <select
-                        value={form.reminder.deliveryChannel}
-                        onChange={(e) =>
-                          setReminder('deliveryChannel', e.target.value as never)
-                        }
-                        className={`${SELECT} pr-8`}
+          }
+        >
+          {form.remindersEnabled ? (
+            <div className="space-y-4 pt-1">
+              {/* Delivery Channel 3 Cards Selection */}
+              <div>
+                <label className="block text-xs font-bold text-txt-main mb-2">
+                  Delivery Channel
+                </label>
+                <div className="grid grid-cols-3 gap-3">
+                  {channelList.map((ch) => {
+                    const isSelected = form.reminder.deliveryChannel === ch.id;
+                    return (
+                      <button
+                        type="button"
+                        key={ch.id}
+                        onClick={() => setReminder('deliveryChannel', ch.id)}
+                        className={`flex flex-col items-center justify-center gap-2 py-3.5 px-3 rounded-2xl border transition-all text-center cursor-pointer ${
+                          isSelected
+                            ? 'bg-[#0F1E36] text-white border-[#0F1E36] shadow-md ring-2 ring-[#0F1E36]/20'
+                            : 'bg-surface text-txt-main border-divider hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50'
+                        }`}
                       >
-                        {DELIVERY_CHANNELS.map((ch) => (
-                          <option key={ch.value} value={ch.value} className="bg-surface">
-                            {ch.icon} {ch.label}
-                          </option>
-                        ))}
-                      </select>
-                      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-txt-sub" />
-                    </div>
-                  </FieldWrap>
-
-                  <FieldWrap
-                    label="Days Before Due"
-                    helper={form.dueDate ? 'Days ahead to send' : 'Pick a due date first'}
-                  >
-                    <div className="relative">
-                      <select
-                        value={form.reminder.daysBeforeDueDate}
-                        onChange={(e) =>
-                          setReminder('daysBeforeDueDate', Number(e.target.value))
-                        }
-                        disabled={!form.dueDate}
-                        className={`${SELECT} pr-8 disabled:opacity-50`}
-                      >
-                        {validDaysBeforeOptions.map((opt) => (
-                          <option key={opt.value} value={opt.value} className="bg-surface">
-                            {opt.label}
-                          </option>
-                        ))}
-                      </select>
-                      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-txt-sub" />
-                    </div>
-                  </FieldWrap>
+                        <div
+                          className={`transition-transform duration-150 ${
+                            isSelected ? 'scale-110 text-white' : 'text-txt-sub'
+                          }`}
+                        >
+                          {ch.icon}
+                        </div>
+                        <span
+                          className={`text-xs font-bold tracking-tight ${
+                            isSelected ? 'text-white' : 'text-txt-main'
+                          }`}
+                        >
+                          {ch.label}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
+              </div>
 
-                {/* Template */}
-                <FieldWrap
-                  label="Message Template"
-                  required
-                  helper="Matched to task type & channel"
-                >
-                  <SearchableSelect
-                    options={templates}
-                    value={selectedTemplate}
-                    onChange={(template) => {
-                      setSelectedTemplate(template);
-                      set('templateId', template?.id ?? '');
-                    }}
-                    getOptionLabel={(t) => t.name}
-                    getOptionKey={(t) => t.id}
-                    loading={templatesLoading}
-                    placeholder="Search and select template..."
-                    emptyMessage={
-                      templates.length === 0
-                        ? 'No templates found. Create a template first.'
-                        : 'No matching templates'
+              {/* Days Before Due */}
+              <FieldWrap
+                label="Days Before Due"
+                helper={form.dueDate ? 'Days ahead to send' : 'Pick a due date first'}
+              >
+                <div className="relative">
+                  <select
+                    value={form.reminder.daysBeforeDueDate}
+                    onChange={(e) =>
+                      setReminder('daysBeforeDueDate', Number(e.target.value))
                     }
-                    renderOption={(t) => (
-                      <div>
-                        <p className="font-semibold text-txt-main">{t.name}</p>
-                        <p className="text-xs text-txt-sub">
-                          {t.businessCategory}
-                          {t.channels?.length ? ` · ${t.channels.join(', ')}` : ''}
-                        </p>
-                      </div>
-                    )}
-                  />
+                    disabled={!form.dueDate}
+                    className={`${SELECT} pr-9 disabled:opacity-50`}
+                  >
+                    {validDaysBeforeOptions.map((opt) => (
+                      <option key={opt.value} value={opt.value} className="bg-surface">
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-txt-sub" />
+                </div>
+              </FieldWrap>
 
-                  {/* Template preview card */}
-                  {selectedTemplate && (
-                    <div className="mt-3 rounded-xl border border-divider bg-bg/50 p-4 space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Sparkles className="w-3.5 h-3.5 text-[#F59E0B]" />
-                        <p className="text-xs font-bold text-txt-main">
-                          Template Preview
-                        </p>
-                      </div>
-                      <div className="text-xs text-txt-sub leading-relaxed">
-                        {form.reminder.deliveryChannel === 'EMAIL' &&
-                        selectedTemplate.templates?.email ? (
-                          <div className="space-y-1">
-                            <p className="font-semibold text-txt-main">
-                              {replaceTemplatePlaceholders(
-                                selectedTemplate.templates.email.subject
-                              )}
-                            </p>
-                            <p className="whitespace-pre-line text-txt-sub">
-                              {replaceTemplatePlaceholders(
-                                selectedTemplate.templates.email.body
-                              )}
-                            </p>
-                          </div>
-                        ) : form.reminder.deliveryChannel === 'EMAIL' ? (
-                          <p className="italic text-txt-sub/60">
-                            No Email content in this template
-                          </p>
-                        ) : null}
-
-                        {form.reminder.deliveryChannel === 'WHATSAPP' &&
-                        selectedTemplate.templates?.whatsapp ? (
-                          <p className="whitespace-pre-line text-txt-sub">
-                            💬{' '}
-                            {replaceTemplatePlaceholders(
-                              selectedTemplate.templates.whatsapp.body
-                            )}
-                          </p>
-                        ) : form.reminder.deliveryChannel === 'WHATSAPP' ? (
-                          <p className="italic text-txt-sub/60">
-                            No WhatsApp content in this template
-                          </p>
-                        ) : null}
-
-                        {form.reminder.deliveryChannel !== 'EMAIL' &&
-                          form.reminder.deliveryChannel !== 'WHATSAPP' && (
-                            <p className="italic text-txt-sub/60">
-                              No preview for {form.reminder.deliveryChannel}
-                            </p>
-                          )}
-                      </div>
+              {/* Template */}
+              <FieldWrap
+                label="Message Template"
+                required
+                helper="Matched to task type & channel"
+              >
+                <SearchableSelect
+                  options={templates}
+                  value={selectedTemplate}
+                  onChange={(template) => {
+                    setSelectedTemplate(template);
+                    set('templateId', template?.id ?? '');
+                  }}
+                  getOptionLabel={(t) => t.name}
+                  getOptionKey={(t) => t.id}
+                  loading={templatesLoading}
+                  placeholder="Search and select template"
+                  emptyMessage={
+                    templates.length === 0
+                      ? 'No templates found. Create a template first.'
+                      : 'No matching templates'
+                  }
+                  renderOption={(t) => (
+                    <div>
+                      <p className="font-semibold text-txt-main">{t.name}</p>
+                      <p className="text-xs text-txt-sub">
+                        {t.businessCategory}
+                        {t.channels?.length ? ` · ${t.channels.join(', ')}` : ''}
+                      </p>
                     </div>
                   )}
-                </FieldWrap>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+                />
+
+                {/* Template preview card */}
+                {selectedTemplate && (
+                  <div className="mt-3 rounded-xl border border-divider bg-bg/50 p-4 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-3.5 h-3.5 text-[#F59E0B]" />
+                      <p className="text-xs font-bold text-txt-main">
+                        Template Preview
+                      </p>
+                    </div>
+                    <div className="text-xs text-txt-sub leading-relaxed">
+                      {form.reminder.deliveryChannel === 'EMAIL' &&
+                      selectedTemplate.templates?.email ? (
+                        <div className="space-y-1">
+                          <p className="font-semibold text-txt-main">
+                            {replaceTemplatePlaceholders(
+                              selectedTemplate.templates.email.subject
+                            )}
+                          </p>
+                          <p className="whitespace-pre-line text-txt-sub">
+                            {replaceTemplatePlaceholders(
+                              selectedTemplate.templates.email.body
+                            )}
+                          </p>
+                        </div>
+                      ) : form.reminder.deliveryChannel === 'EMAIL' ? (
+                        <p className="italic text-txt-sub/60">
+                          No Email content in this template
+                        </p>
+                      ) : null}
+
+                      {form.reminder.deliveryChannel === 'WHATSAPP' &&
+                      selectedTemplate.templates?.whatsapp ? (
+                        <p className="whitespace-pre-line text-txt-sub">
+                          💬{' '}
+                          {replaceTemplatePlaceholders(
+                            selectedTemplate.templates.whatsapp.body
+                          )}
+                        </p>
+                      ) : form.reminder.deliveryChannel === 'WHATSAPP' ? (
+                        <p className="italic text-txt-sub/60">
+                          No WhatsApp content in this template
+                        </p>
+                      ) : null}
+
+                      {form.reminder.deliveryChannel !== 'EMAIL' &&
+                        form.reminder.deliveryChannel !== 'WHATSAPP' && (
+                          <p className="italic text-txt-sub/60">
+                            No preview for {form.reminder.deliveryChannel}
+                          </p>
+                        )}
+                    </div>
+                  </div>
+                )}
+              </FieldWrap>
+            </div>
+          ) : (
+            <p className="text-xs text-txt-sub py-1">
+              Automated reminders are turned off for this task. Turn on to configure notifications.
+            </p>
+          )}
+        </DrawerSection>
+      </div>
     </Drawer>
   );
 }
