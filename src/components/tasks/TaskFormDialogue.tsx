@@ -15,6 +15,7 @@ import {
   Mail,
   Sparkles,
   User2,
+  Loader2,
 } from 'lucide-react';
 import Drawer from '@/components/common/Drawer';
 import SearchableSelect from '@/components/common/SearchableSelect';
@@ -177,31 +178,81 @@ export default function TaskFormDialog({ open, onClose, businessId, onSuccess, t
   // ── Edit: fetch task ────────────────────────────────────────────────────────
   useEffect(() => {
     if (!open) return;
-    if (mode === 'create') { setInitialForm(undefined); return; }
+    if (mode === 'create') {
+      setInitialForm(undefined);
+      setSelectedClient(null);
+      setSelectedStaff(null);
+      setSelectedTemplate(null);
+      return;
+    }
     if (!taskId) return;
 
     (async () => {
       try {
         setLoadingTask(true);
+        setLocalError('');
         const task = await getTaskById(businessId, taskId);
-        const firstReminder = task.reminders?.upcoming?.[0];
-        const hasReminders = (task.reminders?.upcoming?.length ?? 0) > 0;
+        const firstReminder = task.reminders?.upcoming?.[0] ?? (task as any).remindersScheduled?.[0];
+        const hasReminders = ((task.reminders?.upcoming?.length ?? 0) > 0) || Boolean((task as any).remindersScheduled?.length);
+
+        // Match taskType with TASK_TYPES
+        const rawTaskType = task.taskType ?? '';
+        const matchedType = TASK_TYPES.find(
+          (t) =>
+            t.value === rawTaskType ||
+            t.apiValue === rawTaskType ||
+            t.label.toUpperCase() === rawTaskType.toUpperCase()
+        );
+        const resolvedTaskType = matchedType ? matchedType.value : rawTaskType;
+
+        // Match frequency with FREQUENCY_OPTIONS
+        const rawFrequency = (task.frequency ?? '').toLowerCase();
+        const matchedFreq = FREQUENCY_OPTIONS.find(
+          (f) =>
+            f.value.toLowerCase() === rawFrequency ||
+            f.value.replace('_', '').toLowerCase() === rawFrequency.replace('_', '').toLowerCase()
+        );
+        const resolvedFrequency = matchedFreq ? matchedFreq.value : 'one_time';
+
+        const rawDueDate = task.dates?.dueDate ?? task.dueDate ?? '';
+        const resolvedDueDate = rawDueDate ? rawDueDate.slice(0, 10) : '';
+        const resolvedAssigneeId = task.assignee?.id ?? (task as any).assignedStaffId ?? '';
+        const resolvedSubjectId = task.subject?.id ?? (task as any).subjectId ?? '';
+        const resolvedTemplateId = firstReminder?.messageTemplateId ?? (firstReminder as any)?.templateId ?? '';
+
         setInitialForm({
-          subjectId: task.subject?.id ?? '',
-          taskDefinitionId: '',
-          taskType: task.taskType ?? '',
-          taskPriority: 'MEDIUM',
-          frequency: task.frequency ?? 'ONETIME',
-          dueDate: (task.dates?.dueDate ?? task.dueDate ?? '').slice(0, 10),
-          assignedStaffId: task.assignee?.id ?? '',
-          templateId: firstReminder?.messageTemplateId ?? '',
-          notes: task.notes ?? '',
+          subjectId: resolvedSubjectId,
+          taskDefinitionId: (task as any).taskDefinitionId ?? '',
+          taskType: resolvedTaskType,
+          taskPriority: (task as any).priority ?? (task as any).taskPriority ?? 'MEDIUM',
+          frequency: resolvedFrequency,
+          dueDate: resolvedDueDate,
+          assignedStaffId: resolvedAssigneeId,
+          templateId: resolvedTemplateId,
+          notes: task.notes ?? (task as any).description ?? '',
           remindersEnabled: hasReminders,
           reminder: {
-            deliveryChannel: (firstReminder?.deliveryChannel as import('@/types/task.types').DeliveryChannel) ?? 'EMAIL',
+            deliveryChannel: ((firstReminder?.channel ?? (firstReminder as any)?.deliveryChannel ?? 'EMAIL').toUpperCase() as import('@/types/task.types').DeliveryChannel),
             daysBeforeDueDate: firstReminder?.daysBeforeDueDate ?? 1,
           },
         });
+
+        // Prefill client/staff immediately from task if available
+        if (task.subject) {
+          setSelectedClient({
+            id: task.subject.id,
+            displayName: task.subject.name,
+            businessName: (task.subject as any).businessName || task.subject.name,
+          } as SubjectListItem);
+        }
+        if (task.assignee) {
+          setSelectedStaff({
+            id: task.assignee.id,
+            firstName: task.assignee.name,
+            lastName: '',
+            email: '',
+          } as StaffMember);
+        }
       } catch (err) {
         setLocalError(err instanceof Error ? err.message : 'Failed to load task');
       } finally {
@@ -213,12 +264,18 @@ export default function TaskFormDialog({ open, onClose, businessId, onSuccess, t
   // ── Prefill selects ─────────────────────────────────────────────────────────
   useEffect(() => {
     if (!initialForm) return;
-    if (initialForm.subjectId && clients.length)
-      setSelectedClient(clients.find((c) => c.id === initialForm.subjectId) ?? null);
-    if (initialForm.assignedStaffId && staff.length)
-      setSelectedStaff(staff.find((s) => s.id === initialForm.assignedStaffId) ?? null);
-    if (initialForm.templateId && templates.length)
-      setSelectedTemplate(templates.find((t) => t.id === initialForm.templateId) ?? null);
+    if (initialForm.subjectId && clients.length) {
+      const found = clients.find((c) => c.id === initialForm.subjectId);
+      if (found) setSelectedClient(found);
+    }
+    if (initialForm.assignedStaffId && staff.length) {
+      const found = staff.find((s) => s.id === initialForm.assignedStaffId);
+      if (found) setSelectedStaff(found);
+    }
+    if (initialForm.templateId && templates.length) {
+      const found = templates.find((t) => t.id === initialForm.templateId);
+      if (found) setSelectedTemplate(found);
+    }
   }, [initialForm, clients, staff, templates]);
 
   const combinedError = error || fetchError;
@@ -262,6 +319,13 @@ export default function TaskFormDialog({ open, onClose, businessId, onSuccess, t
       submitVariant="success"
       width="md"
     >
+      {loadingTask ? (
+        <div className="flex flex-col items-center justify-center py-24 gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-[var(--accent)]" />
+          <p className="text-sm font-semibold text-txt-main">Loading task details...</p>
+          <p className="text-xs text-txt-sub">Please wait while we retrieve the task information.</p>
+        </div>
+      ) : (
       <div className="space-y-4">
 
         {/* ── Error banner ─────────────────────────────────────────────── */}
@@ -551,6 +615,7 @@ export default function TaskFormDialog({ open, onClose, businessId, onSuccess, t
           )}
         </SectionCard>
       </div>
+      )}
     </Drawer>
   );
 }

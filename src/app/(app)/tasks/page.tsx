@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, X, Eye, Trash2 } from 'lucide-react';
+import { Plus, X, Eye, Pencil, Trash2 } from 'lucide-react';
 import { useWorkspace } from '@/context/WorkspaceContext';
 
 import { TaskListItem } from '@/types/task.types';
@@ -11,6 +11,8 @@ import { useTaskFilters } from '@/hooks/tasks/useTaskFilters';
 import PageFilterBar from '@/components/common/PageFilter';
 import TaskFormDialog from '@/components/tasks/TaskFormDialogue';
 import ConfirmDialog from '@/components/tasks/ConfirmDialog';
+import { updateTask } from '@/services/taskService';
+import { TASK_TYPES } from '@/constants/taskConstants';
 
 const columns: GridColumn<TaskListItem>[] = [
   { headerName: 'Title', field: 'title', minWidth: 220, flex: 2, editable: true },
@@ -27,10 +29,19 @@ const columns: GridColumn<TaskListItem>[] = [
     editable: true,
     cellEditor: 'agSelectCellEditor',
     cellEditorParams: {
-      values: ['Tax Filing', 'GST', 'Audit', 'Compliance', 'Accounting'],
+      values: TASK_TYPES.map((t) => t.label),
     },
   },
-  { headerName: 'Status', field: 'status', minWidth: 140, editable: true },
+  {
+    headerName: 'Status',
+    field: 'status',
+    minWidth: 140,
+    editable: true,
+    cellEditor: 'agSelectCellEditor',
+    cellEditorParams: {
+      values: ['OPEN', 'PENDING', 'IN_PROGRESS', 'COMPLETED', 'CLOSED', 'CANCELLED'],
+    },
+  },
   {
     headerName: 'Due Date',
     field: 'dueDate',
@@ -94,7 +105,18 @@ export default function TasksPage() {
   };
 
   const actions: GridAction<TaskListItem>[] = [
-    { label: 'View', icon: <Eye className="h-4 w-4" />, variant: 'secondary', onClick: (row) => handleView(row.id) },
+    {
+      label: 'View',
+      icon: <Eye className="h-4 w-4" />,
+      variant: 'primary',
+      onClick: (row) => handleView(row.id),
+    },
+    {
+      label: 'Edit',
+      icon: <Pencil className="h-4 w-4" />,
+      variant: 'secondary',
+      onClick: (row) => handleEdit(row.id),
+    },
     {
       label: 'Delete',
       icon: <Trash2 className="h-4 w-4" />,
@@ -152,8 +174,17 @@ export default function TasksPage() {
           isLoading={loading}
           onRowClick={(row) => handleView(row.id)}
           onRowDoubleClick={(row) => handleEdit(row.id)}
-          onCellValueChanged={({ row, field, newValue }) => {
-            // TODO: updateTask(businessId, row.id, { [field]: newValue })
+          onUpdateCell={async ({ row, field, newValue }) => {
+            if (!businessId) return;
+            let valueToSave = newValue;
+            if (field === 'taskType') {
+              const matched = TASK_TYPES.find(
+                (t) => t.label === newValue || t.value === newValue || t.apiValue === newValue
+              );
+              if (matched) valueToSave = matched.apiValue;
+            }
+            await updateTask(businessId, row.id, { [field]: valueToSave });
+            refetch();
           }}
           emptyMessage="No tasks found"
         />

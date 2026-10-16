@@ -5,6 +5,7 @@ import { AgGridReact } from "ag-grid-react";
 import { Eye, Pencil, Trash2, Loader2 } from "lucide-react";
 import { useIsDarkMode } from "@/hooks/useIsDarkMode";
 import { agGridDefaultConfig } from "@/constants/agConfig";
+import { useToast } from "@/context/ToastContext";
 
 
 import {
@@ -66,6 +67,7 @@ export interface CommonDataGridProps<T = any> {
     actions?: GridAction<T>[];
     isLoading?: boolean;
     onRowClick?: (row: T) => void;
+    onRowDoubleClick?: (row: T) => void;
     rowHeight?: number;
     paginationPageSize?: number;
     paginationPageSizeSelector?: number[] | false;
@@ -76,8 +78,16 @@ export interface CommonDataGridProps<T = any> {
     editable?: boolean;
     selectionMode?: "singleRow" | "multiRow" | "none";
     className?: string;
-    // Fired when an editable cell is committed. Wire this to a save call later —
-    // for now it's safe to leave unhandled, edits just update the grid's local state.
+    // Common dynamic database update handler for inline cell edits:
+    onUpdateCell?: (params: {
+        row: T;
+        field: string;
+        newValue: any;
+        oldValue: any;
+    }) => Promise<any> | void;
+    // Optional custom success message generator
+    getUpdateSuccessMessage?: (field: string, newValue: any, row: T) => string;
+    // Fired when an editable cell is committed.
     onCellValueChanged?: (params: {
         row: T;
         field: string | undefined;
@@ -135,7 +145,8 @@ function ActionCell<T = any>({ row, actions }: ActionCellProps<T>) {
                 return (
                     <button
                         key={idx}
-                        onClick={() => {
+                        onClick={(e) => {
+                            e.stopPropagation();
                             if (!isLoading && !isDisabled) {
                                 action.onClick(row);
                             }
@@ -171,7 +182,10 @@ export default function CommonDataGrid<T extends Record<string, any>>({
     actions = [],
     isLoading = false,
     onRowClick,
-    onCellValueChanged,   // ← add this
+    onRowDoubleClick,
+    onUpdateCell,
+    getUpdateSuccessMessage,
+    onCellValueChanged,
     rowHeight = agGridDefaultConfig.rowHeight,
     paginationPageSize = 10,
     paginationPageSizeSelector = [10, 20, 50, 100],
@@ -183,6 +197,7 @@ export default function CommonDataGrid<T extends Record<string, any>>({
     className = "",
 }: CommonDataGridProps<T>) {
     const isDark = useIsDarkMode();
+    const toast = useToast();
 
     // Map selection mode to AG Grid format
     const rowSelection =
@@ -192,7 +207,6 @@ export default function CommonDataGrid<T extends Record<string, any>>({
                 ? "multiple"
                 : undefined;
 
-    // Build column definitions
     // Build column definitions
     const columnDefs = useMemo(() => {
         const cols: ColDef<T>[] = columns.map((col) => {
@@ -243,7 +257,7 @@ export default function CommonDataGrid<T extends Record<string, any>>({
             cols.push({
                 headerName: "Actions",
                 colId: "actions",
-                width: Math.min(actions.length * 60, 220),
+                width: Math.max(actions.length * 48 + 36, 130),
                 minWidth: 120,
 
                 sortable: false,
@@ -322,12 +336,60 @@ export default function CommonDataGrid<T extends Record<string, any>>({
                                 ...defaultColDef,
                             }}
 
-                            onCellValueChanged={(event) => {
+                            onRowClicked={(event) => {
+                                if (event.column?.getColId() === 'actions') return;
+                                if (event.data) {
+                                    onRowClick?.(event.data as T);
+                                }
+                            }}
+
+                            onRowDoubleClicked={(event) => {
+                                if (event.column?.getColId() === 'actions') return;
+                                // If user double-clicks an editable cell, let AG Grid inline editing take place without firing row double-click
+                                if (event.colDef?.editable) return;
+                                if (event.data) {
+                                    onRowDoubleClick?.(event.data as T);
+                                }
+                            }}
+
+                            onCellValueChanged={async (event) => {
+                                const field = event.colDef.field;
+                                const oldValue = event.oldValue;
+                                const newValue = event.newValue;
+                                const row = event.data as T;
+                                const headerName = event.colDef.headerName || field || 'Item';
+
+                                // Skip if value did not change
+                                if (oldValue === newValue) return;
+
+                                if (onUpdateCell && field) {
+                                    try {
+                                        await onUpdateCell({
+                                            row,
+                                            field,
+                                            newValue,
+                                            oldValue,
+                                        });
+                                        const successMsg = getUpdateSuccessMessage
+                                            ? getUpdateSuccessMessage(field, newValue, row)
+                                            : `${headerName} updated successfully`;
+                                        toast.success(successMsg);
+                                    } catch (err: unknown) {
+                                        // Revert cell in AG Grid on failure
+                                        if (field) {
+                                            event.node.setDataValue(field, oldValue);
+                                        }
+                                        const errorMsg =
+                                            err instanceof Error ? err.message : `Failed to update ${headerName}`;
+                                        toast.error(errorMsg);
+                                    }
+                                }
+
                                 onCellValueChanged?.({
-                                    row: event.data as T,
-                                    field: event.colDef.field as string | undefined,
-                                    oldValue: event.oldValue,
-                                    newValue: event.newValue,
+                                    row,
+                                    field: field as string | undefined,
+                                    oldValue,
+                                    newValue,
                                 });
                             }}
                         />

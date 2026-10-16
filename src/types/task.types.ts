@@ -182,6 +182,13 @@ export interface CreateTaskDto {
 // 4️⃣ Update Task Request
 // ─────────────────────────────────────────────
 export interface UpdateTaskDto {
+  title?: string;
+  taskName?: string;
+  subjectId?: string;
+  taskDefinitionId?: string;
+  taskType?: string | null;
+  category?: string | null;
+  frequency?: string;
   description?: string;
   notes?: string;
   status?: TaskStatus;
@@ -189,6 +196,7 @@ export interface UpdateTaskDto {
   dueDate?: string;
   assignedStaffId?: string;
   metadata?: TaskMetadata;
+  remindersScheduled?: ReminderSchedule[];
 }
 
 //to Create Reminder
