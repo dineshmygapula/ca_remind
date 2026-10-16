@@ -1,7 +1,6 @@
 'use client';
 
-import FilterBar, { FilterSelectConfig } from '@/components/common/Filter';
-import { SCHEDULE_PATTERNS } from '@/constants/taskDefinition.constants';
+import FilterBar from '@/components/common/Filter';
 
 interface TaskDefinitionsFilterProps {
   searchQuery: string;
@@ -26,41 +25,6 @@ export default function TaskDefinitionsFilter({
   onAutoCreateChange,
   onReset,
 }: TaskDefinitionsFilterProps) {
-  const filters: FilterSelectConfig[] = [
-    {
-      key: 'status',
-      label: 'Status',
-      value: statusFilter,
-      options: [
-        { value: 'ALL', label: 'All Status' },
-        { value: 'ACTIVE', label: 'Active' },
-        { value: 'INACTIVE', label: 'Inactive' },
-      ],
-      onChange: (val) => onStatusChange(val as 'ALL' | 'ACTIVE' | 'INACTIVE'),
-    },
-    {
-      key: 'schedule',
-      label: 'Schedule',
-      value: scheduleFilter || 'ALL',
-      options: [
-        { value: 'ALL', label: 'All Schedules' },
-        ...SCHEDULE_PATTERNS.map((p) => ({ value: p.value, label: p.label })),
-      ],
-      onChange: (val) => onScheduleChange(val === 'ALL' ? '' : val),
-    },
-    {
-      key: 'autoCreate',
-      label: 'Auto Create',
-      value: autoCreateFilter,
-      options: [
-        { value: 'ALL', label: 'All' },
-        { value: 'ON', label: 'Auto ON' },
-        { value: 'OFF', label: 'Auto OFF' },
-      ],
-      onChange: (val) => onAutoCreateChange(val as 'ALL' | 'ON' | 'OFF'),
-    },
-  ];
-
   const handleReset = () => {
     onSearchChange('');
     onStatusChange('ALL');
@@ -73,8 +37,41 @@ export default function TaskDefinitionsFilter({
     <FilterBar
       searchValue={searchQuery}
       onSearchChange={onSearchChange}
-      searchPlaceholder="Search task rules by name or type..."
-      filters={filters}
+      searchPlaceholder="Search rules by name or type"
+      tabs={{
+        options: [
+          { label: 'All', value: '' },
+          { label: 'Monthly', value: 'monthly' },
+          { label: 'Quarterly', value: 'quarterly' },
+          { label: 'Yearly', value: 'yearly' },
+        ],
+        value: scheduleFilter,
+        onChange: onScheduleChange,
+      }}
+      filters={[
+        {
+          key: 'status',
+          label: 'Status',
+          value: statusFilter,
+          options: [
+            { label: 'All', value: 'ALL' },
+            { label: 'Active', value: 'ACTIVE' },
+            { label: 'Inactive', value: 'INACTIVE' },
+          ],
+          onChange: (v) => onStatusChange(v as 'ALL' | 'ACTIVE' | 'INACTIVE'),
+        },
+        {
+          key: 'autoCreate',
+          label: 'Auto-create',
+          value: autoCreateFilter,
+          options: [
+            { label: 'All', value: 'ALL' },
+            { label: 'Auto ON', value: 'ON' },
+            { label: 'Auto OFF', value: 'OFF' },
+          ],
+          onChange: (v) => onAutoCreateChange(v as 'ALL' | 'ON' | 'OFF'),
+        },
+      ]}
       onReset={handleReset}
     />
   );

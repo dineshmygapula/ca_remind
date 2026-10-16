@@ -220,11 +220,11 @@ export default function RemindersPage() {
 
           <button
             type="button"
-            className="btn gap-2 border-none bg-navy text-white hover:bg-navy-hover"
+            className="inline-flex items-center gap-2 rounded-xl bg-navy hover:bg-navy-hover px-4 py-2.5 text-sm font-semibold text-white shadow-xs transition-colors cursor-pointer"
             onClick={handleCreate}
           >
             <Plus className="h-4 w-4" />
-            Create Reminder
+            <span>Create Reminder</span>
           </button>
         </div>
 

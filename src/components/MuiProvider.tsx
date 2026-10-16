@@ -30,6 +30,8 @@ const theme = createTheme({
   },
   typography: {
     fontFamily: [
+      'var(--font-manrope)',
+      'Manrope',
       'system-ui',
       '-apple-system',
       'BlinkMacSystemFont',

@@ -16,6 +16,7 @@ import {
   FileText,
   AlertTriangle,
   CheckCircle2,
+  X,
 } from 'lucide-react';
 import Drawer from '@/components/common/Drawer';
 import { ReminderDetail, ReminderStatus } from '@/types/reminders.types';
@@ -36,15 +37,15 @@ interface ReminderDetailsDrawerProps {
 const getStatusBadge = (status?: ReminderStatus) => {
   switch (status) {
     case 'SENT':
-      return 'bg-emerald-500/20 text-emerald-300 border-emerald-400/40';
+      return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40';
     case 'SCHEDULED':
-      return 'bg-amber-500/20 text-amber-300 border-amber-400/40';
+      return 'bg-amber-500/20 text-amber-400 border-amber-500/40';
     case 'FAILED':
-      return 'bg-red-500/20 text-red-300 border-red-400/40';
+      return 'bg-red-500/20 text-red-400 border-red-500/40';
     case 'CANCELLED':
-      return 'bg-slate-500/20 text-slate-300 border-slate-400/40';
+      return 'bg-slate-500/20 text-slate-300 border-slate-500/40';
     default:
-      return 'bg-white/10 text-white/70 border-white/20';
+      return 'bg-white/10 text-white/80 border-white/20';
   }
 };
 
@@ -109,8 +110,8 @@ export default function ReminderDetailsDrawer({
     value: React.ReactNode;
     icon: React.ComponentType<{ className?: string }>;
   }) => (
-    <div className="flex items-start gap-3 py-2 border-b border-[var(--border)]/60 last:border-b-0">
-      <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--surface-subtle)] text-[var(--accent)]">
+    <div className="flex items-start gap-3 py-2.5 border-b border-divider/60 last:border-b-0">
+      <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-bg text-txt-sub">
         <Icon className="h-4 w-4" />
       </div>
       <div className="min-w-0 flex-1">
@@ -124,110 +125,152 @@ export default function ReminderDetailsDrawer({
     </div>
   );
 
+  const messageText =
+    typeof reminder?.message === 'string'
+      ? reminder.message
+      : (reminder?.message as any)?.body || '';
+  const messageTitle =
+    typeof reminder?.message === 'object' && reminder?.message !== null
+      ? (reminder.message as any).title
+      : null;
+
   return (
     <Drawer
       open={open}
       onClose={handleClose}
-      eyebrow="Reminder Overview"
       title={reminder?.task?.title || (loading ? 'Loading...' : 'Reminder Details')}
-      width="md"
-      badge={
-        reminder ? (
-          <span
-            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold border ${getStatusBadge(
-              reminder.status
-            )}`}
-          >
-            {REMINDER_STATUS_LABELS[reminder.status] ?? reminder.status}
-          </span>
-        ) : undefined
-      }
-      icon={<Bell className="h-4 w-4 text-[var(--accent)]" />}
-      headerActions={
-        reminderId && (
-          <button
-            type="button"
-            onClick={() => {
-              handleClose();
-              onEdit(reminderId);
-            }}
-            aria-label="Edit reminder"
-            className="rounded-xl bg-white/10 border border-white/20 p-1.5 transition-all hover:bg-white/25 hover:scale-105 text-white"
-            title="Edit Reminder"
-          >
-            <Pencil className="h-4 w-4" />
-          </button>
-        )
+      width="lg"
+      customHeader={
+        <div className="bg-[#0B1528] px-6 py-5 flex items-center justify-between text-white shrink-0">
+          <div className="flex items-center gap-3.5 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-[#F59E0B] flex items-center justify-center text-slate-900 shadow-sm shrink-0">
+              <Bell className="h-5 w-5 text-slate-900" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 mb-0.5">
+                <p className="text-xs font-semibold text-[#F59E0B] uppercase tracking-wider">
+                  Reminder Overview
+                </p>
+                {reminder && (
+                  <span
+                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${getStatusBadge(
+                      reminder.status
+                    )}`}
+                  >
+                    {REMINDER_STATUS_LABELS[reminder.status] ?? reminder.status}
+                  </span>
+                )}
+              </div>
+              <h2 className="text-lg font-bold leading-tight text-white truncate">
+                {reminder?.task?.title || (loading ? 'Loading...' : 'Reminder Details')}
+              </h2>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {reminderId && (
+              <button
+                type="button"
+                onClick={() => {
+                  handleClose();
+                  onEdit(reminderId);
+                }}
+                className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
+                title="Edit Reminder"
+              >
+                <Pencil className="h-4 w-4" />
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={handleClose}
+              className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
       }
       footer={
-        reminder ? (
-          <div className="flex gap-3">
+        <div className="flex items-center justify-end gap-3 w-full">
+          <button
+            type="button"
+            onClick={handleClose}
+            className="rounded-xl border border-divider py-2.5 px-6 text-sm font-semibold text-txt-main bg-surface transition-colors hover:bg-bg cursor-pointer"
+          >
+            Close
+          </button>
+          {reminderId && (
             <button
               type="button"
               onClick={() => {
                 handleClose();
-                onEdit(reminder.id);
+                onEdit(reminderId);
               }}
-              className="btn btn-outline btn-sm flex-1 font-bold"
+              className="inline-flex items-center gap-2 rounded-xl bg-[#F59E0B] hover:bg-[#D97706] text-slate-900 py-2.5 px-6 text-sm font-semibold shadow-xs transition-colors cursor-pointer"
             >
-              <Pencil className="h-3.5 w-3.5" />
-              Edit Reminder
+              <Pencil className="h-4 w-4 text-slate-900" />
+              <span>Edit reminder</span>
             </button>
-            <button
-              type="button"
-              onClick={handleClose}
-              className="btn btn-ghost btn-sm text-txt-sub"
-            >
-              Close
-            </button>
-          </div>
-        ) : undefined
+          )}
+        </div>
       }
     >
       {loading && (
-        <div className="flex flex-col items-center justify-center py-16 text-txt-sub">
-          <Loader2 className="h-8 w-8 animate-spin text-[var(--accent)] mb-2" />
-          <span className="text-sm">Loading reminder details...</span>
+        <div className="flex flex-col items-center justify-center py-20 text-txt-sub">
+          <Loader2 className="h-8 w-8 animate-spin text-[#F59E0B] mb-2" />
+          <span className="text-sm font-medium">Loading reminder details...</span>
         </div>
       )}
 
       {error && (
-        <div className="alert alert-error mb-4 flex items-center gap-2 text-sm">
+        <div role="alert" className="alert alert-error mb-4 flex items-center gap-2 text-sm rounded-xl">
           <AlertCircle className="h-4 w-4 shrink-0" />
           <span>{error}</span>
         </div>
       )}
 
-      {!loading && reminder && (
-        <div className="space-y-4">
-          {/* Main Details Card */}
-          <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-sm space-y-3">
-            <div className="flex items-center gap-2 flex-wrap pb-2 border-b border-[var(--border)]/70">
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                <ChannelIcon channel={reminder.channel} />
-                <span>{REMINDER_CHANNEL_LABELS[reminder.channel] ?? reminder.channel}</span>
-              </span>
-
-              {reminder.taskType && (
-                <span className="px-2.5 py-0.5 rounded-md text-xs font-semibold bg-[var(--surface-subtle)] text-txt-main border border-[var(--border)]">
-                  {reminder.taskType}
+      {reminder && !loading && (
+        <div className="space-y-5 py-2">
+          {/* ── Section 1: Reminder Overview ── */}
+          <div className="rounded-2xl border border-divider bg-surface p-6 space-y-4 shadow-xs">
+            <div className="flex items-center justify-between pb-3 border-b border-divider">
+              <div className="flex items-center gap-2.5">
+                <span className="w-6 h-6 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 text-xs font-bold flex items-center justify-center">
+                  1
                 </span>
-              )}
+                <h3 className="text-base font-bold text-txt-main">
+                  Configuration &amp; Details
+                </h3>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-bg border border-divider text-txt-main">
+                  <ChannelIcon channel={reminder.channel} />
+                  <span>{REMINDER_CHANNEL_LABELS[reminder.channel] ?? reminder.channel}</span>
+                </span>
+              </div>
             </div>
 
-            <div className="divide-y divide-[var(--border)]/40">
+            <div className="divide-y divide-divider">
               <InfoRow
-                label="Task Title"
-                value={reminder.task?.title}
+                label="Associated Task"
+                value={
+                  <div className="font-semibold text-txt-main">
+                    {reminder.task?.title ?? '—'}
+                  </div>
+                }
                 icon={FileText}
               />
 
               <InfoRow
                 label="Task Due Date"
                 value={
-                  reminder.task?.dueDate
-                    ? new Date(reminder.task.dueDate).toLocaleDateString('en-IN')
-                    : '—'
+                  reminder.task?.dueDate ? (
+                    <span className="font-medium text-txt-main">
+                      {new Date(reminder.task.dueDate).toLocaleDateString('en-IN')}
+                    </span>
+                  ) : (
+                    '—'
+                  )
                 }
                 icon={Calendar}
               />
@@ -240,9 +283,7 @@ export default function ReminderDetailsDrawer({
                       {reminder.subject?.name ?? '—'}
                     </span>
                     {reminder.subject?.type && (
-                      <span className="badge badge-xs badge-ghost text-txt-sub">
-                        {reminder.subject.type}
-                      </span>
+                      <span className="text-xs text-txt-sub">({reminder.subject.type})</span>
                     )}
                   </div>
                 }
@@ -256,8 +297,8 @@ export default function ReminderDetailsDrawer({
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-xs">{reminder.recipient?.value}</span>
                       {reminder.recipient?.type && (
-                        <span className="badge badge-xs badge-outline text-txt-sub">
-                          {reminder.recipient.type}
+                        <span className="text-xs text-txt-sub">
+                          ({reminder.recipient.type})
                         </span>
                       )}
                     </div>
@@ -294,29 +335,30 @@ export default function ReminderDetailsDrawer({
             </div>
           </div>
 
-          {/* Message Content Card */}
-          {reminder.message && (reminder.message.title || reminder.message.body) && (
-            <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-sm">
-              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-txt-sub mb-2">
-                <MessageSquare className="h-3.5 w-3.5 text-[var(--accent)]" />
-                <span>Message Payload</span>
+          {/* ── Section 2: Message Payload ── */}
+          {(messageTitle || messageText) && (
+            <div className="rounded-2xl border border-divider bg-surface p-6 space-y-3 shadow-xs">
+              <div className="flex items-center gap-2.5 mb-1">
+                <span className="w-6 h-6 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 text-xs font-bold flex items-center justify-center">
+                  2
+                </span>
+                <h3 className="text-base font-bold text-txt-main">Message Payload</h3>
               </div>
-              {reminder.message.title && (
-                <p className="text-xs font-bold text-txt-main mb-1">
-                  {reminder.message.title}
-                </p>
+
+              {messageTitle && (
+                <p className="text-xs font-bold text-txt-main">{messageTitle}</p>
               )}
-              {reminder.message.body && (
-                <div className="p-3 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border)] text-xs text-txt-main whitespace-pre-wrap leading-relaxed font-sans">
-                  {reminder.message.body}
+              {messageText && (
+                <div className="p-4 rounded-xl bg-bg/50 border border-divider text-xs text-txt-main whitespace-pre-wrap leading-relaxed font-sans">
+                  {messageText}
                 </div>
               )}
             </div>
           )}
 
-          {/* Last Error Card */}
+          {/* ── Error Banner if any ── */}
           {reminder.lastError && (
-            <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-xs text-red-700 space-y-1">
+            <div className="rounded-2xl border border-red-200 dark:border-rose-900 bg-red-50/70 dark:bg-rose-950/30 p-4 text-xs text-red-700 dark:text-rose-300 space-y-1">
               <div className="flex items-center gap-1.5 font-bold">
                 <AlertTriangle className="h-4 w-4 shrink-0 text-red-500" />
                 <span>Dispatch Error</span>

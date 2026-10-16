@@ -191,17 +191,17 @@ function ProfileDropdown({
     {
       heading: "PREFERENCES",
       items: [
-        { label: "Subscription & Billing", icon: CreditCard, href: "/billing" },
+        { label: "Subscription & Billing", icon: CreditCard, href: "/subscription" },
         { label: "Notification Settings", icon: Bell, href: "/notifications" },
       ],
     },
     {
       heading: "SUPPORT",
       items: [
-        { label: "Talk With Agent", icon: Headphones, href: "/support/agent" },
-        { label: "About App", icon: Info, href: "/about" },
+        { label: "Talk With Agent", icon: Headphones, href: "/talkwithagent" },
+        { label: "About App", icon: Info, href: "/aboutapp" },
         { label: "Policies", icon: ShieldCheck, href: "/policies" },
-        { label: "Help & Support", icon: HelpCircle, href: "/help" },
+        { label: "Help & Support", icon: HelpCircle, href: "/help&support" },
       ],
     },
   ];

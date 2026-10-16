@@ -19,6 +19,7 @@ import {
   AlertCircle,
   ClipboardList,
   RotateCcw,
+  X,
 } from 'lucide-react';
 import Drawer from '@/components/common/Drawer';
 import { getTaskById, updateTask } from '@/services/taskService';
@@ -37,17 +38,17 @@ interface TaskDetailsDrawerProps {
 const getStatusBadge = (status?: string) => {
   switch (status) {
     case 'COMPLETED':
-      return 'bg-emerald-500/20 text-emerald-300 border-emerald-400/40';
+      return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40';
     case 'IN_PROGRESS':
-      return 'bg-blue-500/20 text-blue-300 border-blue-400/40';
+      return 'bg-blue-500/20 text-blue-400 border-blue-500/40';
     case 'PENDING':
-      return 'bg-amber-500/20 text-amber-300 border-amber-400/40';
+      return 'bg-amber-500/20 text-amber-400 border-amber-500/40';
     case 'CANCELLED':
-      return 'bg-red-500/20 text-red-300 border-red-400/40';
+      return 'bg-red-500/20 text-red-400 border-red-500/40';
     case 'CLOSED':
-      return 'bg-slate-500/20 text-slate-300 border-slate-400/40';
+      return 'bg-slate-500/20 text-slate-300 border-slate-500/40';
     default:
-      return 'bg-white/10 text-white/70 border-white/20';
+      return 'bg-white/10 text-white/80 border-white/20';
   }
 };
 
@@ -58,10 +59,25 @@ const getDaysUntilDue = (dueDateStr?: string) => {
   const due = new Date(dueDateStr);
   due.setHours(0, 0, 0, 0);
   const diffDays = Math.ceil((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-  if (diffDays < 0) return { text: `${Math.abs(diffDays)} days overdue`, color: 'text-red-600 bg-red-50 border-red-200' };
-  if (diffDays === 0) return { text: 'Due today', color: 'text-amber-600 bg-amber-50 border-amber-200' };
-  if (diffDays === 1) return { text: 'Due tomorrow', color: 'text-blue-600 bg-blue-50 border-blue-200' };
-  return { text: `in ${diffDays} days`, color: 'text-txt-sub bg-slate-50 border-slate-200' };
+  if (diffDays < 0)
+    return {
+      text: `${Math.abs(diffDays)} days overdue`,
+      color: 'text-red-600 bg-red-50 border-red-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900',
+    };
+  if (diffDays === 0)
+    return {
+      text: 'Due today',
+      color: 'text-amber-600 bg-amber-50 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900',
+    };
+  if (diffDays === 1)
+    return {
+      text: 'Due tomorrow',
+      color: 'text-blue-600 bg-blue-50 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900',
+    };
+  return {
+    text: `in ${diffDays} days`,
+    color: 'text-txt-sub bg-bg border-divider',
+  };
 };
 
 export default function TaskDetailsDrawer({
@@ -131,8 +147,8 @@ export default function TaskDetailsDrawer({
     value: React.ReactNode;
     icon: React.ComponentType<{ className?: string }>;
   }) => (
-    <div className="flex items-start gap-3 py-2 border-b border-[var(--border)]/60 last:border-b-0">
-      <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--surface-subtle)] text-[var(--accent)]">
+    <div className="flex items-start gap-3 py-2.5 border-b border-divider/60 last:border-b-0">
+      <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-bg text-txt-sub">
         <Icon className="h-4 w-4" />
       </div>
       <div className="min-w-0 flex-1">
@@ -166,99 +182,135 @@ export default function TaskDetailsDrawer({
     <Drawer
       open={open}
       onClose={onClose}
-      eyebrow="Task Overview"
       title={task?.title || (loading ? 'Loading...' : 'Task Details')}
-      width="md"
-      badge={
-        task ? (
-          <span
-            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold border ${getStatusBadge(
-              task.status
-            )}`}
-          >
-            {task.status}
-          </span>
-        ) : undefined
-      }
-      icon={<ClipboardList className="h-4 w-4 text-[var(--accent)]" />}
-      headerActions={
-        taskId && (
-          <button
-            type="button"
-            onClick={() => {
-              onClose();
-              onEdit(taskId);
-            }}
-            aria-label="Edit task"
-            className="rounded-xl bg-white/10 border border-white/20 p-1.5 transition-all hover:bg-white/25 hover:scale-105 text-white"
-            title="Edit Task"
-          >
-            <Pencil className="h-4 w-4" />
-          </button>
-        )
+      width="lg"
+      customHeader={
+        <div className="bg-[#0B1528] px-6 py-5 flex items-center justify-between text-white shrink-0">
+          <div className="flex items-center gap-3.5 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-[#F59E0B] flex items-center justify-center text-slate-900 shadow-sm shrink-0">
+              <ClipboardList className="h-5 w-5 text-slate-900" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 mb-0.5">
+                <p className="text-xs font-semibold text-[#F59E0B] uppercase tracking-wider">
+                  Task Overview
+                </p>
+                {task && (
+                  <span
+                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${getStatusBadge(
+                      task.status
+                    )}`}
+                  >
+                    {task.status}
+                  </span>
+                )}
+              </div>
+              <h2 className="text-lg font-bold leading-tight text-white truncate">
+                {task?.title || (loading ? 'Loading...' : 'Task Details')}
+              </h2>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {taskId && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onEdit(taskId);
+                }}
+                className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
+                title="Edit Task"
+              >
+                <Pencil className="h-4 w-4" />
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
       }
       footer={
         task ? (
-          <button
-            type="button"
-            onClick={handleToggleStatus}
-            disabled={statusUpdating}
-            className={`w-full py-2.5 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 border ${
-              task.status === 'COMPLETED'
-                ? 'border-amber-300 text-amber-700 bg-amber-50 hover:bg-amber-100'
-                : 'bg-emerald-600 border-emerald-700 text-white hover:bg-emerald-700'
-            } disabled:opacity-50`}
-          >
-            {statusUpdating && <Loader2 className="h-4 w-4 animate-spin" />}
-            {task.status === 'COMPLETED' ? (
-              <>
-                <RotateCcw className="h-4 w-4" />
-                Reopen Task
-              </>
-            ) : (
-              <>
-                <CheckCircle2 className="h-4 w-4" />
-                Mark as Completed
-              </>
-            )}
-          </button>
+          <div className="flex items-center justify-between gap-3 w-full">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-xl border border-divider py-2.5 px-6 text-sm font-semibold text-txt-main bg-surface transition-colors hover:bg-bg cursor-pointer"
+            >
+              Close
+            </button>
+            <button
+              type="button"
+              onClick={handleToggleStatus}
+              disabled={statusUpdating}
+              className={`inline-flex items-center gap-2 rounded-xl py-2.5 px-6 text-sm font-semibold shadow-xs transition-colors cursor-pointer disabled:opacity-50 ${
+                task.status === 'COMPLETED'
+                  ? 'border border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100'
+                  : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+              }`}
+            >
+              {statusUpdating && <Loader2 className="h-4 w-4 animate-spin" />}
+              {task.status === 'COMPLETED' ? (
+                <>
+                  <RotateCcw className="h-4 w-4" />
+                  Reopen Task
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="h-4 w-4" />
+                  Mark as Completed
+                </>
+              )}
+            </button>
+          </div>
         ) : undefined
       }
     >
       {loading && (
-        <div className="flex flex-col items-center justify-center py-16 text-txt-sub">
-          <Loader2 className="h-8 w-8 animate-spin text-[var(--accent)] mb-2" />
-          <span className="text-sm">Loading task details...</span>
+        <div className="flex flex-col items-center justify-center py-20 text-txt-sub">
+          <Loader2 className="h-8 w-8 animate-spin text-[#F59E0B] mb-2" />
+          <span className="text-sm font-medium">Loading task details...</span>
         </div>
       )}
 
       {error && (
-        <div className="alert alert-error mb-4 flex items-center gap-2 text-sm">
+        <div role="alert" className="alert alert-error mb-4 flex items-center gap-2 text-sm rounded-xl">
           <AlertCircle className="h-4 w-4 shrink-0" />
           <span>{error}</span>
         </div>
       )}
 
       {task && !loading && (
-        <div className="space-y-4">
-          {/* ── Main Details Card ── */}
-          <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-sm space-y-3">
-            {/* Chips row */}
-            <div className="flex items-center gap-2 flex-wrap pb-2 border-b border-[var(--border)]/70">
-              {task.taskType && (
-                <span className="px-2.5 py-0.5 rounded-md text-xs font-bold uppercase tracking-wider bg-[var(--surface-subtle)] text-txt-main border border-[var(--border)]">
-                  {task.taskType}
+        <div className="space-y-5 py-2">
+          {/* ── Section 1: Task Overview ── */}
+          <div className="rounded-2xl border border-divider bg-surface p-6 space-y-4 shadow-xs">
+            <div className="flex items-center justify-between pb-3 border-b border-divider">
+              <div className="flex items-center gap-2.5">
+                <span className="w-6 h-6 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 text-xs font-bold flex items-center justify-center">
+                  1
                 </span>
-              )}
-              {task.taskSource && (
-                <span className="px-2.5 py-0.5 rounded-md text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
-                  {task.taskSource === 'AUTO_GENERATED' ? 'Auto Generated' : 'Manual'}
-                </span>
-              )}
+                <h3 className="text-base font-bold text-txt-main">Task Overview</h3>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                {task.taskType && (
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-bg text-txt-main border border-divider">
+                    {task.taskType}
+                  </span>
+                )}
+                {task.taskSource && (
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border border-blue-200 dark:border-blue-900">
+                    {task.taskSource === 'AUTO_GENERATED' ? 'Auto Generated' : 'Manual'}
+                  </span>
+                )}
+              </div>
             </div>
 
-            {/* Info Rows */}
-            <div className="divide-y divide-[var(--border)]/40">
+            <div className="divide-y divide-divider">
               <InfoRow
                 label="Client / Subject"
                 value={
@@ -267,9 +319,7 @@ export default function TaskDetailsDrawer({
                       {task.subject?.name ?? '—'}
                     </span>
                     {task.subject?.type && (
-                      <span className="badge badge-xs badge-ghost text-txt-sub">
-                        {task.subject.type}
-                      </span>
+                      <span className="text-xs text-txt-sub">({task.subject.type})</span>
                     )}
                   </div>
                 }
@@ -280,12 +330,12 @@ export default function TaskDetailsDrawer({
                 label="Due Date"
                 value={
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-mono font-semibold">
+                    <span className="font-medium text-txt-main">
                       {dueDate ? new Date(dueDate).toLocaleDateString('en-IN') : '—'}
                     </span>
                     {relativeDue && (
                       <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold border ${relativeDue.color}`}
+                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold border ${relativeDue.color}`}
                       >
                         {relativeDue.text}
                       </span>
@@ -296,64 +346,52 @@ export default function TaskDetailsDrawer({
               />
 
               {task.assignee?.name && (
-                <InfoRow
-                  label="Assigned Staff"
-                  value={task.assignee.name}
-                  icon={User}
-                />
+                <InfoRow label="Assigned Staff" value={task.assignee.name} icon={User} />
               )}
 
               {task.frequency && (
-                <InfoRow
-                  label="Frequency"
-                  value={task.frequency}
-                  icon={Repeat}
-                />
+                <InfoRow label="Frequency" value={task.frequency} icon={Repeat} />
               )}
 
               {task.periodLabel && (
-                <InfoRow
-                  label="Period Label"
-                  value={task.periodLabel}
-                  icon={Clock}
-                />
+                <InfoRow label="Period Label" value={task.periodLabel} icon={Clock} />
               )}
 
               {task.notes && (
-                <InfoRow
-                  label="Notes"
-                  value={task.notes}
-                  icon={FileText}
-                />
+                <InfoRow label="Notes" value={task.notes} icon={FileText} />
               )}
             </div>
           </div>
 
-          {/* ── Reminders Card ── */}
-          <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-sm">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <Bell className="h-4 w-4 text-[var(--accent)]" />
-                <h3 className="text-sm font-bold text-txt-main">Scheduled Reminders</h3>
+          {/* ── Section 2: Scheduled Reminders ── */}
+          <div className="rounded-2xl border border-divider bg-surface p-6 space-y-4 shadow-xs">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2.5">
+                <span className="w-6 h-6 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 text-xs font-bold flex items-center justify-center">
+                  2
+                </span>
+                <h3 className="text-base font-bold text-txt-main">Scheduled Reminders</h3>
               </div>
-              <span className="badge badge-sm badge-ghost text-txt-sub">
+              <span className="text-xs font-semibold text-txt-sub">
                 {(task.reminders?.upcoming?.length || 0) + (task.reminders?.sent?.length || 0)} total
               </span>
             </div>
 
-            {(!task.reminders?.upcoming?.length && !task.reminders?.sent?.length) ? (
-              <p className="text-xs text-txt-sub italic py-1">No reminders scheduled for this task.</p>
+            {!task.reminders?.upcoming?.length && !task.reminders?.sent?.length ? (
+              <p className="text-xs text-txt-sub italic py-2">
+                No reminders scheduled for this task.
+              </p>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-2.5">
                 {task.reminders?.upcoming?.map((r) => (
                   <div
                     key={r.id}
-                    className="flex items-center justify-between p-2 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border)] text-xs"
+                    className="flex items-center justify-between p-3 rounded-xl bg-bg/60 border border-divider text-xs"
                   >
-                    <div className="flex items-center gap-2 min-w-0">
+                    <div className="flex items-center gap-2.5 min-w-0">
                       <ChannelIcon channel={r.channel} />
                       <span className="font-semibold text-txt-main truncate">{r.channel}</span>
-                      <span className="text-[10px] text-txt-sub">
+                      <span className="text-[11px] text-txt-sub">
                         {new Date(r.scheduledAt).toLocaleString('en-IN', {
                           month: 'short',
                           day: 'numeric',
@@ -362,23 +400,27 @@ export default function TaskDetailsDrawer({
                         })}
                       </span>
                     </div>
-                    <span className="badge badge-xs badge-info text-white font-bold">{r.status}</span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300">
+                      {r.status}
+                    </span>
                   </div>
                 ))}
 
                 {task.reminders?.sent?.map((r) => (
                   <div
                     key={r.id}
-                    className="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-200 text-xs opacity-75"
+                    className="flex items-center justify-between p-3 rounded-xl bg-bg/30 border border-divider text-xs opacity-75"
                   >
-                    <div className="flex items-center gap-2 min-w-0">
+                    <div className="flex items-center gap-2.5 min-w-0">
                       <ChannelIcon channel={r.channel} />
                       <span className="font-semibold text-txt-main truncate">{r.channel}</span>
-                      <span className="text-[10px] text-txt-sub">
+                      <span className="text-[11px] text-txt-sub">
                         Sent {r.sentAt ? new Date(r.sentAt).toLocaleDateString('en-IN') : ''}
                       </span>
                     </div>
-                    <span className="badge badge-xs badge-success text-white font-bold">{r.status}</span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
+                      {r.status}
+                    </span>
                   </div>
                 ))}
               </div>

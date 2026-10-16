@@ -27,6 +27,7 @@
 // }
 
 import type { Metadata } from "next";
+import { Manrope } from "next/font/google";
 import "../globals.css";
 import Providers from "@/components/Providers";
 import NextTopLoader from "nextjs-toploader";
@@ -34,6 +35,11 @@ import { Header } from "@/components/layout/Header";
 import { ModuleRegistry, AllCommunityModule } from "ag-grid-community";
 import { auth } from "@/config/firebase";
 
+const manrope = Manrope({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-manrope",
+});
 
 export const metadata: Metadata = {
   title: "RemindCA | Compliance & Reminder Management",
@@ -48,8 +54,8 @@ export default async function RootLayout({
 }>) {
  
   return (
-    <html lang="en">
-      <body className="min-h-screen bg-[var(--bg)] text-[var(--text-primary)] antialiased transition-colors duration-300">
+    <html lang="en" className={manrope.variable}>
+      <body className={`${manrope.className} min-h-screen bg-[var(--bg)] text-[var(--text-primary)] antialiased transition-colors duration-300`}>
         <NextTopLoader
           color="#29d"
           initialPosition={0.08}

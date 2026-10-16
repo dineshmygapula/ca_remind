@@ -1,7 +1,6 @@
 'use client';
 
-import { Box, TextField, MenuItem, Grid } from '@mui/material';
-import { Search as SearchIcon } from '@mui/icons-material';
+import FilterBar from '@/components/common/Filter';
 
 interface ReminderDefinitionsFilterProps {
   searchQuery: string;
@@ -10,6 +9,7 @@ interface ReminderDefinitionsFilterProps {
   onChannelChange: (value: string) => void;
   statusFilter: 'ALL' | 'ACTIVE' | 'INACTIVE';
   onStatusChange: (value: 'ALL' | 'ACTIVE' | 'INACTIVE') => void;
+  onReset?: () => void;
 }
 
 const STATUS_OPTIONS = [
@@ -33,60 +33,37 @@ export default function ReminderDefinitionsFilter({
   onChannelChange,
   statusFilter,
   onStatusChange,
+  onReset,
 }: ReminderDefinitionsFilterProps) {
   return (
-    <Box sx={{ bgcolor: 'white', p: 2, borderRadius: 1, boxShadow: 1 }}>
-      <Grid container spacing={2}>
-        {/* Search */}
-        <Grid item xs={12} md={6}>
-          <TextField
-            fullWidth
-            size="small"
-            placeholder="Search by name..."
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            InputProps={{
-              startAdornment: <SearchIcon sx={{ color: 'text.secondary', mr: 1 }} />,
-            }}
-          />
-        </Grid>
-
-        {/* Channel Filter */}
-        <Grid item xs={12} sm={6} md={3}>
-          <TextField
-            fullWidth
-            select
-            size="small"
-            label="Channel"
-            value={channelFilter}
-            onChange={(e) => onChannelChange(e.target.value)}
-          >
-            {CHANNEL_OPTIONS.map((option) => (
-              <MenuItem key={option.value} value={option.value}>
-                {option.label}
-              </MenuItem>
-            ))}
-          </TextField>
-        </Grid>
-
-        {/* Status Filter */}
-        <Grid item xs={12} sm={6} md={3}>
-          <TextField
-            fullWidth
-            select
-            size="small"
-            label="Status"
-            value={statusFilter}
-            onChange={(e) => onStatusChange(e.target.value as 'ALL' | 'ACTIVE' | 'INACTIVE')}
-          >
-            {STATUS_OPTIONS.map((option) => (
-              <MenuItem key={option.value} value={option.value}>
-                {option.label}
-              </MenuItem>
-            ))}
-          </TextField>
-        </Grid>
-      </Grid>
-    </Box>
+    <FilterBar
+      searchValue={searchQuery}
+      onSearchChange={onSearchChange}
+      searchPlaceholder="Search by name..."
+      filters={[
+        {
+          key: 'channel',
+          label: 'Channel',
+          value: channelFilter,
+          options: CHANNEL_OPTIONS,
+          onChange: onChannelChange,
+        },
+        {
+          key: 'status',
+          label: 'Status',
+          value: statusFilter,
+          options: STATUS_OPTIONS,
+          onChange: (v) => onStatusChange(v as 'ALL' | 'ACTIVE' | 'INACTIVE'),
+        },
+      ]}
+      onReset={
+        onReset ||
+        (() => {
+          onSearchChange('');
+          onChannelChange('');
+          onStatusChange('ALL');
+        })
+      }
+    />
   );
 }

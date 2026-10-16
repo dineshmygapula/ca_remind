@@ -14,6 +14,8 @@ import {
   Loader2,
   AlertCircle,
   Sliders,
+  X,
+  Power,
 } from 'lucide-react';
 import Drawer from '@/components/common/Drawer';
 import {
@@ -127,15 +129,15 @@ export default function TaskDefinitionDetailsDrawer({
   const getPriorityBadgeClass = (priority?: string) => {
     switch (priority) {
       case 'URGENT':
-        return 'bg-red-500 text-white border-red-600';
+        return 'bg-red-500/20 text-red-500 border-red-500/40';
       case 'HIGH':
-        return 'bg-amber-500 text-white border-amber-600';
+        return 'bg-amber-500/20 text-amber-500 border-amber-500/40';
       case 'MEDIUM':
-        return 'bg-blue-600 text-white border-blue-700';
+        return 'bg-blue-500/20 text-blue-500 border-blue-500/40';
       case 'LOW':
-        return 'bg-slate-500 text-white border-slate-600';
+        return 'bg-slate-500/20 text-slate-400 border-slate-500/40';
       default:
-        return 'bg-slate-400 text-white border-slate-500';
+        return 'bg-slate-400/20 text-slate-400 border-slate-400/40';
     }
   };
 
@@ -151,65 +153,67 @@ export default function TaskDefinitionDetailsDrawer({
       case 'yearly':
         return 'Yearly';
       case 'one_time':
-        return 'One Time';
+      case 'oneTime':
+        return 'One-Time';
       default:
-        return pattern ?? '—';
+        return pattern || '—';
     }
   };
 
-  const getMonthName = (monthNum: number): string => {
-    const month = MONTHS.find((m) => m.value === monthNum);
-    return month?.label || monthNum.toString();
-  };
-
   const formatScheduleDetail = (def: TaskDefinition): string => {
-    const { scheduleRule } = def;
-    if (!scheduleRule) return 'Not configured';
+    const s = def.scheduleRule;
+    if (!s) return '—';
 
-    const ordinal = (n: number) => {
-      const s = ['th', 'st', 'nd', 'rd'];
-      const v = n % 100;
-      return n + (s[(v - 20) % 10] || s[v] || s[0]);
-    };
-
-    switch (scheduleRule.pattern) {
+    switch (s.pattern) {
       case 'monthly':
-        return `${ordinal(scheduleRule.monthly?.day ?? 0)} of each month`;
-
+        return s.monthly?.day !== undefined ? `Day ${s.monthly.day} of every month` : 'Monthly';
       case 'quarterly': {
-        const q = scheduleRule.quarterly;
+        const q = s.quarterly;
         if (!q) return 'Quarterly';
-        return [
-          `Q1: ${getMonthName(q.q1Month)} ${ordinal(q.q1Day)}`,
-          `Q2: ${getMonthName(q.q2Month)} ${ordinal(q.q2Day)}`,
-          `Q3: ${getMonthName(q.q3Month)} ${ordinal(q.q3Day)}`,
-          `Q4: ${getMonthName(q.q4Month)} ${ordinal(q.q4Day)}`,
-        ].join('  •  ');
-      }
-
-      case 'half_yearly': {
-        const h = scheduleRule.halfYearly;
-        if (!h) return 'Half-Yearly';
-        return [
-          `H1: ${getMonthName(h.firstHalf.month)} ${ordinal(h.firstHalf.day)}`,
-          `H2: ${getMonthName(h.secondHalf.month)} ${ordinal(h.secondHalf.day)}`,
-        ].join('  •  ');
-      }
-
-      case 'yearly': {
-        const y = scheduleRule.yearly;
-        if (!y) return 'Yearly';
-        return `${getMonthName(y.month)} ${ordinal(y.day)} each year`;
-      }
-
-      case 'one_time':
-        if (scheduleRule.oneTime?.dueDate) {
-          return new Date(scheduleRule.oneTime.dueDate).toLocaleDateString();
+        const parts: string[] = [];
+        if (q.q1Month !== undefined && q.q1Day !== undefined) {
+          parts.push(`Q1: ${MONTHS.find((m) => m.value === q.q1Month)?.label || q.q1Month} ${q.q1Day}`);
         }
-        return 'One Time';
-
+        if (q.q2Month !== undefined && q.q2Day !== undefined) {
+          parts.push(`Q2: ${MONTHS.find((m) => m.value === q.q2Month)?.label || q.q2Month} ${q.q2Day}`);
+        }
+        if (q.q3Month !== undefined && q.q3Day !== undefined) {
+          parts.push(`Q3: ${MONTHS.find((m) => m.value === q.q3Month)?.label || q.q3Month} ${q.q3Day}`);
+        }
+        if (q.q4Month !== undefined && q.q4Day !== undefined) {
+          parts.push(`Q4: ${MONTHS.find((m) => m.value === q.q4Month)?.label || q.q4Month} ${q.q4Day}`);
+        }
+        return parts.length ? parts.join(', ') : 'Quarterly';
+      }
+      case 'half_yearly': {
+        const h = s.halfYearly;
+        if (!h) return 'Half-Yearly';
+        const parts: string[] = [];
+        if (h.firstHalf) {
+          parts.push(`H1: ${MONTHS.find((m) => m.value === h.firstHalf?.month)?.label} ${h.firstHalf?.day}`);
+        }
+        if (h.secondHalf) {
+          parts.push(`H2: ${MONTHS.find((m) => m.value === h.secondHalf?.month)?.label} ${h.secondHalf?.day}`);
+        }
+        return parts.join(', ');
+      }
+      case 'yearly': {
+        const y = s.yearly;
+        if (!y) return 'Yearly';
+        const monthLabel = MONTHS.find((m) => m.value === y.month)?.label || y.month;
+        return `${monthLabel} ${y.day}`;
+      }
+      case 'one_time': {
+        const due = s.oneTime?.dueDate;
+        if (!due) return 'One-Time';
+        try {
+          return new Date(due).toLocaleDateString('en-IN');
+        } catch {
+          return due;
+        }
+      }
       default:
-        return scheduleRule.pattern;
+        return '—';
     }
   };
 
@@ -222,8 +226,8 @@ export default function TaskDefinitionDetailsDrawer({
     value: React.ReactNode;
     icon: React.ComponentType<{ className?: string }>;
   }) => (
-    <div className="flex items-start gap-3 py-2 border-b border-[var(--border)]/60 last:border-b-0">
-      <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--surface-subtle)] text-[var(--accent)]">
+    <div className="flex items-start gap-3 py-2.5 border-b border-divider/60 last:border-b-0">
+      <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-bg text-txt-sub">
         <Icon className="h-4 w-4" />
       </div>
       <div className="min-w-0 flex-1">
@@ -242,97 +246,136 @@ export default function TaskDefinitionDetailsDrawer({
       <Drawer
         open={open}
         onClose={onClose}
-        eyebrow="Automatic Task & Reminder Setup"
         title={definition?.name || (loading ? 'Loading...' : 'Task Definition')}
-        width="md"
-        badge={
-          definition ? (
-            <span
-              className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold border ${
-                definition.isActive
-                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400/40'
-                  : 'bg-white/10 text-white/70 border-white/20'
-              }`}
-            >
-              {definition.isActive ? 'Active' : 'Inactive'}
-            </span>
-          ) : undefined
-        }
-        icon={<Sliders className="h-4 w-4 text-[var(--accent)]" />}
-        headerActions={
-          definitionId && (
-            <button
-              type="button"
-              onClick={() => {
-                onClose();
-                onEdit(definitionId);
-              }}
-              aria-label="Edit task definition"
-              className="rounded-xl bg-white/10 border border-white/20 p-1.5 transition-all hover:bg-white/25 hover:scale-105 text-white"
-              title="Edit Task Definition"
-            >
-              <Pencil className="h-4 w-4" />
-            </button>
-          )
+        width="lg"
+        customHeader={
+          <div className="bg-[#0B1528] px-6 py-5 flex items-center justify-between text-white shrink-0">
+            <div className="flex items-center gap-3.5 min-w-0">
+              <div className="w-10 h-10 rounded-xl bg-[#F59E0B] flex items-center justify-center text-slate-900 shadow-sm shrink-0">
+                <Sliders className="h-5 w-5 text-slate-900" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <p className="text-xs font-semibold text-[#F59E0B] uppercase tracking-wider">
+                    Rule Setup
+                  </p>
+                  {definition && (
+                    <span
+                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                        definition.isActive
+                          ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+                          : 'bg-white/10 text-white/80 border-white/20'
+                      }`}
+                    >
+                      {definition.isActive ? 'Active' : 'Inactive'}
+                    </span>
+                  )}
+                </div>
+                <h2 className="text-lg font-bold leading-tight text-white truncate">
+                  {definition?.name || (loading ? 'Loading...' : 'Task Definition')}
+                </h2>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {definitionId && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onEdit(definitionId);
+                  }}
+                  className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
+                  title="Edit Rule"
+                >
+                  <Pencil className="h-4 w-4" />
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
         }
         footer={
           definition ? (
-            <button
-              type="button"
-              onClick={handleToggleActive}
-              disabled={toggling}
-              className={`w-full py-2.5 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 border ${
-                definition.isActive
-                  ? 'border-red-300 text-red-600 hover:bg-red-50'
-                  : 'bg-emerald-600 border-emerald-700 text-white hover:bg-emerald-700'
-              } disabled:opacity-50`}
-            >
-              {toggling && <Loader2 className="h-4 w-4 animate-spin" />}
-              {toggling
-                ? definition.isActive
-                  ? 'Disabling…'
-                  : 'Enabling…'
-                : definition.isActive
-                ? 'Disable Definition'
-                : 'Enable Definition'}
-            </button>
+            <div className="flex items-center justify-between gap-3 w-full">
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-xl border border-divider py-2.5 px-6 text-sm font-semibold text-txt-main bg-surface transition-colors hover:bg-bg cursor-pointer"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={handleToggleActive}
+                disabled={toggling}
+                className={`inline-flex items-center gap-2 rounded-xl py-2.5 px-6 text-sm font-semibold shadow-xs transition-colors cursor-pointer disabled:opacity-50 ${
+                  definition.isActive
+                    ? 'border border-red-300 dark:border-rose-800 text-red-600 dark:text-rose-300 bg-red-50 dark:bg-rose-950/40 hover:bg-red-100'
+                    : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                }`}
+              >
+                {toggling && <Loader2 className="h-4 w-4 animate-spin" />}
+                <Power className="h-4 w-4" />
+                <span>
+                  {toggling
+                    ? definition.isActive
+                      ? 'Disabling…'
+                      : 'Enabling…'
+                    : definition.isActive
+                    ? 'Disable Rule'
+                    : 'Enable Rule'}
+                </span>
+              </button>
+            </div>
           ) : undefined
         }
       >
         {loading && (
-          <div className="flex flex-col items-center justify-center py-16 text-txt-sub">
-            <Loader2 className="h-8 w-8 animate-spin text-[var(--accent)] mb-2" />
-            <span className="text-sm">Loading task definition details...</span>
+          <div className="flex flex-col items-center justify-center py-20 text-txt-sub">
+            <Loader2 className="h-8 w-8 animate-spin text-[#F59E0B] mb-2" />
+            <span className="text-sm font-medium">Loading rule details...</span>
           </div>
         )}
 
         {error && (
-          <div className="alert alert-error mb-4 flex items-center gap-2 text-sm">
+          <div role="alert" className="alert alert-error mb-4 flex items-center gap-2 text-sm rounded-xl">
             <AlertCircle className="h-4 w-4 shrink-0" />
             <span>{error}</span>
           </div>
         )}
 
         {definition && !loading && (
-          <div className="space-y-4">
-            {/* ── Main Details Card ── */}
-            <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-sm space-y-3">
-              {/* Chips row */}
-              <div className="flex items-center gap-2 flex-wrap pb-2 border-b border-[var(--border)]/70">
-                <span
-                  className={`px-2.5 py-0.5 rounded-md text-xs font-bold uppercase tracking-wider ${getPriorityBadgeClass(
-                    definition.priority
-                  )}`}
-                >
-                  {definition.priority ?? 'MEDIUM'}
-                </span>
-                <span className="px-2.5 py-0.5 rounded-md text-xs font-semibold bg-[var(--surface-subtle)] text-txt-main border border-[var(--border)]">
-                  {definition.subjectType ?? 'CLIENT'}
-                </span>
+          <div className="space-y-5 py-2">
+            {/* ── Section 1: Main Details ── */}
+            <div className="rounded-2xl border border-divider bg-surface p-6 space-y-4 shadow-xs">
+              <div className="flex items-center justify-between pb-3 border-b border-divider">
+                <div className="flex items-center gap-2.5">
+                  <span className="w-6 h-6 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 text-xs font-bold flex items-center justify-center">
+                    1
+                  </span>
+                  <h3 className="text-base font-bold text-txt-main">Rule Overview</h3>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span
+                    className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider border ${getPriorityBadgeClass(
+                      definition.priority
+                    )}`}
+                  >
+                    {definition.priority ?? 'MEDIUM'}
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-bg text-txt-main border border-divider">
+                    {definition.subjectType ?? 'CLIENT'}
+                  </span>
+                </div>
               </div>
 
-              {/* Info Rows */}
-              <div className="divide-y divide-[var(--border)]/40">
+              <div className="divide-y divide-divider">
                 <InfoRow
                   label="Category / Task Type"
                   value={definition.taskType}
@@ -359,7 +402,7 @@ export default function TaskDefinitionDetailsDrawer({
                     <span
                       className={`inline-flex items-center gap-1.5 font-semibold text-xs ${
                         definition.autoCreateTasks
-                          ? 'text-emerald-600'
+                          ? 'text-emerald-600 dark:text-emerald-400'
                           : 'text-txt-sub'
                       }`}
                     >
@@ -367,7 +410,7 @@ export default function TaskDefinitionDetailsDrawer({
                         className={`h-3.5 w-3.5 ${
                           definition.autoCreateTasks
                             ? 'text-emerald-500'
-                            : 'text-slate-300'
+                            : 'text-slate-300 dark:text-slate-600'
                         }`}
                       />
                       {definition.autoCreateTasks ? 'Enabled' : 'Disabled'}
@@ -381,7 +424,7 @@ export default function TaskDefinitionDetailsDrawer({
                     <span
                       className={`inline-flex items-center gap-1.5 font-semibold text-xs ${
                         definition.autoCreateReminders
-                          ? 'text-emerald-600'
+                          ? 'text-emerald-600 dark:text-emerald-400'
                           : 'text-txt-sub'
                       }`}
                     >
@@ -389,7 +432,7 @@ export default function TaskDefinitionDetailsDrawer({
                         className={`h-3.5 w-3.5 ${
                           definition.autoCreateReminders
                             ? 'text-emerald-500'
-                            : 'text-slate-300'
+                            : 'text-slate-300 dark:text-slate-600'
                         }`}
                       />
                       {definition.autoCreateReminders ? 'Enabled' : 'Disabled'}
@@ -415,44 +458,36 @@ export default function TaskDefinitionDetailsDrawer({
               </div>
             </div>
 
-            {/* ── Reminders Summary Card ── */}
-            <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-sm">
-              <div className="flex items-center justify-between mb-1">
-                <h3 className="text-sm font-bold text-txt-main">Reminders</h3>
-                <span className="badge badge-sm badge-ghost text-txt-sub">
-                  {reminderRules.length} rule{reminderRules.length !== 1 ? 's' : ''}
+            {/* ── Section 2: Reminders Summary Card ── */}
+            <div className="rounded-2xl border border-divider bg-surface p-6 space-y-4 shadow-xs">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <span className="w-6 h-6 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 text-xs font-bold flex items-center justify-center">
+                    2
+                  </span>
+                  <h3 className="text-base font-bold text-txt-main">Reminder Rules</h3>
+                </div>
+                <span className="text-xs font-semibold text-txt-sub">
+                  {reminderRules.length} rule{reminderRules.length !== 1 ? 's' : ''} configured
                 </span>
               </div>
-              <p className="text-xs text-txt-sub mb-2">
+              <p className="text-xs text-txt-sub">
                 {loadingReminders
                   ? 'Loading reminder rules...'
                   : `${reminderRules.length} reminder rule${
                       reminderRules.length !== 1 ? 's' : ''
-                    } configured`}
+                    } configured for this task rule.`}
               </p>
               {!loadingReminders && reminderRules.length > 0 && (
                 <button
                   type="button"
                   onClick={() => setReminderRulesOpen(true)}
-                  className="text-xs font-bold text-[var(--accent)] hover:underline inline-flex items-center gap-1"
+                  className="rounded-xl border border-divider bg-bg/50 px-4 py-2 text-xs font-bold text-txt-main hover:bg-bg transition-colors inline-flex items-center gap-1.5 cursor-pointer"
                 >
-                  View Reminder Rules &rarr;
+                  <Bell className="h-3.5 w-3.5 text-[#F59E0B]" />
+                  <span>View Reminder Rules &rarr;</span>
                 </button>
               )}
-            </div>
-
-            {/* ── Assign Employee Card ── */}
-            <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-sm opacity-70">
-              <div className="flex items-center justify-between mb-1">
-                <h3 className="text-sm font-bold text-txt-main">Assign Employee</h3>
-                <span className="badge badge-xs badge-neutral">Coming Soon</span>
-              </div>
-              <div className="flex items-center gap-2 mt-2 text-xs text-txt-sub">
-                <div className="flex h-6 w-6 items-center justify-center rounded-full border border-dashed border-txt-sub/40">
-                  <UserPlus className="h-3 w-3" />
-                </div>
-                <span>Default assignee mapping per definition</span>
-              </div>
             </div>
           </div>
         )}

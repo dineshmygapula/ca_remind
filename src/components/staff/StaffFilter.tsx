@@ -1,17 +1,16 @@
 'use client';
 
-import { Box, TextField,Grid } from '@mui/material';
+import FilterBar from '@/components/common/Filter';
+import { STATUS_OPTIONS, StaffStatusFilter, STAFF_ROLES } from '../../constants/staffConstants';
 
-import { Search as SearchIcon } from '@mui/icons-material';
-import { STATUS_OPTIONS, StaffStatusFilter } from "../../constants/staffConstants"
-import { MenuItem } from '@mui/material';
 interface StaffFilterProps {
   searchQuery: string;
   onSearchChange: (value: string) => void;
-  statusFilter: StaffStatusFilter; // ← Use imported type
-  onStatusChange: (value: StaffStatusFilter) => void; // ← Use imported type
+  statusFilter: StaffStatusFilter;
+  onStatusChange: (value: StaffStatusFilter) => void;
   roleFilter: string;
   onRoleChange: (value: string) => void;
+  onReset?: () => void;
 }
 
 export default function StaffFilter({
@@ -21,54 +20,37 @@ export default function StaffFilter({
   onStatusChange,
   roleFilter,
   onRoleChange,
+  onReset,
 }: StaffFilterProps) {
   return (
-    <Box sx={{ bgcolor: 'background.paper', p: 2, borderRadius: 1, boxShadow: 1 }}>
-      <Grid container spacing={2}>
-        {/* Search */}
-        <Grid size={{ xs: 12, md: 6 }}>
-          <TextField
-            fullWidth
-            size="small"
-            placeholder="Search staff by name, email, or phone..."
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            InputProps={{
-              startAdornment: <SearchIcon sx={{ color: 'text.secondary', mr: 1 }} />,
-            }}
-          />
-        </Grid>
-
-        {/* Status Filter */}
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <TextField
-            fullWidth
-            select
-            size="small"
-            label="Status"
-            value={statusFilter}
-            onChange={(e) => onStatusChange(e.target.value as StaffStatusFilter)}
-          >
-            {STATUS_OPTIONS.map((option) => (
-              <MenuItem key={option.value} value={option.value}>
-                {option.label}
-              </MenuItem>
-            ))}
-          </TextField>
-        </Grid>
-
-        {/* Role Filter */}
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <TextField
-            fullWidth
-            size="small"
-            label="Filter by Role"
-            value={roleFilter}
-            onChange={(e) => onRoleChange(e.target.value)}
-            placeholder="e.g., Admin, Accountant"
-          />
-        </Grid>
-      </Grid>
-    </Box>
+    <FilterBar
+      searchValue={searchQuery}
+      onSearchChange={onSearchChange}
+      searchPlaceholder="Search staff by name, email, or phone..."
+      filters={[
+        {
+          key: 'status',
+          label: 'Status',
+          value: statusFilter,
+          options: STATUS_OPTIONS,
+          onChange: (v) => onStatusChange(v as StaffStatusFilter),
+        },
+        {
+          key: 'role',
+          label: 'Role',
+          value: roleFilter || 'ALL',
+          options: [{ value: 'ALL', label: 'All Roles' }, ...STAFF_ROLES],
+          onChange: (v) => onRoleChange(v === 'ALL' ? '' : v),
+        },
+      ]}
+      onReset={
+        onReset ||
+        (() => {
+          onSearchChange('');
+          onStatusChange('ALL');
+          onRoleChange('');
+        })
+      }
+    />
   );
 }

@@ -2,36 +2,39 @@
 
 import { useState, useEffect } from 'react';
 import {
-  Drawer,
-  Box,
-  Typography,
-  IconButton,
-  Stack,
-  Chip,
-  Divider,
-  CircularProgress,
-  Alert,
-  Paper,
-} from '@mui/material';
-import {
-  Close as CloseIcon,
-  Edit as EditIcon,
-  Email as EmailIcon,
-  WhatsApp as WhatsAppIcon,
-  Sms as SmsIcon,
-  Notifications as NotificationsIcon,
-  Label as LabelIcon,
-  Category as CategoryIcon,
-} from '@mui/icons-material';
+  FileText,
+  Pencil,
+  X,
+  Mail,
+  MessageSquare,
+  Phone,
+  Bell,
+  CheckCircle,
+  Clock,
+  Loader2,
+  Copy,
+  Check,
+} from 'lucide-react';
+import Drawer from '@/components/common/Drawer';
 import { getMessageTemplateById } from '@/services/messageTemplateService';
-import { MessageTemplate } from '@/types/messageTemplate.types';
+import { MessageTemplate, ChannelType } from '@/types/messageTemplate.types';
 
-interface TemplateDetailsDrawerProps {
+export interface TemplateDetailsDrawerProps {
   open: boolean;
   onClose: () => void;
   templateId: string | null;
   businessId: string;
   onEdit: (templateId: string) => void;
+}
+
+function getTypeBadgeClass(type?: string) {
+  const t = (type || '').toUpperCase();
+  if (t === 'GST') return 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800';
+  if (t === 'TDS') return 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border-blue-200 dark:border-blue-800';
+  if (t === 'ITR') return 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800';
+  if (t === 'ROC') return 'bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border-purple-200 dark:border-purple-800';
+  if (t === 'MSME') return 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border-amber-200 dark:border-amber-800';
+  return 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-200 dark:border-slate-700';
 }
 
 export default function TemplateDetailsDrawer({
@@ -44,426 +47,297 @@ export default function TemplateDetailsDrawer({
   const [template, setTemplate] = useState<MessageTemplate | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [activeChannel, setActiveChannel] = useState<ChannelType>('email');
+  const [copied, setCopied] = useState(false);
 
-  // ─── Fetch Template Details ───────────────────────────────────────────────
   useEffect(() => {
     if (open && templateId && businessId) {
-      fetchTemplateDetails();
+      loadTemplate(templateId);
     }
   }, [open, templateId, businessId]);
 
-  const fetchTemplateDetails = async () => {
-    if (!templateId || !businessId) return;
+  const loadTemplate = async (id: string) => {
     try {
       setLoading(true);
       setError('');
-      console.log('🔍 Fetching template:', templateId);
-      const data = await getMessageTemplateById(businessId, templateId);
-      console.log('📦 Fetched template data:', data);
+      const data = await getMessageTemplateById(businessId, id);
       setTemplate(data);
+      if (data.channels && data.channels.length > 0) {
+        setActiveChannel(data.channels[0]);
+      }
     } catch (err: unknown) {
-      console.error('❌ Fetch error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load template details');
+      setError(err instanceof Error ? err.message : 'Failed to load template');
     } finally {
       setLoading(false);
     }
   };
 
-  // ─── Section Component ────────────────────────────────────────────────────
-  const Section = ({
-    title,
-    icon,
-    children,
-  }: {
-    title: string;
-    icon: React.ReactNode;
-    children: React.ReactNode;
-  }) => (
-    <Box sx={{ mb: 3 }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-        {icon}
-        <Typography
-          variant="overline"
-          sx={{ fontWeight: 700, letterSpacing: '0.08em', color: 'text.secondary' }}
-        >
-          {title}
-        </Typography>
-      </Box>
-      {children}
-    </Box>
-  );
-
-  // ─── Info Row Component ───────────────────────────────────────────────────
-  const InfoRow = ({
-    label,
-    value,
-  }: {
-    label: string;
-    value: string | number | null | undefined;
-  }) => (
-    <Box sx={{ mb: 1.5 }}>
-      <Typography
-        variant="caption"
-        sx={{
-          display: 'block',
-          mb: 0.5,
-          color: '#64748b',
-          fontWeight: 600,
-        }}
-      >
-        {label}
-      </Typography>
-      <Typography
-        variant="body2"
-        sx={{
-          fontWeight: 500,
-          color: '#1e293b',
-          fontSize: '0.875rem',
-        }}
-      >
-        {value || '—'}
-      </Typography>
-    </Box>
-  );
-
-  // ─── Template Preview Component ───────────────────────────────────────────
-  const TemplatePreview = ({
-    title,
-    icon,
-    subject,
-    body,
-  }: {
-    title: string;
-    icon: React.ReactNode;
-    subject?: string;
-    body: string;
-  }) => (
-    <Paper
-      sx={{
-        p: 2.5,
-        bgcolor: '#f8fafc',
-        border: '1px solid',
-        borderColor: 'divider',
-      }}
-    >
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-        {icon}
-        <Typography variant="subtitle2" fontWeight={700}>
-          {title}
-        </Typography>
-      </Box>
-      {subject && (
-        <Box sx={{ mb: 2 }}>
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
-            Subject
-          </Typography>
-          <Typography
-            variant="body2"
-            sx={{
-              fontWeight: 600,
-              p: 1.5,
-              bgcolor: '#fff',
-              borderRadius: 1,
-              border: '1px solid',
-              borderColor: 'divider',
-            }}
-          >
-            {subject}
-          </Typography>
-        </Box>
-      )}
-      <Box>
-        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
-          {subject ? 'Body' : 'Message'}
-        </Typography>
-        <Typography
-          variant="body2"
-          sx={{
-            whiteSpace: 'pre-wrap',
-            p: 2,
-            bgcolor: '#fff',
-            borderRadius: 1,
-            border: '1px solid',
-            borderColor: 'divider',
-            fontFamily: 'inherit',
-            lineHeight: 1.7,
-          }}
-        >
-          {body}
-        </Typography>
-      </Box>
-    </Paper>
-  );
-
-  // ─── Get Reminder Type Color ──────────────────────────────────────────────
-  const getReminderTypeColor = (type: string) => {
-    switch (type) {
-      case 'GST': return '#16a34a';
-      case 'TDS': return '#374151';
-      case 'ITR': return '#2563eb';
-      case 'ROC': return '#7c3aed';
-      case 'ESI': return '#ea580c';
-      case 'PF': return '#f59e0b';
-      case 'GENERAL': return '#64748b';
-      default: return '#64748b';
-    }
+  const copyMessage = (text?: string) => {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
-  // ─── Render ───────────────────────────────────────────────────────────────
   return (
     <Drawer
-      anchor="right"
       open={open}
       onClose={onClose}
-      PaperProps={{
-        sx: {
-          width: { xs: '100%', sm: 600, md: 700 },
-          borderRadius: 0,
-        },
-      }}
-    >
-      {/* Header */}
-      <Box
-        sx={{
-          background: 'linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%)',
-          color: '#fff',
-          p: 3,
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}
-      >
-        <Box>
-          <Typography
-            variant="caption"
-            sx={{
-              color: 'rgba(255,255,255,0.7)',
-              letterSpacing: '0.1em',
-              textTransform: 'uppercase',
-            }}
-          >
-            Message Template Details
-          </Typography>
-          <Typography variant="h6" sx={{ fontWeight: 700, mt: 0.5 }}>
-            {template?.name || 'Loading...'}
-          </Typography>
-        </Box>
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          {templateId && (
-            <IconButton
-              onClick={() => onEdit(templateId)}
-              sx={{
-                color: '#fff',
-                bgcolor: 'rgba(255,255,255,0.15)',
-                '&:hover': { bgcolor: 'rgba(255,255,255,0.25)' },
-              }}
-            >
-              <EditIcon fontSize="small" />
-            </IconButton>
-          )}
-          <IconButton
-            onClick={onClose}
-            sx={{
-              color: '#fff',
-              bgcolor: 'rgba(255,255,255,0.15)',
-              '&:hover': { bgcolor: 'rgba(255,255,255,0.25)' },
-            }}
-          >
-            <CloseIcon fontSize="small" />
-          </IconButton>
-        </Box>
-      </Box>
-
-      {/* Content */}
-      <Box sx={{ p: 3, overflowY: 'auto', flex: 1, bgcolor: '#f8fafc' }}>
-        {/* Loading */}
-        {loading && (
-          <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-            <CircularProgress />
-          </Box>
-        )}
-
-        {/* Error */}
-        {error && (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            {error}
-          </Alert>
-        )}
-
-        {/* Template Data */}
-        {template && !loading && (
-          <Stack spacing={3}>
-            {/* Status & Type */}
-            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-              <Chip
-                label={template.isActive ? 'Active' : 'Inactive'}
-                size="small"
-                color={template.isActive ? 'success' : 'default'}
-                sx={{ fontWeight: 600 }}
-              />
-              <Chip
-                label={template.reminder_type}
-                size="small"
-                sx={{
-                  bgcolor: getReminderTypeColor(template.reminder_type),
-                  color: '#fff',
-                  fontWeight: 600,
-                }}
-              />
-              <Chip
-                label={template.businessCategory}
-                size="small"
-                variant="outlined"
-                sx={{ fontWeight: 600 }}
-              />
-            </Box>
-
-            <Divider />
-
-            {/* Basic Info */}
-            <Section title="Basic Information" icon={<CategoryIcon fontSize="small" />}>
-              <Box
-                sx={{
-                  bgcolor: '#fff',
-                  borderRadius: 2,
-                  p: 2.5,
-                  border: '1px solid',
-                  borderColor: 'divider',
-                }}
-              >
-                <InfoRow label="Template Name" value={template.name} />
-                <InfoRow label="Reminder Type" value={template.reminder_type} />
-                <InfoRow label="Business Category" value={template.businessCategory} />
-                <InfoRow label="Template ID" value={template.id} />
-              </Box>
-            </Section>
-
-            {/* Channels */}
-            <Section title="Delivery Channels" icon={<NotificationsIcon fontSize="small" />}>
-              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                {template.channels.map((channel) => {
-                  let icon, label, color;
-                  if (channel === 'email') {
-                    icon = <EmailIcon fontSize="small" />;
-                    label = 'Email';
-                    color = '#10b981';
-                  } else if (channel === 'whatsapp') {
-                    icon = <WhatsAppIcon fontSize="small" />;
-                    label = 'WhatsApp';
-                    color = '#25D366';
-                  } else if (channel === 'sms') {
-                    icon = <SmsIcon fontSize="small" />;
-                    label = 'SMS';
-                    color = '#f59e0b';
-                  } else {
-                    icon = <NotificationsIcon fontSize="small" />;
-                    label = 'In-App';
-                    color = '#3b82f6';
-                  }
-
-                  return (
-                    <Chip
-                      key={channel}
-                      icon={icon}
-                      label={label}
-                      sx={{
-                        bgcolor: color,
-                        color: '#fff',
-                        fontWeight: 600,
-                        '& .MuiChip-icon': { color: '#fff' },
-                      }}
+      title=""
+      width="lg"
+      customHeader={
+        <div className="flex items-center justify-between w-full px-6 py-5 bg-[#0B1528] text-white">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-[#F59E0B] text-slate-900 shrink-0 shadow-xs">
+              <FileText className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-amber-400">
+                  Template Details
+                </span>
+                {template && (
+                  <span
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                      template.isActive
+                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                        : 'bg-slate-500/20 text-slate-300 border border-slate-500/30'
+                    }`}
+                  >
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full ${
+                        template.isActive ? 'bg-emerald-400' : 'bg-slate-400'
+                      }`}
                     />
-                  );
-                })}
-              </Box>
-            </Section>
-
-            {/* Placeholders */}
-            <Section title="Placeholders" icon={<LabelIcon fontSize="small" />}>
-              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                {template.placeholders.map((placeholder) => (
-                  <Chip
-                    key={placeholder}
-                    label={`[${placeholder}]`}
-                    variant="outlined"
-                    sx={{
-                      fontFamily: 'monospace',
-                      fontWeight: 600,
-                      fontSize: '0.75rem',
-                    }}
-                  />
-                ))}
-                {template.placeholders.length === 0 && (
-                  <Typography variant="body2" color="text.disabled">
-                    No placeholders defined
-                  </Typography>
+                    {template.isActive ? 'Active' : 'Inactive'}
+                  </span>
                 )}
-              </Box>
-            </Section>
+              </div>
+              <h2 className="text-lg font-bold leading-tight text-white truncate">
+                {template?.name || 'Message Template'}
+              </h2>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      }
+      footer={
+        <div className="flex items-center justify-between w-full">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-xl border border-divider py-2.5 px-5 text-sm font-semibold text-txt-main bg-surface transition-colors hover:bg-bg cursor-pointer"
+          >
+            Close
+          </button>
 
-            <Divider />
+          {template && (
+            <button
+              type="button"
+              onClick={() => onEdit(template.id)}
+              className="inline-flex items-center gap-2 rounded-xl bg-[#F59E0B] hover:bg-[#D97706] text-slate-900 py-2.5 px-6 text-sm font-semibold shadow-xs transition-colors cursor-pointer"
+            >
+              <Pencil className="h-4 w-4 text-slate-900" />
+              <span>Edit template</span>
+            </button>
+          )}
+        </div>
+      }
+    >
+      {loading ? (
+        <div className="flex flex-col items-center justify-center py-24 gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-[#F59E0B]" />
+          <p className="text-sm font-semibold text-txt-main">Loading template details...</p>
+        </div>
+      ) : error ? (
+        <div className="p-6 text-center">
+          <p className="text-sm font-semibold text-red-600">{error}</p>
+        </div>
+      ) : !template ? null : (
+        <div className="space-y-5 py-2">
+          {/* ── Card 1: Template Overview ── */}
+          <div className="rounded-2xl border border-divider bg-surface p-6 space-y-4 shadow-xs">
+            <div className="flex items-center gap-2.5 mb-2">
+              <span className="w-6 h-6 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 text-xs font-bold flex items-center justify-center">
+                1
+              </span>
+              <h3 className="text-base font-bold text-txt-main">Template Overview</h3>
+            </div>
 
-            {/* Email Template */}
-            {template.templates.email && (
-              <Section title="Templates" icon={<EmailIcon fontSize="small" />}>
-                <Stack spacing={2}>
-                  <TemplatePreview
-                    title="Email Template"
-                    icon={<EmailIcon fontSize="small" sx={{ color: '#10b981' }} />}
-                    subject={template.templates.email.subject}
-                    body={template.templates.email.body}
-                  />
-                </Stack>
-              </Section>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+              <div className="p-3.5 rounded-xl bg-bg border border-divider/60">
+                <span className="text-[11px] font-semibold text-txt-sub uppercase">Reminder Type</span>
+                <div className="mt-1">
+                  <span
+                    className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold border ${getTypeBadgeClass(
+                      template.reminder_type
+                    )}`}
+                  >
+                    {template.reminder_type || '—'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-bg border border-divider/60">
+                <span className="text-[11px] font-semibold text-txt-sub uppercase">Business Category</span>
+                <p className="mt-1 text-sm font-semibold text-txt-main capitalize">
+                  {template.businessCategory ? template.businessCategory.toLowerCase() : 'General'}
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-bg border border-divider/60 col-span-2 sm:col-span-1">
+                <span className="text-[11px] font-semibold text-txt-sub uppercase">Channels</span>
+                <p className="mt-1 text-xs font-semibold text-txt-main">
+                  {template.channels?.map((c) => c.toUpperCase()).join(', ') || 'None'}
+                </p>
+              </div>
+            </div>
+
+            {template.key && (
+              <div className="flex items-center justify-between text-xs py-2 px-3 rounded-lg bg-bg border border-divider font-mono text-txt-sub">
+                <span>Unique Key:</span>
+                <span className="font-bold text-txt-main">{template.key}</span>
+              </div>
+            )}
+          </div>
+
+          {/* ── Card 2: Message Content by Channel ── */}
+          <div className="rounded-2xl border border-divider bg-surface p-6 space-y-4 shadow-xs">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <span className="w-6 h-6 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 text-xs font-bold flex items-center justify-center">
+                  2
+                </span>
+                <h3 className="text-base font-bold text-txt-main">Channel Message Content</h3>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const content =
+                    activeChannel === 'email'
+                      ? `${template.templates?.email?.subject || ''}\n\n${template.templates?.email?.body || ''}`
+                      : activeChannel === 'whatsapp'
+                      ? template.templates?.whatsapp?.body || ''
+                      : activeChannel === 'sms'
+                      ? template.templates?.sms?.body || ''
+                      : template.templates?.in_app?.body || '';
+                  copyMessage(content);
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-divider bg-bg text-xs font-semibold text-txt-main hover:bg-surface transition-colors cursor-pointer"
+              >
+                {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                <span>{copied ? 'Copied!' : 'Copy message'}</span>
+              </button>
+            </div>
+
+            {/* Channels tab selector */}
+            <div className="flex items-center gap-1.5 border-b border-divider pb-2.5 overflow-x-auto">
+              {(template.channels || []).map((ch) => {
+                const isSelected = activeChannel === ch;
+                return (
+                  <button
+                    key={ch}
+                    type="button"
+                    onClick={() => setActiveChannel(ch)}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-navy text-white shadow-xs'
+                        : 'text-txt-sub hover:text-txt-main hover:bg-bg'
+                    }`}
+                  >
+                    {ch === 'email' && <Mail className="w-3.5 h-3.5" />}
+                    {ch === 'whatsapp' && <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />}
+                    {ch === 'sms' && <Phone className="w-3.5 h-3.5 text-amber-400" />}
+                    {ch === 'in_app' && <Bell className="w-3.5 h-3.5 text-blue-400" />}
+                    <span className="capitalize">{ch.replace('_', ' ')}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Email view */}
+            {activeChannel === 'email' && (
+              <div className="space-y-3 pt-1">
+                <div>
+                  <span className="text-[11px] font-bold text-txt-sub uppercase">Subject</span>
+                  <div className="mt-1 p-3 rounded-xl bg-bg border border-divider text-sm font-semibold text-txt-main font-mono">
+                    {template.templates?.email?.subject || '—'}
+                  </div>
+                </div>
+
+                <div>
+                  <span className="text-[11px] font-bold text-txt-sub uppercase">Body</span>
+                  <div className="mt-1 p-4 rounded-xl bg-bg border border-divider text-xs text-txt-main font-mono whitespace-pre-wrap leading-relaxed max-h-72 overflow-y-auto">
+                    {template.templates?.email?.body || 'No email body configured'}
+                  </div>
+                </div>
+              </div>
             )}
 
-            {/* WhatsApp Template */}
-            {template.templates.whatsapp && (
-              <Section title="" icon={null}>
-                <TemplatePreview
-                  title="WhatsApp Template"
-                  icon={<WhatsAppIcon fontSize="small" sx={{ color: '#25D366' }} />}
-                  body={template.templates.whatsapp.body}
-                />
-              </Section>
+            {/* WhatsApp view */}
+            {activeChannel === 'whatsapp' && (
+              <div className="pt-1">
+                <span className="text-[11px] font-bold text-txt-sub uppercase">WhatsApp Message</span>
+                <div className="mt-1 p-4 rounded-xl bg-[#0b141a]/5 dark:bg-[#0b141a]/40 border border-emerald-500/20 text-xs text-txt-main font-mono whitespace-pre-wrap leading-relaxed max-h-72 overflow-y-auto">
+                  {template.templates?.whatsapp?.body || 'No WhatsApp template configured'}
+                </div>
+              </div>
             )}
 
-            {/* SMS Template */}
-            {template.templates.sms && (
-              <Section title="" icon={null}>
-                <TemplatePreview
-                  title="SMS Template"
-                  icon={<SmsIcon fontSize="small" sx={{ color: '#f59e0b' }} />}
-                  body={template.templates.sms.body}
-                />
-              </Section>
+            {/* SMS view */}
+            {activeChannel === 'sms' && (
+              <div className="pt-1">
+                <span className="text-[11px] font-bold text-txt-sub uppercase">SMS Content</span>
+                <div className="mt-1 p-4 rounded-xl bg-bg border border-divider text-xs text-txt-main font-mono whitespace-pre-wrap leading-relaxed">
+                  {template.templates?.sms?.body || 'No SMS body configured'}
+                </div>
+              </div>
             )}
 
-            {/* In-App Template */}
-            {template.templates.in_app && (
-              <Section title="" icon={null}>
-                <TemplatePreview
-                  title="In-App Template"
-                  icon={<NotificationsIcon fontSize="small" sx={{ color: '#3b82f6' }} />}
-                  body={template.templates.in_app.body}
-                />
-              </Section>
+            {/* In-App view */}
+            {activeChannel === 'in_app' && (
+              <div className="pt-1">
+                <span className="text-[11px] font-bold text-txt-sub uppercase">In-App Notification</span>
+                <div className="mt-1 p-4 rounded-xl bg-bg border border-divider text-xs text-txt-main font-mono whitespace-pre-wrap leading-relaxed">
+                  {template.templates?.in_app?.body || 'No In-App notification configured'}
+                </div>
+              </div>
             )}
+          </div>
 
-            {/* Metadata */}
-            <Box sx={{ bgcolor: '#f1f5f9', borderRadius: 2, p: 2 }}>
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                Template ID: {template.id}
-              </Typography>
-            </Box>
-          </Stack>
-        )}
+          {/* ── Card 3: Placeholders Configured ── */}
+          <div className="rounded-2xl border border-divider bg-surface p-6 space-y-3 shadow-xs">
+            <div className="flex items-center gap-2.5 mb-1">
+              <span className="w-6 h-6 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 text-xs font-bold flex items-center justify-center">
+                3
+              </span>
+              <h3 className="text-base font-bold text-txt-main">Placeholders Used</h3>
+            </div>
 
-        {/* Debug Info */}
-        {!loading && !error && !template && (
-          <Alert severity="info">No template loaded. Template ID: {templateId}</Alert>
-        )}
-      </Box>
+            {template.placeholders && template.placeholders.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {template.placeholders.map((ph) => (
+                  <span
+                    key={ph}
+                    className="font-mono text-xs font-semibold px-2.5 py-1 rounded-lg bg-bg border border-divider text-txt-main"
+                  >
+                    [{ph}]
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-txt-sub">No placeholders attached to this template.</p>
+            )}
+          </div>
+        </div>
+      )}
     </Drawer>
   );
 }

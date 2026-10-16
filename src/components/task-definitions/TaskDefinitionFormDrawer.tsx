@@ -3,18 +3,13 @@
 import { useState, useEffect } from 'react';
 import {
   Pencil,
-  PlusCircle,
+  Plus,
   AlertCircle,
   X,
-  Calendar,
-  Layers,
-  Settings,
   ChevronDown,
   Loader2,
-  Tag,
-  AlignLeft,
-  Users,
-  Clock,
+  Check,
+  Settings,
   Zap,
   Bell,
 } from 'lucide-react';
@@ -33,7 +28,6 @@ import {
   SchedulePattern,
 } from '@/types/taskDefinition.types';
 import {
-  PRIORITY_OPTIONS,
   SCHEDULE_PATTERNS,
   SUBJECT_TYPE_OPTIONS,
   TASK_CATEGORIES,
@@ -107,129 +101,14 @@ const DEFAULT_FORM: FormData = {
   h1Day: 30,
   h2Month: 10,
   h2Day: 31,
-  yearlyMonth: 3,
+  yearlyMonth: 7,
   yearlyDay: 31,
   oneTimeDueDate: '',
   targetOffsetDays: 0,
   isActive: true,
-  autoCreateTasks: false,
-  autoCreateReminders: false,
+  autoCreateTasks: true,
+  autoCreateReminders: true,
 };
-
-// ─── Field Primitives ─────────────────────────────────────────────────────────
-
-const INPUT =
-  'w-full h-10 rounded-xl border border-[var(--border)] bg-[var(--surface)] ' +
-  'text-sm font-medium text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 ' +
-  'outline-none transition-all hover:border-[var(--accent)]/50 ' +
-  'focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/20';
-
-const TEXTAREA =
-  'w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] ' +
-  'text-sm font-medium text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 resize-none ' +
-  'outline-none transition-all hover:border-[var(--accent)]/50 ' +
-  'focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/20';
-
-const SELECT =
-  'w-full h-10 rounded-xl border border-[var(--border)] bg-[var(--surface)] ' +
-  'text-sm font-medium text-[var(--text-primary)] ' +
-  'outline-none transition-all hover:border-[var(--accent)]/50 appearance-none ' +
-  'focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/20';
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function FieldWrap({
-  label,
-  required,
-  helper,
-  icon: Icon,
-  children,
-}: {
-  label: string;
-  required?: boolean;
-  helper?: string;
-  icon?: React.ElementType;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <label className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-wide text-txt-sub">
-        {Icon && <Icon className="w-3 h-3 text-[var(--accent)]" />}
-        {label}
-        {required && <span className="text-[var(--accent)] ml-0.5">*</span>}
-      </label>
-      {helper && <p className="text-[11px] text-txt-sub/70 leading-snug -mt-0.5">{helper}</p>}
-      {children}
-    </div>
-  );
-}
-
-function SelectWithIcon({
-  value,
-  onChange,
-  options,
-  placeholder,
-  disabled,
-  icon: Icon,
-}: {
-  value: string | number;
-  onChange: (val: string) => void;
-  options: readonly { value: string | number; label: string }[];
-  placeholder?: string;
-  disabled?: boolean;
-  icon?: React.ElementType;
-}) {
-  return (
-    <div className="relative">
-      {Icon && (
-        <Icon className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--accent)] pointer-events-none z-10" />
-      )}
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        disabled={disabled}
-        className={`${SELECT} ${Icon ? 'pl-9' : 'pl-3'} pr-8 ${
-          disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'
-        }`}
-      >
-        {placeholder && (
-          <option value="" disabled>
-            {placeholder}
-          </option>
-        )}
-        {options.map((o) => (
-          <option key={o.value} value={o.value} className="bg-[var(--surface)]">
-            {o.label}
-          </option>
-        ))}
-      </select>
-      <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-txt-sub/60 pointer-events-none" />
-    </div>
-  );
-}
-
-function SectionCard({
-  title,
-  children,
-  className = '',
-}: {
-  title: string;
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <div className={`rounded-2xl border border-[var(--border)] bg-[var(--surface)] ${className}`}>
-      <div className="px-4 py-3 border-b border-[var(--border)] bg-[var(--bg)]">
-        <p className="text-[11px] font-extrabold uppercase tracking-widest text-[var(--accent)]">
-          {title}
-        </p>
-      </div>
-      <div className="px-4 py-4">{children}</div>
-    </div>
-  );
-}
-
-// ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function TaskDefinitionFormDrawer({
   open,
@@ -248,54 +127,52 @@ export default function TaskDefinitionFormDrawer({
   // ── Fetch & Pre-fill when editing ───────────────────────────────────────────
   useEffect(() => {
     if (!open) return;
+
     if (mode === 'create') {
       setForm(DEFAULT_FORM);
       setError('');
       return;
     }
+
     if (!definitionId || !businessId) return;
 
     (async () => {
+      setFetching(true);
+      setError('');
       try {
-        setFetching(true);
-        setError('');
         const def: TaskDefinition = await getTaskDefinitionById(businessId, definitionId);
+        const sched = def.scheduleRule;
 
         setForm({
-          name: def.name,
-          taskType: def.taskType,
-          description: def.description || '',
-          category: def.category || '',
-          subjectType: def.subjectType,
-          priority: def.priority,
-          schedulePattern: def.scheduleRule.pattern,
+          name: def.name ?? '',
+          taskType: def.taskType ?? '',
+          description: def.description ?? '',
+          category: def.category ?? '',
+          subjectType: def.subjectType ?? 'CLIENT',
+          priority: def.priority ?? 'MEDIUM',
 
-          // Monthly
-          monthlyDay: def.scheduleRule.monthly?.day ?? 10,
+          schedulePattern: sched?.pattern ?? 'monthly',
+          monthlyDay: sched?.monthly?.day ?? 10,
 
-          // Quarterly
-          q1Month: def.scheduleRule.quarterly?.q1Month ?? 4,
-          q1Day: def.scheduleRule.quarterly?.q1Day ?? 30,
-          q2Month: def.scheduleRule.quarterly?.q2Month ?? 7,
-          q2Day: def.scheduleRule.quarterly?.q2Day ?? 31,
-          q3Month: def.scheduleRule.quarterly?.q3Month ?? 10,
-          q3Day: def.scheduleRule.quarterly?.q3Day ?? 31,
-          q4Month: def.scheduleRule.quarterly?.q4Month ?? 1,
-          q4Day: def.scheduleRule.quarterly?.q4Day ?? 31,
+          q1Month: sched?.quarterly?.q1Month ?? 4,
+          q1Day: sched?.quarterly?.q1Day ?? 30,
+          q2Month: sched?.quarterly?.q2Month ?? 7,
+          q2Day: sched?.quarterly?.q2Day ?? 31,
+          q3Month: sched?.quarterly?.q3Month ?? 10,
+          q3Day: sched?.quarterly?.q3Day ?? 31,
+          q4Month: sched?.quarterly?.q4Month ?? 1,
+          q4Day: sched?.quarterly?.q4Day ?? 31,
 
-          // Half-Yearly
-          h1Month: def.scheduleRule.halfYearly?.firstHalf.month ?? 4,
-          h1Day: def.scheduleRule.halfYearly?.firstHalf.day ?? 30,
-          h2Month: def.scheduleRule.halfYearly?.secondHalf.month ?? 10,
-          h2Day: def.scheduleRule.halfYearly?.secondHalf.day ?? 31,
+          h1Month: sched?.halfYearly?.firstHalf?.month ?? 4,
+          h1Day: sched?.halfYearly?.firstHalf?.day ?? 30,
+          h2Month: sched?.halfYearly?.secondHalf?.month ?? 10,
+          h2Day: sched?.halfYearly?.secondHalf?.day ?? 31,
 
-          // Yearly
-          yearlyMonth: def.scheduleRule.yearly?.month ?? 3,
-          yearlyDay: def.scheduleRule.yearly?.day ?? 31,
+          yearlyMonth: sched?.yearly?.month ?? 7,
+          yearlyDay: sched?.yearly?.day ?? 31,
 
-          // One-Time
-          oneTimeDueDate: def.scheduleRule.oneTime?.dueDate
-            ? new Date(def.scheduleRule.oneTime.dueDate).toISOString().split('T')[0]
+          oneTimeDueDate: sched?.oneTime?.dueDate
+            ? new Date(sched.oneTime.dueDate).toISOString().slice(0, 10)
             : '',
 
           targetOffsetDays: def.targetOffsetDays ?? 0,
@@ -316,9 +193,9 @@ export default function TaskDefinitionFormDrawer({
   };
 
   const validate = (): string | null => {
-    if (!form.name.trim()) return 'Task name is required';
+    if (!form.name.trim()) return 'Rule name is required';
     if (!form.taskType.trim()) return 'Task type is required';
-    if (!form.subjectType) return 'Subject type is required';
+    if (!form.subjectType) return 'Applies to is required';
     if (form.schedulePattern === 'one_time' && !form.oneTimeDueDate)
       return 'Due date is required for one-time tasks';
     return null;
@@ -424,28 +301,81 @@ export default function TaskDefinitionFormDrawer({
     onClose();
   };
 
+  const repeatsTabs: { label: string; value: SchedulePattern }[] = [
+    { label: 'Monthly', value: 'monthly' },
+    { label: 'Quarterly', value: 'quarterly' },
+    { label: 'Yearly', value: 'yearly' },
+  ];
+
   return (
     <Drawer
       open={open}
       onClose={handleClose}
-      icon={mode === 'edit' ? <Pencil className="h-4 w-4" /> : <PlusCircle className="h-4 w-4" />}
-      eyebrow={mode === 'edit' ? 'Edit Definition' : 'New Definition'}
-      title={mode === 'edit' ? 'Update Task Definition' : 'Create Task Definition'}
-      onCancel={handleClose}
-      onSubmit={handleSubmit}
-      submitLabel={mode === 'edit' ? 'Update Definition' : 'Save Definition'}
-      submitting={submitting || fetching}
-      submitVariant="success"
+      title={mode === 'edit' ? form.name || 'Edit rule' : 'New rule'}
       width="lg"
+      customHeader={
+        <div className="bg-[#0B1528] px-6 py-5 flex items-center justify-between text-white shrink-0">
+          <div className="flex items-center gap-3.5 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-[#F59E0B] flex items-center justify-center text-slate-900 shadow-sm shrink-0">
+              {mode === 'edit' ? (
+                <Pencil className="h-5 w-5 text-slate-900" />
+              ) : (
+                <Plus className="h-5 w-5 text-slate-900" />
+              )}
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-[#F59E0B] uppercase tracking-wider mb-0.5">
+                {mode === 'edit' ? 'Edit rule' : 'New rule'}
+              </p>
+              <h2 className="text-lg font-bold leading-tight text-white truncate">
+                {mode === 'edit' ? form.name || 'Edit rule' : 'Create new rule'}
+              </h2>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleClose}
+            disabled={submitting}
+            className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      }
+      footer={
+        <div className="flex items-center justify-end gap-3 w-full">
+          <button
+            type="button"
+            onClick={handleClose}
+            disabled={submitting}
+            className="rounded-xl border border-divider py-2.5 px-6 text-sm font-semibold text-txt-main bg-surface transition-colors hover:bg-bg cursor-pointer disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={submitting}
+            className="inline-flex items-center gap-2 rounded-xl bg-[#F59E0B] hover:bg-[#D97706] text-slate-900 py-2.5 px-6 text-sm font-semibold shadow-xs transition-colors cursor-pointer disabled:opacity-60"
+          >
+            {submitting ? (
+              <Loader2 className="h-4 w-4 animate-spin text-slate-900" />
+            ) : (
+              <Check className="h-4 w-4 text-slate-900" />
+            )}
+            <span>{mode === 'edit' ? 'Save changes' : 'Create rule'}</span>
+          </button>
+        </div>
+      }
     >
       {fetching ? (
         <div className="flex flex-col items-center justify-center py-24 gap-3">
-          <Loader2 className="h-8 w-8 animate-spin text-[var(--accent)]" />
-          <p className="text-sm font-semibold text-txt-main">Loading definition details...</p>
+          <Loader2 className="h-8 w-8 animate-spin text-[#F59E0B]" />
+          <p className="text-sm font-semibold text-txt-main">Loading rule details...</p>
           <p className="text-xs text-txt-sub">Please wait while we retrieve the rule configuration.</p>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-5 py-2">
           {/* Error Banner */}
           {error && (
             <div role="alert" className="alert alert-error rounded-xl py-3 px-4 text-sm flex gap-2">
@@ -461,281 +391,389 @@ export default function TaskDefinitionFormDrawer({
             </div>
           )}
 
-          {/* ── Section 1: Basic Information ───────────────────────────────── */}
-          <SectionCard title="Basic Information">
-            <div className="space-y-4">
-              <FieldWrap label="Task Name" required icon={Tag}>
-                <input
-                  type="text"
-                  value={form.name}
-                  onChange={(e) => set('name', e.target.value)}
-                  placeholder="e.g., GST-3B Monthly Filing"
-                  className={`${INPUT} px-3`}
-                />
-              </FieldWrap>
+          {/* ── Section 1: Basics ─────────────────────────────────────── */}
+          <div className="rounded-2xl border border-divider bg-surface p-6 space-y-4 shadow-xs">
+            <div className="flex items-center gap-2.5 mb-2">
+              <span className="w-6 h-6 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 text-xs font-bold flex items-center justify-center">
+                1
+              </span>
+              <h3 className="text-base font-bold text-txt-main">Basics</h3>
+            </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <FieldWrap label="Task Type" required icon={Layers}>
-                  <SelectWithIcon
+            {/* Rule name */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-txt-main">
+                Rule name <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={form.name}
+                onChange={(e) => set('name', e.target.value)}
+                placeholder="e.g. ROC_ANNUAL123"
+                className="w-full h-11 rounded-xl border border-divider bg-bg/50 px-3.5 text-sm font-medium text-txt-main placeholder:text-txt-sub/60 focus:bg-surface focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/15 transition-all"
+              />
+            </div>
+
+            {/* Task type & Category */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-txt-main">
+                  Task type <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <select
                     value={form.taskType}
-                    onChange={(val) => set('taskType', val)}
-                    options={TASK_TYPES.map((t) => ({ value: t, label: t }))}
-                    placeholder="Select task type"
-                    icon={Layers}
-                  />
-                </FieldWrap>
-
-                <FieldWrap label="Category" icon={Tag}>
-                  <SelectWithIcon
-                    value={form.category}
-                    onChange={(val) => set('category', val)}
-                    options={TASK_CATEGORIES.map((c) => ({ value: c, label: c }))}
-                    placeholder="Select category"
-                    icon={Tag}
-                  />
-                </FieldWrap>
-
-                <FieldWrap label="Subject Type" required icon={Users}>
-                  <SelectWithIcon
-                    value={form.subjectType}
-                    onChange={(val) => set('subjectType', val)}
-                    options={SUBJECT_TYPE_OPTIONS}
-                    icon={Users}
-                  />
-                </FieldWrap>
-
-                <FieldWrap label="Priority" icon={Clock}>
-                  <SelectWithIcon
-                    value={form.priority}
-                    onChange={(val) => set('priority', val as TaskPriority)}
-                    options={PRIORITY_OPTIONS}
-                    icon={Clock}
-                  />
-                </FieldWrap>
+                    onChange={(e) => set('taskType', e.target.value)}
+                    className="w-full h-11 appearance-none rounded-xl border border-divider bg-bg/50 pl-3.5 pr-8 text-sm font-medium text-txt-main focus:bg-surface focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/15 transition-all cursor-pointer"
+                  >
+                    <option value="" disabled>Select task type</option>
+                    {TASK_TYPES.map((t) => (
+                      <option key={t} value={t} className="bg-surface">
+                        {t}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-txt-sub" />
+                </div>
               </div>
 
-              <FieldWrap label="Description" icon={AlignLeft}>
-                <textarea
-                  rows={2}
-                  value={form.description}
-                  onChange={(e) => set('description', e.target.value)}
-                  placeholder="Describe the compliance rule or notes..."
-                  className={`${TEXTAREA} px-3 py-2`}
-                />
-              </FieldWrap>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-txt-main">Category</label>
+                <div className="relative">
+                  <select
+                    value={form.category}
+                    onChange={(e) => set('category', e.target.value)}
+                    className="w-full h-11 appearance-none rounded-xl border border-divider bg-bg/50 pl-3.5 pr-8 text-sm font-medium text-txt-main focus:bg-surface focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/15 transition-all cursor-pointer"
+                  >
+                    <option value="">Select category</option>
+                    {TASK_CATEGORIES.map((c) => (
+                      <option key={c} value={c} className="bg-surface">
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-txt-sub" />
+                </div>
+              </div>
             </div>
-          </SectionCard>
 
-          {/* ── Section 2: Schedule ────────────────────────────────────────── */}
-          <SectionCard title="Schedule Pattern">
-            <div className="space-y-4">
-              <FieldWrap label="Schedule Frequency" required icon={Calendar}>
-                <SelectWithIcon
-                  value={form.schedulePattern}
-                  onChange={(val) => set('schedulePattern', val as SchedulePattern)}
-                  options={SCHEDULE_PATTERNS}
-                  icon={Calendar}
-                />
-              </FieldWrap>
+            {/* Applies to & Priority Dropdown */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-txt-main">
+                  Applies to <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <select
+                    value={form.subjectType}
+                    onChange={(e) => set('subjectType', e.target.value)}
+                    className="w-full h-11 appearance-none rounded-xl border border-divider bg-bg/50 pl-3.5 pr-8 text-sm font-medium text-txt-main focus:bg-surface focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/15 transition-all cursor-pointer"
+                  >
+                    {SUBJECT_TYPE_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value} className="bg-surface">
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-txt-sub" />
+                </div>
+              </div>
 
-              {/* Monthly */}
-              {form.schedulePattern === 'monthly' && (
-                <FieldWrap label="Day of Month" helper="Day of each month the task is due" icon={Clock}>
-                  <SelectWithIcon
+              {/* Priority as a DROPDOWN per user's explicit request */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-txt-main">Priority</label>
+                <div className="relative">
+                  <select
+                    value={form.priority}
+                    onChange={(e) => set('priority', e.target.value as TaskPriority)}
+                    className="w-full h-11 appearance-none rounded-xl border border-divider bg-bg/50 pl-3.5 pr-8 text-sm font-medium text-txt-main focus:bg-surface focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/15 transition-all cursor-pointer"
+                  >
+                    <option value="LOW" className="bg-surface">● Low</option>
+                    <option value="MEDIUM" className="bg-surface">● Medium</option>
+                    <option value="HIGH" className="bg-surface">● High</option>
+                    <option value="URGENT" className="bg-surface">● Urgent</option>
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-txt-sub" />
+                </div>
+              </div>
+            </div>
+
+            {/* Description */}
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-txt-main">Description</label>
+                <span className="text-xs text-txt-sub">{form.description.length} / 240</span>
+              </div>
+              <textarea
+                rows={3}
+                maxLength={240}
+                value={form.description}
+                onChange={(e) => set('description', e.target.value)}
+                placeholder="Describe the compliance rule or add notes"
+                className="w-full rounded-xl border border-divider bg-bg/50 p-3 text-sm font-medium text-txt-main placeholder:text-txt-sub/60 focus:bg-surface focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/15 transition-all"
+              />
+            </div>
+          </div>
+
+          {/* ── Section 2: Schedule ───────────────────────────────────── */}
+          <div className="rounded-2xl border border-divider bg-surface p-6 space-y-4 shadow-xs">
+            <div className="flex items-center gap-2.5 mb-2">
+              <span className="w-6 h-6 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 text-xs font-bold flex items-center justify-center">
+                2
+              </span>
+              <h3 className="text-base font-bold text-txt-main">Schedule</h3>
+            </div>
+
+            {/* Repeats Segmented Toggle */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-txt-main">
+                Repeats <span className="text-red-500">*</span>
+              </label>
+              <div className="bg-bg p-1 rounded-xl border border-divider/50 flex items-center gap-1">
+                {repeatsTabs.map((tab) => {
+                  const isSelected = form.schedulePattern === tab.value;
+                  return (
+                    <button
+                      key={tab.value}
+                      type="button"
+                      onClick={() => set('schedulePattern', tab.value)}
+                      className={`flex-1 py-2 text-xs font-medium rounded-lg transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-[#0F1E36] dark:bg-navy text-white font-semibold shadow-xs'
+                          : 'text-txt-sub hover:text-txt-main'
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Frequency details */}
+            {form.schedulePattern === 'monthly' && (
+              <div className="flex flex-col gap-1.5 pt-2">
+                <label className="text-xs font-semibold text-txt-main">
+                  Day of Month (due day)
+                </label>
+                <div className="relative">
+                  <select
                     value={form.monthlyDay}
-                    onChange={(val) => set('monthlyDay', Number(val))}
-                    options={DAYS}
-                  />
-                </FieldWrap>
-              )}
+                    onChange={(e) => set('monthlyDay', Number(e.target.value))}
+                    className="w-full h-11 appearance-none rounded-xl border border-divider bg-bg/50 pl-3.5 pr-8 text-sm font-medium text-txt-main focus:bg-surface focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/15 transition-all cursor-pointer"
+                  >
+                    {DAYS.map((d) => (
+                      <option key={d.value} value={d.value} className="bg-surface">
+                        Day {d.label}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-txt-sub" />
+                </div>
+              </div>
+            )}
 
-              {/* Quarterly */}
-              {form.schedulePattern === 'quarterly' && (
-                <div className="space-y-3 pt-2">
-                  {[
-                    { label: 'Q1 (Apr – Jun)', mField: 'q1Month' as const, dField: 'q1Day' as const },
-                    { label: 'Q2 (Jul – Sep)', mField: 'q2Month' as const, dField: 'q2Day' as const },
-                    { label: 'Q3 (Oct – Dec)', mField: 'q3Month' as const, dField: 'q3Day' as const },
-                    { label: 'Q4 (Jan – Mar)', mField: 'q4Month' as const, dField: 'q4Day' as const },
-                  ].map(({ label, mField, dField }) => (
-                    <div key={label} className="p-3 rounded-xl border border-[var(--border)] bg-[var(--bg)] space-y-2">
-                      <p className="text-xs font-bold text-txt-main">{label}</p>
-                      <div className="grid grid-cols-2 gap-3">
-                        <FieldWrap label="Month">
-                          <SelectWithIcon
-                            value={form[mField]}
-                            onChange={(val) => set(mField, Number(val))}
-                            options={MONTHS}
-                          />
-                        </FieldWrap>
-                        <FieldWrap label="Day">
-                          <SelectWithIcon
-                            value={form[dField]}
-                            onChange={(val) => set(dField, Number(val))}
-                            options={DAYS}
-                          />
-                        </FieldWrap>
+            {form.schedulePattern === 'quarterly' && (
+              <div className="space-y-3 pt-2">
+                {[
+                  { label: 'Q1 (Apr – Jun)', mField: 'q1Month' as const, dField: 'q1Day' as const },
+                  { label: 'Q2 (Jul – Sep)', mField: 'q2Month' as const, dField: 'q2Day' as const },
+                  { label: 'Q3 (Oct – Dec)', mField: 'q3Month' as const, dField: 'q3Day' as const },
+                  { label: 'Q4 (Jan – Mar)', mField: 'q4Month' as const, dField: 'q4Day' as const },
+                ].map(({ label, mField, dField }) => (
+                  <div key={label} className="p-3 rounded-xl border border-divider bg-bg/40 space-y-2">
+                    <p className="text-xs font-bold text-txt-main">{label}</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[11px] font-medium text-txt-sub">Month</label>
+                        <select
+                          value={form[mField]}
+                          onChange={(e) => set(mField, Number(e.target.value))}
+                          className="w-full h-10 rounded-lg border border-divider bg-surface px-2.5 text-xs text-txt-main"
+                        >
+                          {MONTHS.map((m) => (
+                            <option key={m.value} value={m.value}>
+                              {m.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-medium text-txt-sub">Day</label>
+                        <select
+                          value={form[dField]}
+                          onChange={(e) => set(dField, Number(e.target.value))}
+                          className="w-full h-10 rounded-lg border border-divider bg-surface px-2.5 text-xs text-txt-main"
+                        >
+                          {DAYS.map((d) => (
+                            <option key={d.value} value={d.value}>
+                              {d.label}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                     </div>
-                  ))}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {form.schedulePattern === 'yearly' && (
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                <div>
+                  <label className="text-xs font-semibold text-txt-main">Due Month</label>
+                  <select
+                    value={form.yearlyMonth}
+                    onChange={(e) => set('yearlyMonth', Number(e.target.value))}
+                    className="w-full h-11 rounded-xl border border-divider bg-bg/50 px-3.5 text-sm text-txt-main"
+                  >
+                    {MONTHS.map((m) => (
+                      <option key={m.value} value={m.value}>
+                        {m.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-              )}
-
-              {/* Half-Yearly */}
-              {form.schedulePattern === 'half_yearly' && (
-                <div className="space-y-3 pt-2">
-                  {[
-                    { label: 'First Half', mField: 'h1Month' as const, dField: 'h1Day' as const },
-                    { label: 'Second Half', mField: 'h2Month' as const, dField: 'h2Day' as const },
-                  ].map(({ label, mField, dField }) => (
-                    <div key={label} className="p-3 rounded-xl border border-[var(--border)] bg-[var(--bg)] space-y-2">
-                      <p className="text-xs font-bold text-txt-main">{label}</p>
-                      <div className="grid grid-cols-2 gap-3">
-                        <FieldWrap label="Month">
-                          <SelectWithIcon
-                            value={form[mField]}
-                            onChange={(val) => set(mField, Number(val))}
-                            options={MONTHS}
-                          />
-                        </FieldWrap>
-                        <FieldWrap label="Day">
-                          <SelectWithIcon
-                            value={form[dField]}
-                            onChange={(val) => set(dField, Number(val))}
-                            options={DAYS}
-                          />
-                        </FieldWrap>
-                      </div>
-                    </div>
-                  ))}
+                <div>
+                  <label className="text-xs font-semibold text-txt-main">Due Day</label>
+                  <select
+                    value={form.yearlyDay}
+                    onChange={(e) => set('yearlyDay', Number(e.target.value))}
+                    className="w-full h-11 rounded-xl border border-divider bg-bg/50 px-3.5 text-sm text-txt-main"
+                  >
+                    {DAYS.map((d) => (
+                      <option key={d.value} value={d.value}>
+                        Day {d.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-              )}
+              </div>
+            )}
 
-              {/* Yearly */}
-              {form.schedulePattern === 'yearly' && (
-                <div className="grid grid-cols-2 gap-3 pt-2">
-                  <FieldWrap label="Month">
-                    <SelectWithIcon
-                      value={form.yearlyMonth}
-                      onChange={(val) => set('yearlyMonth', Number(val))}
-                      options={MONTHS}
-                    />
-                  </FieldWrap>
-                  <FieldWrap label="Day">
-                    <SelectWithIcon
-                      value={form.yearlyDay}
-                      onChange={(val) => set('yearlyDay', Number(val))}
-                      options={DAYS}
-                    />
-                  </FieldWrap>
-                </div>
-              )}
-
-              {/* One-Time */}
-              {form.schedulePattern === 'one_time' && (
-                <FieldWrap label="Due Date" required icon={Calendar}>
-                  <input
-                    type="date"
-                    value={form.oneTimeDueDate}
-                    onChange={(e) => set('oneTimeDueDate', e.target.value)}
-                    className={`${INPUT} px-3`}
-                  />
-                </FieldWrap>
-              )}
-
-              <FieldWrap
-                label="Target Offset Days"
-                helper="Days before (−) or after (+) due date to target completion"
-                icon={Clock}
-              >
-                <input
-                  type="number"
-                  min={-365}
-                  max={365}
-                  value={form.targetOffsetDays}
-                  onChange={(e) => set('targetOffsetDays', Number(e.target.value))}
-                  className={`${INPUT} px-3`}
-                />
-              </FieldWrap>
+            {/* Target offset days */}
+            <div className="flex flex-col gap-1.5 pt-2">
+              <label className="text-xs font-semibold text-txt-main">
+                Target Offset Days (days before due date)
+              </label>
+              <input
+                type="number"
+                min={-365}
+                max={365}
+                value={form.targetOffsetDays}
+                onChange={(e) => set('targetOffsetDays', Number(e.target.value))}
+                className="w-full h-11 rounded-xl border border-divider bg-bg/50 px-3.5 text-sm font-medium text-txt-main focus:bg-surface focus:border-blue-500 focus:outline-none transition-all"
+              />
             </div>
-          </SectionCard>
+          </div>
 
-          {/* ── Section 3: Automation & Status ─────────────────────────────── */}
-          <SectionCard title="Automation & Status">
-            <div className="divide-y divide-[var(--border)]">
+          {/* ── Section 3: Automation & Status ────────────────────────── */}
+          <div className="rounded-2xl border border-divider bg-surface p-6 space-y-4 shadow-xs">
+            <div className="flex items-center gap-2.5 mb-2">
+              <span className="w-6 h-6 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 text-xs font-bold flex items-center justify-center">
+                3
+              </span>
+              <h3 className="text-base font-bold text-txt-main">Automation &amp; Status</h3>
+            </div>
+
+            <div className="divide-y divide-divider">
               {/* Active */}
               <div className="flex items-center justify-between py-3">
-                <div className="flex items-center gap-2">
-                  <div className={`flex items-center justify-center w-7 h-7 rounded-lg ${form.isActive ? 'bg-emerald-500/15 text-emerald-600' : 'bg-slate-200 text-slate-500'}`}>
-                    <Settings className="w-3.5 h-3.5" />
+                <div className="flex items-center gap-2.5">
+                  <div className={`flex items-center justify-center w-8 h-8 rounded-lg ${form.isActive ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>
+                    <Settings className="w-4 h-4" />
                   </div>
                   <div>
-                    <p className="text-xs font-bold text-txt-main">Active Status</p>
+                    <p className="text-xs font-bold text-txt-main">Rule Status</p>
                     <p className="text-[11px] text-txt-sub">Enable or disable this task rule</p>
                   </div>
                 </div>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <span className={`text-[11px] font-bold ${form.isActive ? 'text-emerald-600' : 'text-txt-sub'}`}>
-                    {form.isActive ? 'ACTIVE' : 'INACTIVE'}
+                <div
+                  className="flex items-center gap-2 cursor-pointer select-none"
+                  onClick={() => set('isActive', !form.isActive)}
+                >
+                  <div
+                    className={`w-9 h-5 rounded-full p-0.5 flex items-center transition-colors relative ${
+                      form.isActive ? 'bg-[#1e293b]' : 'bg-slate-300 dark:bg-slate-700'
+                    }`}
+                  >
+                    <div
+                      className={`w-4 h-4 bg-white rounded-full shadow-xs transition-transform ${
+                        form.isActive ? 'translate-x-4' : 'translate-x-0'
+                      }`}
+                    />
+                  </div>
+                  <span className={`text-xs font-semibold ${form.isActive ? 'text-[#059669]' : 'text-txt-sub'}`}>
+                    {form.isActive ? 'Active' : 'Inactive'}
                   </span>
-                  <input
-                    type="checkbox"
-                    checked={form.isActive}
-                    onChange={(e) => set('isActive', e.target.checked)}
-                    className="toggle toggle-sm toggle-success"
-                  />
-                </label>
+                </div>
               </div>
 
               {/* Auto Tasks */}
               <div className="flex items-center justify-between py-3">
-                <div className="flex items-center gap-2">
-                  <div className={`flex items-center justify-center w-7 h-7 rounded-lg ${form.autoCreateTasks ? 'bg-[var(--accent)]/15 text-[var(--accent)]' : 'bg-slate-200 text-slate-500'}`}>
-                    <Zap className="w-3.5 h-3.5" />
+                <div className="flex items-center gap-2.5">
+                  <div className={`flex items-center justify-center w-8 h-8 rounded-lg ${form.autoCreateTasks ? 'bg-amber-50 text-amber-600' : 'bg-slate-100 text-slate-500'}`}>
+                    <Zap className="w-4 h-4" />
                   </div>
                   <div>
                     <p className="text-xs font-bold text-txt-main">Auto-create Tasks</p>
                     <p className="text-[11px] text-txt-sub">Automatically generate task instances on due dates</p>
                   </div>
                 </div>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <span className={`text-[11px] font-bold ${form.autoCreateTasks ? 'text-[var(--accent)]' : 'text-txt-sub'}`}>
-                    {form.autoCreateTasks ? 'ON' : 'OFF'}
+                <div
+                  className="flex items-center gap-2 cursor-pointer select-none"
+                  onClick={() => set('autoCreateTasks', !form.autoCreateTasks)}
+                >
+                  <div
+                    className={`w-9 h-5 rounded-full p-0.5 flex items-center transition-colors relative ${
+                      form.autoCreateTasks ? 'bg-[#1e293b]' : 'bg-slate-300 dark:bg-slate-700'
+                    }`}
+                  >
+                    <div
+                      className={`w-4 h-4 bg-white rounded-full shadow-xs transition-transform ${
+                        form.autoCreateTasks ? 'translate-x-4' : 'translate-x-0'
+                      }`}
+                    />
+                  </div>
+                  <span className={`text-xs font-semibold ${form.autoCreateTasks ? 'text-txt-main' : 'text-txt-sub'}`}>
+                    {form.autoCreateTasks ? 'On' : 'Off'}
                   </span>
-                  <input
-                    type="checkbox"
-                    checked={form.autoCreateTasks}
-                    onChange={(e) => set('autoCreateTasks', e.target.checked)}
-                    className="toggle toggle-sm toggle-warning"
-                  />
-                </label>
+                </div>
               </div>
 
               {/* Auto Reminders */}
               <div className="flex items-center justify-between py-3">
-                <div className="flex items-center gap-2">
-                  <div className={`flex items-center justify-center w-7 h-7 rounded-lg ${form.autoCreateReminders ? 'bg-blue-500/15 text-blue-600' : 'bg-slate-200 text-slate-500'}`}>
-                    <Bell className="w-3.5 h-3.5" />
+                <div className="flex items-center gap-2.5">
+                  <div className={`flex items-center justify-center w-8 h-8 rounded-lg ${form.autoCreateReminders ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-500'}`}>
+                    <Bell className="w-4 h-4" />
                   </div>
                   <div>
                     <p className="text-xs font-bold text-txt-main">Auto-create Reminders</p>
                     <p className="text-[11px] text-txt-sub">Automatically schedule client notifications</p>
                   </div>
                 </div>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <span className={`text-[11px] font-bold ${form.autoCreateReminders ? 'text-blue-600' : 'text-txt-sub'}`}>
-                    {form.autoCreateReminders ? 'ON' : 'OFF'}
+                <div
+                  className="flex items-center gap-2 cursor-pointer select-none"
+                  onClick={() => set('autoCreateReminders', !form.autoCreateReminders)}
+                >
+                  <div
+                    className={`w-9 h-5 rounded-full p-0.5 flex items-center transition-colors relative ${
+                      form.autoCreateReminders ? 'bg-[#1e293b]' : 'bg-slate-300 dark:bg-slate-700'
+                    }`}
+                  >
+                    <div
+                      className={`w-4 h-4 bg-white rounded-full shadow-xs transition-transform ${
+                        form.autoCreateReminders ? 'translate-x-4' : 'translate-x-0'
+                      }`}
+                    />
+                  </div>
+                  <span className={`text-xs font-semibold ${form.autoCreateReminders ? 'text-txt-main' : 'text-txt-sub'}`}>
+                    {form.autoCreateReminders ? 'On' : 'Off'}
                   </span>
-                  <input
-                    type="checkbox"
-                    checked={form.autoCreateReminders}
-                    onChange={(e) => set('autoCreateReminders', e.target.checked)}
-                    className="toggle toggle-sm toggle-info"
-                  />
-                </label>
+                </div>
               </div>
             </div>
-          </SectionCard>
+          </div>
         </div>
       )}
     </Drawer>

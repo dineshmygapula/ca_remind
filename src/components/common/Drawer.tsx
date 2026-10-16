@@ -27,6 +27,9 @@ export interface DrawerProps {
 
   children: ReactNode;
 
+  /** Custom header node. If provided, replaces default top banner header. */
+  customHeader?: ReactNode;
+
   /** Custom footer node. If provided, replaces default onCancel/onSubmit footer buttons. */
   footer?: ReactNode;
 
@@ -68,6 +71,7 @@ export default function Drawer({
   headerActions,
   width = 'md',
   children,
+  customHeader,
   footer,
   onCancel,
   onSubmit,
@@ -112,44 +116,48 @@ export default function Drawer({
           ${open ? 'translate-x-0' : 'translate-x-full'}`}
       >
         {/* ── Header ──────────────────────────────────────────────────────── */}
-        <div className="relative flex items-center justify-between bg-gradient-to-r from-[var(--primary)] to-[#2a3f6f] px-6 py-5 text-white overflow-hidden shrink-0">
-          {/* decorative glow */}
-          <div className="absolute -top-6 -right-6 w-32 h-32 rounded-full bg-[var(--accent)]/20 blur-2xl pointer-events-none" />
+        {customHeader ? (
+          <div className="shrink-0">{customHeader}</div>
+        ) : (
+          <div className="relative flex items-center justify-between bg-gradient-to-r from-[var(--primary)] to-[#2a3f6f] px-6 py-5 text-white overflow-hidden shrink-0">
+            {/* decorative glow */}
+            <div className="absolute -top-6 -right-6 w-32 h-32 rounded-full bg-[var(--accent)]/20 blur-2xl pointer-events-none" />
 
-          <div className="flex items-center gap-3 z-10 min-w-0">
-            {icon && (
-              <div className="flex shrink-0 items-center justify-center w-9 h-9 rounded-xl bg-white/15 backdrop-blur-sm border border-white/20">
-                {icon}
-              </div>
-            )}
-            <div className="min-w-0">
-              {eyebrow && (
-                <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[var(--accent)] mb-0.5">
-                  {eyebrow}
-                </p>
+            <div className="flex items-center gap-3 z-10 min-w-0">
+              {icon && (
+                <div className="flex shrink-0 items-center justify-center w-9 h-9 rounded-xl bg-white/15 backdrop-blur-sm border border-white/20">
+                  {icon}
+                </div>
               )}
-              <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-base font-extrabold leading-tight tracking-tight truncate">
-                  {title}
-                </h2>
-                {badge}
+              <div className="min-w-0">
+                {eyebrow && (
+                  <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[var(--accent)] mb-0.5">
+                    {eyebrow}
+                  </p>
+                )}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="text-base font-extrabold leading-tight tracking-tight truncate">
+                    {title}
+                  </h2>
+                  {badge}
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="z-10 ml-4 flex items-center gap-1.5 shrink-0">
-            {headerActions}
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={submitting}
-              aria-label="Close drawer"
-              className="rounded-xl bg-white/10 border border-white/20 p-1.5 transition-all hover:bg-white/25 hover:scale-105 disabled:opacity-40"
-            >
-              <X className="h-4 w-4" />
-            </button>
+            <div className="z-10 ml-4 flex items-center gap-1.5 shrink-0">
+              {headerActions}
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={submitting}
+                aria-label="Close drawer"
+                className="rounded-xl bg-white/10 border border-white/20 p-1.5 transition-all hover:bg-white/25 hover:scale-105 disabled:opacity-40"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* ── Body ────────────────────────────────────────────────────────── */}
         <div className="flex-1 overflow-y-auto px-6 py-5">

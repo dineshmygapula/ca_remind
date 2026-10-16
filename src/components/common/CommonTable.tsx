@@ -78,6 +78,7 @@ export interface CommonDataGridProps<T = any> {
     editable?: boolean;
     selectionMode?: "singleRow" | "multiRow" | "none";
     className?: string;
+    actionStyle?: 'tinted' | 'ghost';
     // Common dynamic database update handler for inline cell edits:
     onUpdateCell?: (params: {
         row: T;
@@ -108,6 +109,7 @@ export function formatCurrency(value: number | null | undefined): string {
 interface ActionCellProps<T = any> {
     row: T;
     actions: GridAction<T>[];
+    actionStyle?: 'tinted' | 'ghost';
 }
 
 // Maps semantic variants onto tinted icon-square styling (matches the
@@ -118,6 +120,12 @@ const VARIANT_CLASS: Record<NonNullable<GridAction["variant"]>, string> = {
     danger: "rc-action-btn rc-action-btn--danger",
 };
 
+const GHOST_VARIANT_CLASS: Record<NonNullable<GridAction["variant"]>, string> = {
+    primary: "p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer",
+    secondary: "p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer",
+    danger: "p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors cursor-pointer",
+};
+
 // Fallback icons so existing callers that don't pass `icon` still get the
 // eye / pencil / trash look from the reference design, keyed off variant.
 const DEFAULT_ICON: Record<NonNullable<GridAction["variant"]>, ReactNode> = {
@@ -126,7 +134,7 @@ const DEFAULT_ICON: Record<NonNullable<GridAction["variant"]>, ReactNode> = {
     danger: <Trash2 className="h-4 w-4" />,
 };
 
-function ActionCell<T = any>({ row, actions }: ActionCellProps<T>) {
+function ActionCell<T = any>({ row, actions, actionStyle = 'tinted' }: ActionCellProps<T>) {
     const visibleActions = actions.filter(
         (action) => !action.visible || action.visible(row),
     );
@@ -136,11 +144,12 @@ function ActionCell<T = any>({ row, actions }: ActionCellProps<T>) {
     }
 
     return (
-        <div className="flex h-full items-center gap-2">
+        <div className="flex h-full items-center gap-1.5">
             {visibleActions.map((action, idx) => {
                 const isLoading = action.loading?.(row) ?? false;
                 const isDisabled = action.disabled?.(row) ?? false;
                 const variant = action.variant ?? "primary";
+                const btnClass = actionStyle === 'ghost' ? GHOST_VARIANT_CLASS[variant] : VARIANT_CLASS[variant];
 
                 return (
                     <button
@@ -152,7 +161,7 @@ function ActionCell<T = any>({ row, actions }: ActionCellProps<T>) {
                             }
                         }}
                         disabled={isLoading || isDisabled}
-                        className={VARIANT_CLASS[variant]}
+                        className={btnClass}
                         title={action.label}
                     >
                         {isLoading ? (
@@ -195,6 +204,7 @@ export default function CommonDataGrid<T extends Record<string, any>>({
     hideToolbar = false,
     selectionMode = "singleRow",
     className = "",
+    actionStyle = "tinted",
 }: CommonDataGridProps<T>) {
     const isDark = useIsDarkMode();
     const toast = useToast();
@@ -254,11 +264,16 @@ export default function CommonDataGrid<T extends Record<string, any>>({
 
         // Actions column
         if (actions.length > 0) {
+            const actionColWidth = actionStyle === 'ghost'
+                ? Math.max(actions.length * 36 + 24, 110)
+                : Math.max(actions.length * 48 + 36, 130);
+            const actionMinWidth = actionStyle === 'ghost' ? 100 : 120;
+
             cols.push({
                 headerName: "Actions",
                 colId: "actions",
-                width: Math.max(actions.length * 48 + 36, 130),
-                minWidth: 120,
+                width: actionColWidth,
+                minWidth: actionMinWidth,
 
                 sortable: false,
                 resizable: true,
@@ -272,20 +287,21 @@ export default function CommonDataGrid<T extends Record<string, any>>({
                     <ActionCell
                         row={params.data as T}
                         actions={actions}
+                        actionStyle={actionStyle}
                     />
                 ),
             });
         }
 
         return cols;
-    }, [columns, actions]);
+    }, [columns, actions, actionStyle]);
 
     return (
         <div className={`w-full ${className}`}>
             {!hideToolbar && toolbar && <div className="mb-4">{toolbar}</div>}
 
-            {/* Card wrapper — white surface, soft border, rounded corners */}
-            <div className="w-full overflow-hidden rounded-2xl border border-divider bg-surface shadow-sm">
+            {/* Card wrapper — surface background, theme divider, rounded corners */}
+            <div className="w-full overflow-hidden rounded-2xl border border-divider bg-surface shadow-xs">
                 <div className="w-full overflow-x-auto">
                     <div
                         className={
@@ -328,11 +344,11 @@ export default function CommonDataGrid<T extends Record<string, any>>({
                             defaultColDef={{
                                 resizable: true,
                                 sortable: true,
+                                unSortIcon: true,
                                 minWidth: 150,
                                 flex: 1,
 
-                                // DO NOT put editable: true here.
-                                // Each column controls its own editability.
+                               
                                 ...defaultColDef,
                             }}
 

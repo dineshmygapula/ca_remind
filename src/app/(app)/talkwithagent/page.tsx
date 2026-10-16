@@ -1,5 +1,6 @@
 "use client";
 
+import { Logo } from "@/components/common/Logo";
 import {
     Smartphone,
     Headset,
@@ -85,10 +86,9 @@ export default function TalkWithAgent() {
                                     <span className="inline-flex rounded-md bg-[var(--primary)]/10 px-3 py-1.5 text-xs font-semibold text-[var(--primary)]">
                                         Trusted by CA Firms
                                     </span>
-
-                                    <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-[var(--heading)]">
-                                        RemindCA
-                                    </h2>
+<div className="m-2">
+                                   <Logo/>
+                                   </div>
 
                                     <p className="mt-1 text-sm text-[var(--text-secondary)]">
                                         Manage your Business efficiently

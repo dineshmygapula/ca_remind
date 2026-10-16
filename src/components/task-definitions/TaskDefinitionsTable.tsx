@@ -6,7 +6,6 @@ import CommonDataGrid, { GridAction, GridColumn } from '@/components/common/Comm
 import { TaskDefinitionListItem } from '@/types/taskDefinition.types';
 import { updateTaskDefinition } from '@/services/taskDefinitionService';
 import { useToast } from '@/context/ToastContext';
-import { TASK_TYPES } from '@/constants/taskDefinition.constants';
 
 interface TaskDefinitionsTableProps {
   definitions: TaskDefinitionListItem[];
@@ -18,35 +17,116 @@ interface TaskDefinitionsTableProps {
   onRefresh: () => void;
 }
 
-const formatSchedulePattern = (pattern: string) => {
-  switch (pattern) {
+function getRuleTypePrefix(val?: string) {
+  if (!val) return 'RULE';
+  const upper = val.toUpperCase();
+  if (upper.includes('GST')) return 'GST';
+  if (upper.includes('TDS')) return 'TDS';
+  if (upper.includes('ITR')) return 'ITR';
+  if (upper.includes('ROC')) return 'ROC';
+  if (upper.includes('MSME')) return 'MSME';
+  return val.split('_')[0] || 'RULE';
+}
+
+function getRuleBadgeClass(val?: string) {
+  const prefix = getRuleTypePrefix(val);
+  if (prefix === 'TDS') return 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300';
+  if (prefix === 'ITR') return 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300';
+  if (prefix === 'GST') return 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300';
+  if (prefix === 'ROC') return 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300';
+  return 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300';
+}
+
+function getTaskTypeDescription(taskType?: string, name?: string) {
+  const key = (taskType || name || '').toUpperCase();
+  if (key.includes('GST')) return 'Goods & Services Tax';
+  if (key.includes('TDS')) return 'Tax Deducted at Source';
+  if (key.includes('ITR')) return 'Income Tax Return';
+  if (key.includes('ROC')) return 'Registrar of Companies';
+  if (key.includes('MSME')) return 'Ministry of MSME';
+  return taskType || 'Compliance Rule';
+}
+
+function formatSchedulePattern(pattern?: string) {
+  switch (pattern?.toLowerCase()) {
     case 'monthly':
       return 'Monthly';
     case 'quarterly':
       return 'Quarterly';
     case 'half_yearly':
-    case 'halfYearly':
+    case 'halfyearly':
       return 'Half-Yearly';
     case 'yearly':
       return 'Yearly';
     case 'one_time':
+    case 'onetime':
       return 'One Time';
     default:
-      return pattern;
+      return pattern || '—';
   }
-};
+}
 
-const getDaysUntilDue = (dueDate: string) => {
+function ScheduleBadge({ pattern }: { pattern?: string }) {
+  const label = formatSchedulePattern(pattern);
+  const p = pattern?.toLowerCase() || '';
+
+  if (p === 'yearly') {
+    return (
+      <span className="inline-block px-3 py-0.5 rounded-full text-xs font-semibold bg-[#fef3c7] text-[#b45309] dark:bg-amber-950/40 dark:text-amber-300">
+        {label}
+      </span>
+    );
+  }
+  if (p === 'quarterly') {
+    return (
+      <span className="inline-block px-3 py-0.5 rounded-full text-xs font-semibold bg-[#f3e8ff] text-[#7e22ce] dark:bg-purple-950/40 dark:text-purple-300">
+        {label}
+      </span>
+    );
+  }
+  if (p === 'monthly') {
+    return (
+      <span className="inline-block px-3 py-0.5 rounded-full text-xs font-semibold bg-[#e0f2fe] text-[#0369a1] dark:bg-blue-950/40 dark:text-blue-300">
+        {label}
+      </span>
+    );
+  }
+  if (p.includes('half')) {
+    return (
+      <span className="inline-block px-3 py-0.5 rounded-full text-xs font-semibold bg-[#ccfbf1] text-[#0f766e] dark:bg-teal-950/40 dark:text-teal-300">
+        {label}
+      </span>
+    );
+  }
+  return (
+    <span className="inline-block px-3 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+      {label}
+    </span>
+  );
+}
+
+function formatNextDueDate(dateStr?: string) {
+  if (!dateStr) return null;
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return null;
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = d.toLocaleDateString('en-US', { month: 'short' });
+    const year = d.getFullYear();
+    return `${day} ${month} ${year}`;
+  } catch {
+    return dateStr;
+  }
+}
+
+function getDueDifferenceDays(dueDate?: string) {
+  if (!dueDate) return null;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const due = new Date(dueDate);
   due.setHours(0, 0, 0, 0);
-  const diffDays = Math.ceil((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-  if (diffDays < 0) return `${Math.abs(diffDays)} days overdue`;
-  if (diffDays === 0) return 'Due today';
-  if (diffDays === 1) return 'Due tomorrow';
-  return `in ${diffDays} days`;
-};
+  return Math.ceil((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+}
 
 export default function TaskDefinitionsTable({
   definitions,
@@ -59,14 +139,13 @@ export default function TaskDefinitionsTable({
 }: TaskDefinitionsTableProps) {
   const toast = useToast();
 
-  // Tracks toggle in flight
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [togglingField, setTogglingField] = useState<
     'autoCreateTasks' | 'autoCreateReminders' | null
   >(null);
 
   const handleToggle = async (
-    e: React.ChangeEvent<HTMLInputElement>,
+    e: React.MouseEvent,
     def: TaskDefinitionListItem,
     field: 'autoCreateTasks' | 'autoCreateReminders'
   ) => {
@@ -91,124 +170,122 @@ export default function TaskDefinitionsTable({
     }
   };
 
-  const handleUpdateCell = async ({
-    row,
-    field,
-    newValue,
-  }: {
-    row: TaskDefinitionListItem;
-    field: string;
-    newValue: any;
-    oldValue: any;
-  }) => {
-    await updateTaskDefinition(businessId, row.id, {
-      [field]: newValue,
-    });
-    onRefresh();
-  };
-
   const columns: GridColumn<TaskDefinitionListItem>[] = useMemo(
     () => [
       {
-        headerName: 'Task Name',
+        headerName: 'Rule',
         field: 'name',
-        minWidth: 220,
-        flex: 2,
-        editable: true,
-      },
-      {
-        headerName: 'Task Type',
-        field: 'taskType',
-        minWidth: 150,
-        editable: true,
-        cellEditor: 'agSelectCellEditor',
-        cellEditorParams: {
-          values: TASK_TYPES.map((t) => t.value),
+        minWidth: 260,
+        flex: 2.5,
+        cellRenderer: (p) => {
+          if (!p.data) return null;
+          return (
+            <div className="flex items-center gap-3 py-1">
+              <span
+                className={`w-11 h-9 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 ${getRuleBadgeClass(
+                  p.data.taskType || p.data.name
+                )}`}
+              >
+                {getRuleTypePrefix(p.data.taskType || p.data.name)}
+              </span>
+              <div className="flex flex-col min-w-0">
+                <span className="font-bold text-sm text-[var(--primary)] dark:text-slate-100 truncate">
+                  {p.data.name || '—'}
+                </span>
+                <span className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                  {getTaskTypeDescription(p.data.taskType, p.data.name)}
+                </span>
+              </div>
+            </div>
+          );
         },
       },
       {
         headerName: 'Schedule',
         field: 'schedulePattern',
-        minWidth: 150,
-        editable: true,
-        cellEditor: 'agSelectCellEditor',
-        cellEditorParams: {
-          values: ['monthly', 'quarterly', 'half_yearly', 'yearly', 'one_time'],
-        },
-        cellRenderer: (p) => {
-          const label = formatSchedulePattern(p.data?.schedulePattern ?? '');
-          return (
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-lg text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
-              {label}
-            </span>
-          );
-        },
+        minWidth: 140,
+        flex: 1,
+        cellRenderer: (p) => <ScheduleBadge pattern={p.data?.schedulePattern} />,
       },
       {
-        headerName: 'Auto Tasks',
+        headerName: 'Auto task',
         colId: 'autoCreateTasks',
-        minWidth: 140,
+        minWidth: 130,
+        flex: 1,
         cellRenderer: (p) => {
-          if (!p.data) return null;
-          const isToggling = togglingId === p.data.id && togglingField === 'autoCreateTasks';
-          const checked = Boolean(p.data.autoCreateTasks);
+          const row = p.data;
+          if (!row) return null;
+          const isToggling = togglingId === row.id && togglingField === 'autoCreateTasks';
+          const checked = Boolean(row.autoCreateTasks);
+
           return (
             <div
-              className="flex h-full items-center gap-2 cursor-default"
-              onClick={(e) => e.stopPropagation()}
+              className="flex h-full items-center gap-2 cursor-pointer select-none"
+              onClick={(e) => handleToggle(e, row, 'autoCreateTasks')}
             >
               {isToggling ? (
-                <Loader2 className="h-4 w-4 animate-spin text-[var(--accent)]" />
+                <Loader2 className="h-4 w-4 animate-spin text-slate-500" />
               ) : (
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  onChange={(e) => handleToggle(e, p.data, 'autoCreateTasks')}
-                  className="toggle toggle-sm toggle-success"
-                  aria-label="Toggle Auto Tasks"
-                />
+                <div
+                  className={`w-9 h-5 rounded-full p-0.5 flex items-center transition-colors relative ${
+                    checked ? 'bg-[#14224D]' : 'bg-slate-300 dark:bg-slate-700'
+                  }`}
+                >
+                  <div
+                    className={`w-4 h-4 bg-white rounded-full shadow-xs transition-transform ${
+                      checked ? 'translate-x-4' : 'translate-x-0'
+                    }`}
+                  />
+                </div>
               )}
               <span
-                className={`text-[11px] font-bold ${
-                  checked ? 'text-emerald-600' : 'text-txt-sub/60'
+                className={`text-xs font-semibold ${
+                  checked ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400'
                 }`}
               >
-                {checked ? 'ON' : 'OFF'}
+                {checked ? 'On' : 'Off'}
               </span>
             </div>
           );
         },
       },
       {
-        headerName: 'Auto Reminders',
+        headerName: 'Auto reminder',
         colId: 'autoCreateReminders',
-        minWidth: 150,
+        minWidth: 140,
+        flex: 1,
         cellRenderer: (p) => {
-          if (!p.data) return null;
-          const isToggling = togglingId === p.data.id && togglingField === 'autoCreateReminders';
-          const checked = Boolean(p.data.autoCreateReminders);
+          const row = p.data;
+          if (!row) return null;
+          const isToggling = togglingId === row.id && togglingField === 'autoCreateReminders';
+          const checked = Boolean(row.autoCreateReminders);
+
           return (
             <div
-              className="flex h-full items-center gap-2 cursor-default"
-              onClick={(e) => e.stopPropagation()}
+              className="flex h-full items-center gap-2 cursor-pointer select-none"
+              onClick={(e) => handleToggle(e, row, 'autoCreateReminders')}
             >
               {isToggling ? (
-                <Loader2 className="h-4 w-4 animate-spin text-[var(--accent)]" />
+                <Loader2 className="h-4 w-4 animate-spin text-slate-500" />
               ) : (
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  onChange={(e) => handleToggle(e, p.data, 'autoCreateReminders')}
-                  className="toggle toggle-sm toggle-success"
-                  aria-label="Toggle Auto Reminders"
-                />
+                <div
+                  className={`w-9 h-5 rounded-full p-0.5 flex items-center transition-colors relative ${
+                    checked ? 'bg-[#1e293b]' : 'bg-slate-300 dark:bg-slate-700'
+                  }`}
+                >
+                  <div
+                    className={`w-4 h-4 bg-white rounded-full shadow-xs transition-transform ${
+                      checked ? 'translate-x-4' : 'translate-x-0'
+                    }`}
+                  />
+                </div>
               )}
               <span
-                className={`text-[11px] font-bold ${
-                  checked ? 'text-emerald-600' : 'text-txt-sub/60'
+                className={`text-xs font-semibold ${
+                  checked ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400'
                 }`}
               >
-                {checked ? 'ON' : 'OFF'}
+                {checked ? 'On' : 'Off'}
               </span>
             </div>
           );
@@ -217,45 +294,57 @@ export default function TaskDefinitionsTable({
       {
         headerName: 'Status',
         field: 'isActive',
-        minWidth: 120,
+        minWidth: 110,
+        flex: 0.9,
         cellRenderer: (p) => {
           const active = Boolean(p.data?.isActive);
-          return (
-            <span
-              className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${
-                active
-                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                  : 'bg-slate-100 text-slate-600 border-slate-200'
-              }`}
-            >
-              {active ? 'Active' : 'Inactive'}
+          return active ? (
+            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#059669] dark:text-emerald-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#10b981]" />
+              Active
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+              Inactive
             </span>
           );
         },
       },
       {
-        headerName: 'Next Due Date',
+        headerName: 'Next due',
         field: 'dueDate',
         minWidth: 160,
+        flex: 1.3,
         cellRenderer: (p) => {
           if (!p.data?.dueDate) {
-            return <span className="text-sm text-txt-sub/50">Not scheduled</span>;
+            return <span className="text-xs text-slate-400">—</span>;
           }
-          const dateStr = new Date(p.data.dueDate).toLocaleDateString('en-IN');
-          const relativeText = getDaysUntilDue(p.data.dueDate);
-          const isOverdue = relativeText.includes('overdue');
-          const isToday = relativeText === 'Due today';
+          const formatted = formatNextDueDate(p.data.dueDate);
+          const diffDays = getDueDifferenceDays(p.data.dueDate);
 
           return (
             <div className="flex flex-col justify-center py-1 leading-tight">
-              <span className="font-mono text-xs font-semibold text-txt-main">{dateStr}</span>
-              <span
-                className={`text-[10px] font-medium ${
-                  isOverdue ? 'text-red-600 font-bold' : isToday ? 'text-amber-600 font-bold' : 'text-txt-sub'
-                }`}
-              >
-                {relativeText}
+              <span className="font-bold text-xs sm:text-sm text-slate-900 dark:text-slate-100">
+                {formatted}
               </span>
+              {diffDays !== null && (
+                <div>
+                  {diffDays < 0 ? (
+                    <span className="inline-block mt-0.5 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#fef2f2] text-[#dc2626] dark:bg-rose-950/40 dark:text-rose-400">
+                      {Math.abs(diffDays)} days overdue
+                    </span>
+                  ) : diffDays <= 7 ? (
+                    <span className="inline-block mt-0.5 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#fffbeb] text-[#b45309] dark:bg-amber-950/40 dark:text-amber-400">
+                      {diffDays === 0 ? 'Due today' : `Due in ${diffDays} days`}
+                    </span>
+                  ) : (
+                    <span className="inline-block mt-0.5 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#eef2ff] text-[#4f46e5] dark:bg-indigo-950/40 dark:text-indigo-400">
+                      In {diffDays} days
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           );
         },
@@ -292,9 +381,10 @@ export default function TaskDefinitionsTable({
       columns={columns}
       actions={actions}
       isLoading={loading}
+      actionStyle="ghost"
+      rowHeight={64}
       onRowClick={(row) => onView(row.id)}
       onRowDoubleClick={(row) => onEdit(row.id)}
-      onUpdateCell={handleUpdateCell}
       emptyMessage="No task definitions found"
     />
   );

@@ -11,46 +11,60 @@
   --color-txt-main: var(--text-primary);
   --color-txt-sub: var(--text-secondary);
   --color-divider: var(--border);
+  --font-sans: var(--font-manrope), "Manrope", system-ui, sans-serif;
 }
 
 :root {
-  --bg: #F8F6F1;
-  --surface: #FFFFFF;
-  --primary: #1B2A4A;
-  --primary-hover: #0F2440;
-  --accent: #C9A227;
-  --accent-hover: #B8860B;
-  --text-primary: #1C1C1E;
-  --text-secondary: #5A5A5A;
-  --border: #E2DFD6;
-  --heading: #1B2A4A;
-  --code-bg: #EAE6DF;
-  --code-text: #1B2A4A;
-  --nav-text: #1B2A4A;
+  --bg: #f8f6f1;
+  --surface: #ffffff;
+  --primary: #14224d;
+  --primary-hover: #0f2440;
+  --accent: #c9a227;
+  --accent-hover: #b8860b;
+  --text-primary: #1c1c1e;
+  --text-secondary: #5a5a5a;
+  --border: #e2dfd6;
+  --heading: #1b2a4a;
+  --code-bg: #eae6df;
+  --code-text: #1b2a4a;
+  --nav-text: #1b2a4a;
 }
 
 .dark {
-  --bg: #0B1220;
-  --surface: #141F35;
-  --primary: #1B2A4A;
-  --primary-hover: #2A3D63;
-  --accent: #E0B93A;
-  --accent-hover: #F0CC4D;
-  --text-primary: #F8FAFC;
-  --text-secondary: #94A3B8;
+  --bg: #0b1220;
+  --surface: #141f35;
+  --primary: #1b2a4a;
+  --primary-hover: #2a3d63;
+  --accent: #e0b93a;
+  --accent-hover: #f0cc4d;
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
   --border: #243047;
-  --heading: #FFFFFF;
-  --code-bg: #1E293B;
-  --code-text: #F8FAFC;
-  --nav-text: #F8FAFC;
+  --heading: #ffffff;
+  --code-bg: #1e293b;
+  --code-text: #f8fafc;
+  --nav-text: #f8fafc;
 }
 
 body {
   background-color: var(--bg);
   color: var(--text-primary);
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  font-family:
+    var(--font-manrope),
+    "Manrope",
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    Oxygen,
+    Ubuntu,
+    Cantarell,
+    sans-serif;
   -webkit-font-smoothing: antialiased;
-  transition: background-color 0.3s ease, color 0.3s ease;
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease;
   min-height: 100vh;
 }
 
@@ -136,39 +150,51 @@ body {
   background: transparent;
 }
 
-/* ── RemindCA AG Grid theme overrides ──────────────────────────────────
-   Purely cosmetic: restyles the existing ag-theme-alpine(-dark) grid to
-   match the RemindCA design tokens (bg / surface / navy / gold / divider).
-   Does not touch grid behavior, data, sorting, filtering, or pagination logic.
-────────────────────────────────────────────────────────────────────── */
-
 .rc-grid-theme {
   --ag-font-family: inherit;
   --ag-borders: none;
   --ag-row-border-color: var(--border);
-  --ag-header-background-color: var(--bg);
-  --ag-header-foreground-color: var(--text-secondary);
+  --ag-header-background-color: "#fff";
+  --ag-header-foreground-color: "#fff";
   --ag-background-color: var(--surface);
   --ag-odd-row-background-color: var(--surface);
-  --ag-row-hover-color: color-mix(in srgb, var(--primary) 5%, var(--surface));
+  --ag-row-hover-color: color-mix(in srgb, var(--primary) 4%, var(--surface));
   --ag-foreground-color: var(--text-primary);
   --ag-secondary-foreground-color: var(--text-secondary);
   --ag-border-color: var(--border);
   --ag-cell-horizontal-padding: 20px;
   --ag-font-size: 14px;
   --ag-header-height: 48px;
-  --ag-row-height: 64px;
+  --ag-row-height: 56px;
 }
 
-/* Header row: uppercase-ish label styling + subtle bottom border */
+.dark .rc-grid-theme {
+  --ag-row-border-color: var(--border);
+  --ag-header-background-color: var(--surface);
+  --ag-header-foreground-color: var(--text-secondary);
+  --ag-background-color: var(--surface);
+  --ag-odd-row-background-color: var(--surface);
+  --ag-row-hover-color: color-mix(in srgb, var(--primary) 8%, var(--surface));
+  --ag-border-color: var(--border);
+}
+
+/* Header row: subtle label styling + clean bottom border */
 .rc-grid-theme .ag-header {
   border-bottom: 1px solid var(--border);
-  font-weight: 600;
+  font-weight: 500;
+}
+
+.dark .rc-grid-theme .ag-header {
+  border-bottom: 1px solid var(--border);
 }
 
 .rc-grid-theme .ag-header-cell-label {
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.dark .rc-grid-theme .ag-header-cell-label {
   color: var(--text-secondary);
 }
 
@@ -180,6 +206,10 @@ body {
 }
 
 .rc-grid-theme .ag-row {
+  border-bottom: 1px solid var(--border);
+}
+
+.dark .rc-grid-theme .ag-row {
   border-bottom: 1px solid var(--border);
 }
 
@@ -195,6 +225,11 @@ body {
   font-size: 13px;
 }
 
+.dark .rc-grid-theme .ag-paging-panel {
+  border-top: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+
 .rc-grid-theme .ag-paging-button {
   border-radius: 9999px;
   min-width: 28px;
@@ -205,6 +240,10 @@ body {
 }
 
 .rc-grid-theme .ag-paging-description {
+  color: var(--text-secondary);
+}
+
+.dark .rc-grid-theme .ag-paging-description {
   color: var(--text-secondary);
 }
 
@@ -219,7 +258,7 @@ body {
   border-radius: 8px;
   border: none;
   cursor: pointer;
-  transition: background-color 0.15s ease, opacity 0.15s ease;
+  transition: all 0.15s ease;
 }
 
 .rc-action-btn:disabled {
@@ -228,28 +267,55 @@ body {
 }
 
 .rc-action-btn--primary {
-  background-color: color-mix(in srgb, var(--primary) 10%, transparent);
-  color: var(--primary);
+  background-color: #eff6ff;
+  color: #2563eb;
 }
 
 .rc-action-btn--primary:hover:not(:disabled) {
-  background-color: color-mix(in srgb, var(--primary) 18%, transparent);
+  background-color: #dbeafe;
 }
 
 .rc-action-btn--secondary {
-  background-color: color-mix(in srgb, var(--accent) 12%, transparent);
-  color: var(--accent-hover);
+  background-color: #fffbeb;
+  color: #d97706;
 }
 
 .rc-action-btn--secondary:hover:not(:disabled) {
-  background-color: color-mix(in srgb, var(--accent) 20%, transparent);
+  background-color: #fef3c7;
 }
 
 .rc-action-btn--danger {
-  background-color: rgba(220, 38, 38, 0.1);
-  color: #dc2626;
+  background-color: #fef2f2;
+  color: #ef4444;
 }
 
 .rc-action-btn--danger:hover:not(:disabled) {
-  background-color: rgba(220, 38, 38, 0.18);
+  background-color: #fee2e2;
+}
+
+.dark .rc-action-btn--primary {
+  background-color: rgba(37, 99, 235, 0.15);
+  color: #60a5fa;
+}
+
+.dark .rc-action-btn--primary:hover:not(:disabled) {
+  background-color: rgba(37, 99, 235, 0.25);
+}
+
+.dark .rc-action-btn--secondary {
+  background-color: rgba(217, 119, 6, 0.15);
+  color: #fbbf24;
+}
+
+.dark .rc-action-btn--secondary:hover:not(:disabled) {
+  background-color: rgba(217, 119, 6, 0.25);
+}
+
+.dark .rc-action-btn--danger {
+  background-color: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+}
+
+.dark .rc-action-btn--danger:hover:not(:disabled) {
+  background-color: rgba(239, 68, 68, 0.25);
 }

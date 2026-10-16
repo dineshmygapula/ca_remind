@@ -16,10 +16,10 @@ import { useRedirectIfSignedIn } from "@/hooks/useRedirectAfterSignin";
 const ErrorAlert = ({ message }: { message: string }) => (
   <div
     role="alert"
-    className="alert alert-error mb-3.5 py-2 px-3 rounded-lg text-red-700 bg-red-50 border border-red-200 items-start gap-2"
+    className="alert alert-error mb-5 py-3 px-4 rounded-xl text-red-700 bg-red-50 border border-red-200 items-start gap-2.5"
   >
     <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-    <span className="text-xs">{message}</span>
+    <span className="text-sm">{message}</span>
   </div>
 );
 
@@ -42,11 +42,11 @@ export default function LoginForm() {
 
   return (
     <AuthLayout mode="login">
-      <div className="mb-4">
-        <h1 className="text-xl sm:text-2xl font-black tracking-tight text-[var(--heading)]">
+      <div className="mb-7">
+        <h1 className="text-3xl sm:text-[34px] leading-tight font-extrabold tracking-tight text-[var(--heading)]">
           Welcome back
         </h1>
-        <p className="mt-1.5 text-xs text-[var(--text-secondary)]">
+        <p className="mt-1.5 text-base text-[var(--text-secondary)]">
           Sign in to manage your compliance tasks and reminders.
         </p>
       </div>
@@ -57,51 +57,50 @@ export default function LoginForm() {
         schema={loginSchema}
         defaultValues={{ email: "", password: "", rememberMe: false }}
         onSubmit={submit}
-        className="space-y-3"
+        className="space-y-5"
       >
         <InputField name="email" label="Email address" placeholder="name@yourfirm.com" icon={Mail} />
         <PasswordField name="password" label="Password" placeholder="Enter your password" />
 
-        <div className="flex justify-end -mt-1">
+        <div className="flex items-center justify-between -mt-1">
+          <CheckboxField name="rememberMe" label="Remember me" />
           <button
             type="button"
             onClick={openModal}
-            className="btn btn-link btn-xs no-underline hover:underline p-0 h-auto min-h-0 text-xs font-semibold text-[var(--primary)]"
+            className="min-h-11 px-1 text-sm font-bold text-[var(--primary)] hover:underline"
           >
             Forgot password?
           </button>
         </div>
 
-        <CheckboxField name="rememberMe" label="Remember me" />
-
         <button
           type="submit"
           disabled={loading || googleLoading}
-          className="btn mt-1 w-full h-10 min-h-10 rounded-lg bg-[var(--primary)] border-none text-white font-bold text-xs flex items-center justify-center gap-2 disabled:opacity-50 shadow-md hover:shadow-lg"
+          className="btn w-full h-[54px] min-h-[54px] rounded-[14px] bg-[var(--primary)] border-none text-white text-base font-extrabold flex items-center justify-center gap-2.5 disabled:opacity-50 shadow-[0_8px_20px_rgba(20,34,77,0.22)] hover:shadow-[0_10px_24px_rgba(20,34,77,0.3)]"
         >
           {loading ? (
-            <><Loader2 className="w-4 h-4 animate-spin" /> Logging in...</>
+            <><Loader2 className="w-[18px] h-[18px] animate-spin" /> Logging in...</>
           ) : (
-            <>Log in <ArrowRight className="w-4 h-4" /></>
+            <>Log in <ArrowRight className="w-[18px] h-[18px] text-[#F2B63F]" strokeWidth={2.4} /></>
           )}
         </button>
       </FormWrapper>
 
-      <div className="divider text-[10px] font-semibold text-[var(--text-secondary)] my-4">OR</div>
+      <div className="divider text-xs font-bold tracking-wider text-[var(--text-secondary)] my-6">OR</div>
 
       <button
         type="button"
         onClick={googleSignIn}
         disabled={googleLoading || loading}
-        className="btn btn-outline w-full h-10 min-h-10 rounded-lg text-xs font-semibold flex items-center justify-center gap-2.5 disabled:opacity-50"
+        className="btn btn-outline w-full h-[54px] min-h-[54px] rounded-[14px] border-[var(--border)] text-[15.5px] font-bold flex items-center justify-center gap-3 disabled:opacity-50"
       >
-        {googleLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <GoogleIcon />}
+        {googleLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <GoogleIcon />}
         <span>Continue with Google</span>
       </button>
 
-      <p className="text-center text-xs text-[var(--text-secondary)] mt-4">
+      <p className="text-center text-sm text-[var(--text-secondary)] mt-6">
         Don't have an account?{" "}
-        <Link href="/signup" className="font-bold text-[var(--primary)] hover:underline">
+        <Link href="/signup" className="inline-block px-1 py-3 font-extrabold text-[var(--primary)] hover:underline">
           Sign up
         </Link>
       </p>

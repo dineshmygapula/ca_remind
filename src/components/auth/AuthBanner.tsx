@@ -1,101 +1,78 @@
-// components/auth/AuthBanner.tsx
-import { ShieldCheck, CheckCircle2, Bell, Users, FileText, Clock } from "lucide-react";
+import { Bell, Users, FileText, Clock, ShieldCheck } from "lucide-react";
 import { Logo } from "../common/Logo";
 
 const COPY = {
     login: {
-        badge: "Compliance made simple",
-        heading: <>Never miss a<br />compliance<br />deadline again.</>,
-        body: "Automated reminders, delivery tracking, and client alerts — all in one place for your practice.",
-        features: [
-            { icon: Bell, text: "Smart deadline reminders sent automatically" },
-            { icon: Users, text: "Client & staff task management in one place" },
-            { icon: FileText, text: "Compliance reports generated instantly" },
-            { icon: Clock, text: "Real-time delivery tracking & alerts" },
-        ],
-        stats: [
-            { value: "132", label: "Delivered\nthis month" },
-            { value: "99.4%", label: "Delivery\nrate" },
-            { value: "48", label: "Active\nreminders" },
-        ],
+        headline: "Never miss a compliance deadline again.",
+        sub: "Automated reminders, delivery tracking and client alerts, all in one place for your practice.",
     },
     signup: {
-        badge: "Start your free trial",
-        heading: <>Take control of<br />your compliance<br />workflow.</>,
-        body: "Automate reminders, track deadlines, and keep every client obligation organized in one place.",
-        features: [
-            { icon: CheckCircle2, text: "14-day free trial, no credit card needed" },
-            { icon: Bell, text: "Unlimited automated deadline reminders" },
-            { icon: Users, text: "Manage all clients from a single dashboard" },
-            { icon: Clock, text: "Set up in under 5 minutes" },
-        ],
-        stats: [
-            { value: "14", label: "Day free\ntrial" },
-            { value: "99.4%", label: "Delivery\nrate" },
-            { value: "24/7", label: "Deadline\ntracking" },
-        ],
+        headline: "Set up your practice in minutes.",
+        sub: "Add your clients, choose your rules, and let RemindCA handle the deadlines.",
     },
 } as const;
+
+const FEATURES = [
+    { icon: Bell, text: "Smart deadline reminders, sent automatically" },
+    { icon: Users, text: "Client and staff tasks in one place" },
+    { icon: FileText, text: "Compliance reports generated instantly" },
+    { icon: Clock, text: "Real-time delivery tracking and alerts" },
+];
+
+const STATS = [
+    { value: "132", label: "Delivered this month" },
+    { value: "99.4%", label: "Delivery rate" },
+    { value: "48", label: "Active reminders" },
+];
 
 export function AuthBanner({ mode }: { mode: "login" | "signup" }) {
     const copy = COPY[mode];
 
     return (
-        <div className="hidden lg:flex lg:w-[46%] relative overflow-hidden bg-[var(--primary)] text-white">
-            {/* Decorative circles */}
-            <div className="absolute -top-24 -left-24 w-[360px] h-[360px] rounded-full border border-[var(--accent)]/20" />
-            <div className="absolute top-16 -right-36 w-[440px] h-[440px] rounded-full border border-[var(--accent)]/20" />
-            <div className="absolute -bottom-36 -left-24 w-[440px] h-[440px] rounded-full border border-[var(--accent)]/20" />
+        <aside className="relative hidden lg:flex lg:w-[50%] xl:w-[52%] shrink-0 flex-col gap-10 overflow-hidden bg-[#14224D] px-14 py-14 text-white">
+            {/* decorative rings */}
+          
 
-            <div className="relative z-10 w-full flex flex-col p-7 xl:p-9 gap-0">
+          <Logo authBanner={true}/>
 
-                {/* ── TOP: Logo ── */}
-                <div className="shrink-0">
-                    <Logo variant="light" />
-                </div>
-
-                {/* ── MIDDLE: Badge + Heading + Body — grows to fill space ── */}
-                <div className="flex-1 flex flex-col justify-center py-6">
-                    <div className="inline-flex items-center gap-1.5 mb-4 px-2.5 py-1 rounded-full border border-[var(--accent)]/30 bg-[var(--accent)]/10 w-fit">
-                        <ShieldCheck className="w-3.5 h-3.5 text-[var(--accent)]" />
-                        <span className="text-[11px] font-semibold text-[var(--accent)]">{copy.badge}</span>
-                    </div>
-
-                    <h2 className="text-2xl xl:text-3xl font-black leading-[1.12] tracking-tight">
-                        {copy.heading}
-                    </h2>
-
-                    <p className="mt-3 text-sm leading-6 text-slate-300 max-w-xs">{copy.body}</p>
-
-                    {/* Feature list */}
-                    <ul className="mt-5 flex flex-col gap-2.5">
-                        {copy.features.map(({ icon: Icon, text }) => (
-                            <li key={text} className="flex items-center gap-2.5">
-                                <div className="shrink-0 w-6 h-6 rounded-md bg-[var(--accent)]/15 flex items-center justify-center">
-                                    <Icon className="w-3.5 h-3.5 text-[var(--accent)]" />
-                                </div>
-                                <span className="text-xs text-slate-200 leading-4">{text}</span>
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-
-                {/* ── BOTTOM: Divider + Stats ── */}
-                <div className="shrink-0">
-                    <div className="border-t border-white/10 mb-5" />
-                    <div className="grid grid-cols-3 gap-4">
-                        {copy.stats.map((s) => (
-                            <div key={s.label}>
-                                <div className="text-xl font-black text-[var(--accent)]">{s.value}</div>
-                                <div className="mt-0.5 text-[11px] text-slate-300 leading-4 whitespace-pre-line">
-                                    {s.label}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-
+            {/* headline */}
+            <div className="relative flex max-w-[520px] flex-col gap-6">
+                <span className="inline-flex w-fit items-center gap-2 rounded-full border border-[#F2B63F]/45 px-3.5 py-1.5 text-[13.5px] font-bold text-[#F2B63F]">
+                    <ShieldCheck className="h-4 w-4" />
+                    Compliance made simple
+                </span>
+                <h1 className="text-[52px] font-extrabold leading-[1.05] tracking-[-0.035em]">
+                    {copy.headline}
+                </h1>
+                <p className="text-lg leading-relaxed text-white/80">{copy.sub}</p>
             </div>
-        </div>
+
+            {/* features */}
+            <ul className="relative grid max-w-[620px] grid-cols-1 gap-3 xl:grid-cols-2">
+                {FEATURES.map(({ icon: Icon, text }) => (
+                    <li
+                        key={text}
+                        className="flex items-center gap-3.5 rounded-2xl bg-white/[0.07] px-4 py-3.5"
+                    >
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#F2B63F]/15 text-[#F2B63F]">
+                            <Icon className="h-5 w-5" strokeWidth={1.8} />
+                        </span>
+                        <span className="text-[14.5px] font-semibold">{text}</span>
+                    </li>
+                ))}
+            </ul>
+
+            {/* stats */}
+            <dl className="relative mt-auto flex flex-wrap gap-x-14 gap-y-6 border-t border-white/15 pt-7">
+                {STATS.map((s) => (
+                    <div key={s.label} className="flex flex-col gap-0.5">
+                        <dd className="order-1 text-[32px] font-extrabold leading-none tracking-tight text-[#F2B63F]">
+                            {s.value}
+                        </dd>
+                        <dt className="order-2 mt-1 text-sm text-white/75">{s.label}</dt>
+                    </div>
+                ))}
+            </dl>
+        </aside>
     );
 }
