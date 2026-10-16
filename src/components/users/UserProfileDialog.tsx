@@ -1,66 +1,81 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
+import { z } from "zod";
 import {
-  Dialog,
-  DialogContent,
-  Button,
-  TextField,
-  Grid,
-  Box,
-  Avatar,
-  Typography,
-  Divider,
-  CircularProgress,
-  Alert,
-  Chip,
-  IconButton,
-  Stack,
-  Paper,
-} from '@mui/material';
-import {
-  Close as CloseIcon,
-  Edit as EditIcon,
-  Save as SaveIcon,
-  Cancel as CancelIcon,
-  Phone as PhoneIcon,
-  Email as EmailIcon,
-  Badge as BadgeIcon,
-  //Person as PersonIcon,
-  CalendarToday as CalendarIcon,
-} from '@mui/icons-material';
-import { getCurrentUser, updateUser } from '@/services/userService';
-import { User, UpdateUserDto } from '@/types/user';
+  X,
+  Mail,
+  AtSign,
+  Phone,
+  Edit2,
+  Save,
+  Calendar,
+  Loader2,
+  User as UserIcon,
+  Clock,
+  ShieldCheck,
+  CreditCard,
+} from "lucide-react";
+import type { User, UpdateUserDto } from "@/types/user";
+import { ModalWrapper } from "../wrappers/ModalWrapper";
+import { FormWrapper } from "../wrappers/FormWrapper";
+import { InputField } from "../ui/InputField";
+import { getCurrentUser, updateUser } from "@/services/userService";
 
 interface UserProfileDialogProps {
   open: boolean;
   onClose: () => void;
 }
 
-// ─── Local form shape — all required strings (no undefined) ──────────────────
-interface UserFormData {
-  //username: string;
-  firstName: string;
-  lastName: string;
-  mobileNumber: string;
+const USER_PROFILE_FORM_ID = "user-profile-form";
+
+// ─── Zod Validation Schema ───────────────────────────────────────────────────
+const userProfileSchema = z.object({
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().optional().or(z.literal("")),
+  mobileNumber: z
+    .string()
+    .optional()
+    .or(z.literal(""))
+    .refine(
+      (val) => !val || val.length === 0 || /^[0-9]{10}$/.test(val),
+      "Mobile number must be exactly 10 digits"
+    ),
+});
+
+type UserProfileFormValues = z.infer<typeof userProfileSchema>;
+
+// ─── Helper InfoRow Component for View Mode ──────────────────────────────────
+function InfoRow({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: React.ElementType;
+  label: string;
+  value?: string;
+}) {
+  return (
+    <div className="flex items-center gap-3 py-3 border-b border-[var(--border)] last:border-b-0">
+      <div className="p-2 rounded-xl bg-[var(--accent)]/10 text-[var(--accent)] shrink-0">
+        <Icon size={16} />
+      </div>
+      <div>
+        <div className="text-xs text-[var(--text-secondary)] font-medium">{label}</div>
+        <div className="text-sm font-semibold text-[var(--text-primary)]">{value || "—"}</div>
+      </div>
+    </div>
+  );
 }
 
 export default function UserProfileDialog({ open, onClose }: UserProfileDialogProps) {
-  const [user, setUser]             = useState<User | null>(null);
-  const [loading, setLoading]       = useState(false);
-  const [error, setError]           = useState('');
-  const [isEditing, setIsEditing]   = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  // ✅ Use local form interface — all fields are required strings, no undefined
-  const [formData, setFormData] = useState<UserFormData>({
-    //username:     '',
-    firstName:    '',
-    lastName:     '',
-    mobileNumber: '',
-  });
-
-  // ─── Fetch when dialog opens ──────────────────────────────────────────────
+  // ─── Fetch User Profile on Dialog Open ──────────────────────────────────────
   useEffect(() => {
     if (open) fetchUserProfile();
   }, [open]);
@@ -68,415 +83,345 @@ export default function UserProfileDialog({ open, onClose }: UserProfileDialogPr
   const fetchUserProfile = async () => {
     try {
       setLoading(true);
-      setError('');
+      setError("");
       const data = await getCurrentUser();
       setUser(data);
-      setFormData({
-       // username:     data.username     || '',
-        firstName:    data.firstName    || '',
-        lastName:     data.lastName     || '',
-        mobileNumber: data.mobileNumber || '',
-      });
       setIsEditing(false);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to load profile');
+      setError(err instanceof Error ? err.message : "Failed to load profile");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleCancel = () => {
-    setIsEditing(false);
-    if (user) {
-      setFormData({
-      //  username:     user.username     || '',
-        firstName:    user.firstName    || '',
-        lastName:     user.lastName     || '',
-        mobileNumber: user.mobileNumber || '',
-      });
-    }
-  };
-
-  const handleSave = async () => {
-    // ✅ Safe — formData.mobileNumber is always string, never undefined
-    if (formData.mobileNumber.length > 0 && formData.mobileNumber.length !== 10) {
-      setError('Mobile number must be exactly 10 digits');
-      return;
-    }
-
+  const handleSave = async (values: UserProfileFormValues) => {
     try {
       setSubmitting(true);
-      setError('');
+      setError("");
 
-      // Only send fields that have values
       const dto: UpdateUserDto = {
-       // ...(formData.username     && { username:     formData.username }),
-        ...(formData.firstName    && { firstName:    formData.firstName }),
-        ...(formData.lastName     && { lastName:     formData.lastName }),
-        ...(formData.mobileNumber && { mobileNumber: formData.mobileNumber }),
+        ...(values.firstName && { firstName: values.firstName }),
+        ...(values.lastName && { lastName: values.lastName }),
+        ...(values.mobileNumber && { mobileNumber: values.mobileNumber }),
       };
 
       await updateUser(dto);
-      await new Promise((r) => setTimeout(r, 400));
+      await new Promise((r) => setTimeout(r, 300));
       await fetchUserProfile();
       setIsEditing(false);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to update profile');
+      setError(err instanceof Error ? err.message : "Failed to update profile");
     } finally {
       setSubmitting(false);
     }
   };
 
+  const handleClose = () => {
+    setIsEditing(false);
+    setError("");
+    onClose();
+  };
+
   const getUserInitials = () => {
-    if (!user) return '?';
-    const first = user.firstName?.[0] || user.username?.[0] || '';
-    const last  = user.lastName?.[0]  || '';
-    return `${first}${last}`.toUpperCase() || '?';
+    if (!user) return "?";
+    const first = user.firstName?.[0] || user.username?.[0] || "";
+    const last = user.lastName?.[0] || "";
+    return `${first}${last}`.toUpperCase() || "?";
   };
 
   const getFullName = () => {
-    if (!user) return '';
+    if (!user) return "";
     const parts = [user.firstName, user.lastName].filter(Boolean);
-    return parts.length > 0 ? parts.join(' ') : user.username;
+    return parts.length > 0 ? parts.join(" ") : user.username;
   };
 
   const formatDate = (dateString?: string) => {
-    if (!dateString) return '—';
-    return new Date(dateString).toLocaleDateString('en-IN', {
-      year: 'numeric', month: 'long', day: 'numeric',
+    if (!dateString) return "—";
+    return new Date(dateString).toLocaleDateString("en-IN", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
     });
   };
 
+  const getDefaultValues = (u: User): UserProfileFormValues => ({
+    firstName: u.firstName || "",
+    lastName: u.lastName || "",
+    mobileNumber: u.mobileNumber || "",
+  });
+
   return (
-    <Dialog
+    <ModalWrapper
       open={open}
-      onClose={onClose}
-      maxWidth="md"
+      onClose={handleClose}
       fullWidth
-      PaperProps={{
-        sx: {
-          borderRadius: 2,
-          mt: 8,
-          alignSelf: 'flex-start',
-        },
-      }}
-    >
-      {/* ── Header ── */}
-      <Box sx={{ bgcolor: '#0b1f3a', color: 'white', p: 3, position: 'relative' }}>
-        <IconButton
-          onClick={onClose}
-          sx={{ position: 'absolute', right: 8, top: 8, color: 'white' }}
-        >
-          <CloseIcon />
-        </IconButton>
-
-        {loading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
-            <CircularProgress sx={{ color: 'white' }} />
-          </Box>
-        ) : user ? (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Avatar
-              sx={{
-                width: 64,
-                height: 64,
-                fontSize: '1.6rem',
-                bgcolor: 'rgba(255,255,255,0.15)',
-                border: '2px solid rgba(255,255,255,0.4)',
-              }}
+      widthVw={60}
+      heightVh={80}
+      header={
+        <div className="flex justify-between items-center bg-[#0B1220] text-white px-6 py-4 shrink-0 border-b-2 border-[var(--accent)]/40 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-[var(--accent)]/15 border border-[var(--accent)]/40 text-[var(--accent)] flex items-center justify-center font-bold">
+              <UserIcon size={18} />
+            </div>
+            <div>
+              <h3 className="font-bold text-base text-white tracking-tight">User Profile</h3>
+              <p className="text-xs text-white/70">Personal settings and account management</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleClose}
+            className="p-2 rounded-xl text-white/70 hover:text-white hover:bg-white/10 transition-colors cursor-pointer z-50 flex items-center justify-center"
+            aria-label="Close dialog"
+          >
+            <X size={20} />
+          </button>
+        </div>
+      }
+      actions={
+        isEditing ? (
+          <div className="flex items-center justify-end w-full">
+            <button
+              type="submit"
+              form={USER_PROFILE_FORM_ID}
+              disabled={submitting}
+              className="h-11 px-7 text-sm font-bold bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[#0B1220] shadow-md rounded-xl cursor-pointer border-none flex items-center gap-2.5 transition-all hover:scale-[1.01] active:scale-[0.98] disabled:opacity-50"
             >
-              {getUserInitials()}
-            </Avatar>
-            <Box>
-              <Typography variant="h6" fontWeight={700}>
-                {getFullName()}
-              </Typography>
-              <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.5 }}>
-                <EmailIcon fontSize="small" sx={{ opacity: 0.8 }} />
-                <Typography variant="body2" sx={{ opacity: 0.85 }}>
-                  {user.email}
-                </Typography>
-              </Stack>
-              <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.4 }}>
-                <BadgeIcon sx={{ opacity: 0.7, fontSize: '0.9rem' }} />
-                <Typography variant="caption" sx={{ opacity: 0.75 }}>
-                  @{user.username}
-                </Typography>
-              </Stack>
-            </Box>
-          </Box>
-        ) : null}
-      </Box>
-
-      <DialogContent sx={{ p: 3 }}>
-        {error && (
-          <Alert severity="error" onClose={() => setError('')} sx={{ mb: 2 }}>
-            {error}
-          </Alert>
-        )}
-
-        {user && (
-          <Box>
-            {/* ── Edit Controls ── */}
-            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
-              {!isEditing ? (
-                <Button
-                  variant="outlined"
-                  startIcon={<EditIcon />}
-                  size="small"
-                  onClick={() => setIsEditing(true)}
-                  sx={{
-                    textTransform: 'none',
-                    borderColor: '#0b1f3a',
-                    color: '#0b1f3a',
-                  }}
-                >
-                  Edit Profile
-                </Button>
+              {submitting ? (
+                <Loader2 className="animate-spin" size={18} />
               ) : (
-                <Stack direction="row" spacing={1}>
-                  <Button
-                    startIcon={<CancelIcon />}
-                    onClick={handleCancel}
-                    disabled={submitting}
-                    size="small"
-                    sx={{ textTransform: 'none' }}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    variant="contained"
-                    startIcon={<SaveIcon />}
-                    onClick={handleSave}
-                    disabled={submitting}
-                    size="small"
-                    sx={{
-                      textTransform: 'none',
-                      bgcolor: '#0b1f3a',
-                      '&:hover': { bgcolor: '#112a4e' },
-                    }}
-                  >
-                    {submitting
-                      ? <CircularProgress size={18} sx={{ color: '#fff' }} />
-                      : 'Save'
-                    }
-                  </Button>
-                </Stack>
+                <>
+                  <Save size={16} />
+                  Save Changes
+                </>
               )}
-            </Box>
+            </button>
+          </div>
+        ) : undefined
+      }
+    >
+      {loading ? (
+        <div className="flex justify-center items-center py-16">
+          <Loader2 className="animate-spin text-[var(--accent)]" size={32} />
+        </div>
+      ) : error ? (
+        <div role="alert" className="alert alert-error mb-5 py-3 rounded-xl border border-red-200 dark:border-red-900 shadow-sm">
+          <span className="flex-1 text-sm font-medium">{error}</span>
+          <button
+            type="button"
+            onClick={() => setError("")}
+            className="btn btn-xs btn-circle btn-ghost"
+            aria-label="Dismiss error"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      ) : null}
 
-            <Divider sx={{ mb: 3 }} />
+      {!loading && user && (
+        <div className="space-y-6">
+          {/* ── Brand User Profile Hero Card ── */}
+          <div className="bg-gradient-to-r from-[#0B1220] to-[#16223D] text-white border border-[var(--accent)]/30 rounded-2xl p-5 shadow-sm flex flex-wrap items-center justify-between gap-4 relative overflow-hidden">
+            <div className="absolute -right-10 -bottom-10 w-36 h-36 rounded-full bg-[var(--accent)]/10 blur-xl pointer-events-none" />
 
-            {/* ── Two Column Layout ── */}
-            <Grid container spacing={3}>
+            <div className="flex items-center gap-4 relative z-10">
+              <div className="w-14 h-14 rounded-2xl bg-[var(--accent)]/15 border-2 border-[var(--accent)] text-[var(--accent)] font-extrabold flex items-center justify-center shadow-md shrink-0">
+                <span className="text-xl tracking-wide">{getUserInitials()}</span>
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <h2 className="text-lg font-bold text-white tracking-tight">{getFullName()}</h2>
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-[var(--accent)]/20 text-[var(--accent)] border border-[var(--accent)]/40">
+                    <ShieldCheck size={12} />
+                    Verified User
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-4 text-xs text-white/80">
+                  <span className="flex items-center gap-1.5">
+                    <Mail size={13} className="text-[var(--accent)]" />
+                    {user.email}
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <AtSign size={13} className="text-[var(--accent)]" />
+                    {user.username}
+                  </span>
+                </div>
+              </div>
+            </div>
 
-              {/* LEFT — Personal Info */}
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <Paper elevation={0} sx={{ p: 2, bgcolor: 'grey.50', height: '100%' }}>
-                  <Typography variant="subtitle2" fontWeight={600} gutterBottom>
+            {!isEditing && (
+              <button
+                type="button"
+                onClick={() => setIsEditing(true)}
+                className="h-10 px-5 text-xs font-bold border-2 border-[var(--accent)] text-[var(--accent)] hover:bg-[var(--accent)] hover:text-[#0B1220] rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer relative z-10"
+              >
+                <Edit2 size={14} />
+                Edit Profile
+              </button>
+            )}
+          </div>
+
+          {/* ── Main Two-Column Content Grid ── */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* LEFT COLUMN: Personal Information (Span 7) */}
+            <div className="lg:col-span-7 bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5 shadow-xs flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-4 pb-2 border-b border-[var(--border)]">
+                  <h4 className="font-bold text-sm text-[var(--text-primary)] flex items-center gap-2">
+                    <UserIcon size={16} className="text-[var(--accent)]" />
                     Personal Information
-                  </Typography>
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
-
-                   {/*  <TextField
-                      label="Username"
-                      name="username"
-                      value={formData.username}
-                      onChange={handleInputChange}
-                      disabled={!isEditing}
-                      fullWidth
-                      size="small"
-                      InputProps={{
-                        startAdornment: (
-                          <PersonIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
-                        ),
-                      }}
-                    />
- */}
-                    <TextField
-                      label="First Name"
-                      name="firstName"
-                      value={formData.firstName}
-                      onChange={handleInputChange}
-                      disabled={!isEditing}
-                      fullWidth
-                      size="small"
-                    />
-
-                    <TextField
-                      label="Last Name"
-                      name="lastName"
-                      value={formData.lastName}
-                      onChange={handleInputChange}
-                      disabled={!isEditing}
-                      fullWidth
-                      size="small"
-                    />
-
-                    {/* ✅ Mobile — numeric only, max 10 digits */}
-                    <TextField
-                      label="Mobile Number"
-                      name="mobileNumber"
-                      value={formData.mobileNumber}
-                      onChange={(e) => {
-                        const numeric = e.target.value.replace(/[^0-9]/g, '').slice(0, 10);
-                        setFormData((prev) => ({ ...prev, mobileNumber: numeric }));
-                      }}
-                      disabled={!isEditing}
-                      fullWidth
-                      size="small"
-                      slotProps={{
-                        input: {
-                          maxLength: 10,
-                          startAdornment: (
-                            <PhoneIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
-                          ),
-                        },
-                      }}
-                      error={
-                        isEditing &&
-                        formData.mobileNumber.length > 0 &&
-                        formData.mobileNumber.length < 10
-                      }
-                      helperText={
-                        isEditing
-                          ? formData.mobileNumber.length > 0 &&
-                            formData.mobileNumber.length < 10
-                            ? `${formData.mobileNumber.length}/10 digits`
-                            : 'Enter 10 digit mobile number'
-                          : undefined
-                      }
-                    />
-
-                    {/* Email — always read only */}
-                    <TextField
-                      label="Email"
-                      value={user.email}
-                      disabled
-                      fullWidth
-                      size="small"
-                      helperText="Email cannot be changed"
-                      slotProps={{
-                        input: {
-                          startAdornment: (
-                            <EmailIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
-                          ),
-                        },
-                      }}
-                    />
-
-                  </Box>
-                </Paper>
-              </Grid>
-
-              {/* RIGHT — Subscription + Account Info */}
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-
-                  {/* Subscription */}
-                  {user.razorpaySubscriptionData && (
-                    <Paper elevation={0} sx={{ p: 2, bgcolor: 'grey.50' }}>
-                      <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 600 }}>
-                        Subscription
-                      </Typography>
-                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mt: 1 }}>
-
-                        <Box>
-                          <Typography variant="caption" color="text.secondary">
-                            Status
-                          </Typography>
-                          <Box sx={{ mt: 0.5 }}>
-                            <Chip
-                              label={user.razorpaySubscriptionData.subscriptionStatus.toUpperCase()}
-                              color={
-                                user.razorpaySubscriptionData.subscriptionStatus === 'active'
-                                  ? 'success'
-                                  : user.razorpaySubscriptionData.subscriptionStatus === 'created'
-                                  ? 'info'
-                                  : 'default'
-                              }
-                              size="small"
-                            />
-                          </Box>
-                        </Box>
-
-                        <Box>
-                          <Typography variant="caption" color="text.secondary">
-                            Plan
-                          </Typography>
-                          <Typography variant="body2" sx={{ mt: 0.3, fontWeight: 500 }}>
-                            {user.razorpaySubscriptionData.planName || '—'}
-                          </Typography>
-                        </Box>
-
-                        <Box>
-                          <Typography
-                            variant="caption"
-                            color="text.secondary"
-                            sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}
-                          >
-                            <CalendarIcon sx={{ fontSize: '0.85rem' }} />
-                            Next Billing Date
-                          </Typography>
-                          <Typography variant="body2" sx={{ mt: 0.3, fontWeight: 500 }}>
-                            {formatDate(user.razorpaySubscriptionData.nextBillingDate)}
-                          </Typography>
-                        </Box>
-
-                        <Box>
-                          <Typography variant="caption" color="text.secondary">
-                            Payment Status
-                          </Typography>
-                          <Box sx={{ mt: 0.5 }}>
-                            <Chip
-                              label={user.razorpaySubscriptionData.paymentStatus || '—'}
-                              size="small"
-                              sx={{ bgcolor: '#0b1f3a', color: 'white' }}
-                            />
-                          </Box>
-                        </Box>
-
-                      </Box>
-                    </Paper>
+                  </h4>
+                  {isEditing && (
+                    <span className="text-xs font-semibold text-[var(--accent)] bg-[var(--accent)]/10 px-2.5 py-0.5 rounded-full border border-[var(--accent)]/20">Editing Mode</span>
                   )}
+                </div>
 
-                  {/* Account Info */}
-                  <Paper elevation={0} sx={{ p: 2, bgcolor: 'grey.50' }}>
-                    <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 600 }}>
-                      Account Information
-                    </Typography>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mt: 1 }}>
-                      <Box>
-                        <Typography variant="caption" color="text.secondary">
-                          Member Since
-                        </Typography>
-                        <Typography variant="body2" sx={{ mt: 0.3, fontWeight: 500 }}>
-                          {formatDate(user.createdAt)}
-                        </Typography>
-                      </Box>
-                      <Box>
-                        <Typography variant="caption" color="text.secondary">
-                          Last Updated
-                        </Typography>
-                        <Typography variant="body2" sx={{ mt: 0.3, fontWeight: 500 }}>
-                          {formatDate(user.updatedAt)}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  </Paper>
+                {!isEditing ? (
+                  /* View Mode */
+                  <div className="flex flex-col gap-1">
+                    <InfoRow icon={UserIcon} label="First Name" value={user.firstName} />
+                    <InfoRow icon={UserIcon} label="Last Name" value={user.lastName} />
+                    <InfoRow icon={Phone} label="Mobile Number" value={user.mobileNumber} />
+                    <InfoRow icon={Mail} label="Email Address" value={user.email} />
+                    <InfoRow icon={AtSign} label="Username" value={user.username} />
+                  </div>
+                ) : (
+                  /* Edit Mode with FormWrapper */
+                  <FormWrapper
+                    key={user.id}
+                    formId={USER_PROFILE_FORM_ID}
+                    schema={userProfileSchema}
+                    defaultValues={getDefaultValues(user)}
+                    onSubmit={handleSave}
+                    className="space-y-4 pt-1"
+                  >
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <InputField
+                        name="firstName"
+                        label="First Name"
+                        placeholder="Enter first name"
+                        icon={UserIcon}
+                        required
+                      />
+                      <InputField
+                        name="lastName"
+                        label="Last Name"
+                        placeholder="Enter last name"
+                        icon={UserIcon}
+                      />
+                    </div>
 
-                </Box>
-              </Grid>
+                    <InputField
+                      name="mobileNumber"
+                      label="Mobile Number"
+                      placeholder="10-digit mobile number"
+                      icon={Phone}
+                      maxLength={10}
+                      inputMode="numeric"
+                    />
 
-            </Grid>
-          </Box>
-        )}
-      </DialogContent>
-    </Dialog>
+                    <div>
+                      <InputField
+                        name="email"
+                        label="Email Address (Read-only)"
+                        placeholder={user.email}
+                        value={user.email}
+                        icon={Mail}
+                        disabled
+                      />
+                      <p className="text-[11px] text-[var(--text-secondary)] mt-1.5 ml-0.5">
+                        Email address is tied to your login identity and cannot be changed.
+                      </p>
+                    </div>
+                  </FormWrapper>
+                )}
+              </div>
+            </div>
+
+            {/* RIGHT COLUMN: Subscription & Account Info (Span 5) */}
+            <div className="lg:col-span-5 flex flex-col gap-5">
+              {/* Subscription Card */}
+              {user.razorpaySubscriptionData ? (
+                <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5 shadow-xs">
+                  <h4 className="font-bold text-sm text-[var(--text-primary)] mb-4 pb-2 border-b border-[var(--border)] flex items-center gap-2">
+                    <CreditCard size={16} className="text-[var(--accent)]" />
+                    Subscription Plan
+                  </h4>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-[var(--text-secondary)] font-medium">Status</span>
+                      <span
+                        className={`badge badge-sm font-semibold capitalize px-2.5 py-1 ${user.razorpaySubscriptionData.subscriptionStatus === "active"
+                            ? "bg-[var(--accent)]/20 text-[var(--accent)] border border-[var(--accent)]/40"
+                            : "badge-ghost"
+                          }`}
+                      >
+                        {user.razorpaySubscriptionData.subscriptionStatus}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-[var(--text-secondary)] font-medium">Current Plan</span>
+                      <span className="text-sm font-bold text-[var(--text-primary)]">
+                        {user.razorpaySubscriptionData.planName || "Standard Plan"}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-[var(--text-secondary)] font-medium flex items-center gap-1">
+                        <Calendar size={13} />
+                        Next Billing
+                      </span>
+                      <span className="text-xs font-semibold text-[var(--text-primary)]">
+                        {formatDate(user.razorpaySubscriptionData.nextBillingDate)}
+                      </span>
+                    </div>
+
+                    {user.razorpaySubscriptionData.paymentStatus && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-[var(--text-secondary)] font-medium">Payment Status</span>
+                        <span className="text-xs font-semibold text-[var(--accent)]">
+                          {user.razorpaySubscriptionData.paymentStatus}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5 shadow-xs">
+                  <h4 className="font-bold text-sm text-[var(--text-primary)] mb-3 pb-2 border-b border-[var(--border)] flex items-center gap-2">
+                    <CreditCard size={16} className="text-[var(--accent)]" />
+                    Subscription
+                  </h4>
+                  <p className="text-xs text-[var(--text-secondary)]">No active paid subscription attached to this account.</p>
+                </div>
+              )}
+
+              {/* Account Metadata Card */}
+              <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5 shadow-xs flex-1">
+                <h4 className="font-bold text-sm text-[var(--text-primary)] mb-4 pb-2 border-b border-[var(--border)] flex items-center gap-2">
+                  <Clock size={16} className="text-[var(--accent)]" />
+                  Account Details
+                </h4>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-[var(--text-secondary)] font-medium">Member Since</span>
+                    <span className="text-xs font-semibold text-[var(--text-primary)]">
+                      {formatDate(user.createdAt)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-[var(--text-secondary)] font-medium">Last Profile Update</span>
+                    <span className="text-xs font-semibold text-[var(--text-primary)]">
+                      {formatDate(user.updatedAt)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </ModalWrapper>
   );
 }

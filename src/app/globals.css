@@ -135,3 +135,121 @@ body {
 .ag-virtual-list-viewport::-webkit-scrollbar-track {
   background: transparent;
 }
+
+/* ── RemindCA AG Grid theme overrides ──────────────────────────────────
+   Purely cosmetic: restyles the existing ag-theme-alpine(-dark) grid to
+   match the RemindCA design tokens (bg / surface / navy / gold / divider).
+   Does not touch grid behavior, data, sorting, filtering, or pagination logic.
+────────────────────────────────────────────────────────────────────── */
+
+.rc-grid-theme {
+  --ag-font-family: inherit;
+  --ag-borders: none;
+  --ag-row-border-color: var(--border);
+  --ag-header-background-color: var(--bg);
+  --ag-header-foreground-color: var(--text-secondary);
+  --ag-background-color: var(--surface);
+  --ag-odd-row-background-color: var(--surface);
+  --ag-row-hover-color: color-mix(in srgb, var(--primary) 5%, var(--surface));
+  --ag-foreground-color: var(--text-primary);
+  --ag-secondary-foreground-color: var(--text-secondary);
+  --ag-border-color: var(--border);
+  --ag-cell-horizontal-padding: 20px;
+  --ag-font-size: 14px;
+  --ag-header-height: 48px;
+  --ag-row-height: 64px;
+}
+
+/* Header row: uppercase-ish label styling + subtle bottom border */
+.rc-grid-theme .ag-header {
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+}
+
+.rc-grid-theme .ag-header-cell-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+/* Row separators, no vertical column borders (matches flat table look) */
+.rc-grid-theme .ag-cell {
+  border-right: none !important;
+  display: flex;
+  align-items: center;
+}
+
+.rc-grid-theme .ag-row {
+  border-bottom: 1px solid var(--border);
+}
+
+.rc-grid-theme .ag-row:last-child {
+  border-bottom: none;
+}
+
+/* Pagination footer — rounded pill-style page buttons like the reference */
+.rc-grid-theme .ag-paging-panel {
+  border-top: 1px solid var(--border);
+  padding: 12px 20px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.rc-grid-theme .ag-paging-button {
+  border-radius: 9999px;
+  min-width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rc-grid-theme .ag-paging-description {
+  color: var(--text-secondary);
+}
+
+/* ── Action buttons (eye / pencil / trash) ──────────────────────────── */
+
+.rc-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.15s ease, opacity 0.15s ease;
+}
+
+.rc-action-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.rc-action-btn--primary {
+  background-color: color-mix(in srgb, var(--primary) 10%, transparent);
+  color: var(--primary);
+}
+
+.rc-action-btn--primary:hover:not(:disabled) {
+  background-color: color-mix(in srgb, var(--primary) 18%, transparent);
+}
+
+.rc-action-btn--secondary {
+  background-color: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent-hover);
+}
+
+.rc-action-btn--secondary:hover:not(:disabled) {
+  background-color: color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+.rc-action-btn--danger {
+  background-color: rgba(220, 38, 38, 0.1);
+  color: #dc2626;
+}
+
+.rc-action-btn--danger:hover:not(:disabled) {
+  background-color: rgba(220, 38, 38, 0.18);
+}

@@ -32,6 +32,7 @@ import Providers from "@/components/Providers";
 import NextTopLoader from "nextjs-toploader";
 import { Header } from "@/components/layout/Header";
 import { ModuleRegistry, AllCommunityModule } from "ag-grid-community";
+import { auth } from "@/config/firebase";
 
 
 export const metadata: Metadata = {
@@ -40,11 +41,12 @@ export const metadata: Metadata = {
     "Automated compliance task and reminder management platform for CA firms.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+ 
   return (
     <html lang="en">
       <body className="min-h-screen bg-[var(--bg)] text-[var(--text-primary)] antialiased transition-colors duration-300">

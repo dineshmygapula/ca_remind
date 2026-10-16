@@ -9,6 +9,8 @@ interface SubHeaderProps {
   actionText: string;
   searchQuery: string;
   onSearchChange: (query: string) => void;
+  /** Called when the primary action button is clicked. */
+  onAction?: () => void;
 }
 
 export function SubHeader({
@@ -17,10 +19,12 @@ export function SubHeader({
   actionText,
   searchQuery,
   onSearchChange,
+  onAction,
 }: SubHeaderProps) {
   return (
     <div className="bg-[var(--surface)] border-b border-[var(--border)] px-4 sm:px-8 py-6 transition-colors duration-300">
       <div className="max-w-6xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
+        {/* Title + badge */}
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-[var(--heading)] flex items-center gap-3">
             {activeTab}
@@ -31,8 +35,9 @@ export function SubHeader({
           <p className="text-sm text-[var(--text-secondary)] mt-1">{subtitle}</p>
         </div>
 
+        {/* Controls */}
         <div className="flex items-center gap-3">
-          {/* Search Input */}
+          {/* Search */}
           <div className="relative">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" />
             <input
@@ -44,8 +49,12 @@ export function SubHeader({
             />
           </div>
 
-          {/* Action Button */}
-          <button className="btn btn-sm rounded-xl bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white border-none shadow-md gap-2 font-bold px-4 dark:bg-[var(--accent)] dark:text-[#0B1220] dark:hover:bg-[var(--accent-hover)] cursor-pointer">
+          {/* Action */}
+          <button
+            type="button"
+            onClick={onAction}
+            className="btn btn-sm rounded-xl bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white border-none shadow-md gap-2 font-bold px-4 dark:bg-[var(--accent)] dark:text-[#0B1220] dark:hover:bg-[var(--accent-hover)] cursor-pointer"
+          >
             <Plus className="w-4 h-4 stroke-[3]" />
             {actionText}
           </button>

@@ -108,8 +108,8 @@ export const isAuthenticated = (): boolean => {
 };
 
 export const getHeaders = () => {
-  // const token = getToken();
-  const token = `Bearer eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkMzY5NGVhMC04YjM4LTRkNmMtOWJmOS02MWVhNDVkYjIyZDciLCJlbWFpbCI6InNhcmFueWFkZWVwaWthbXlnYXB1bGFAZ21haWwuY29tIiwicm9sZSI6InN1YnNjcmliZXIiLCJleHAiOjE4MTc3MTcxMTV9.lhlAFOUkCEpUyMFpQ0_J4C6wNjq9WGhdovQ4JalMZm8howXzOmeKpAUdTc9gnLwQQUYER_r2yDjqpJ6vzZr5CA`
+  const token = getToken();
+  // const token = `Bearer eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkMzY5NGVhMC04YjM4LTRkNmMtOWJmOS02MWVhNDVkYjIyZDciLCJlbWFpbCI6InNhcmFueWFkZWVwaWthbXlnYXB1bGFAZ21haWwuY29tIiwicm9sZSI6InN1YnNjcmliZXIiLCJleHAiOjE4MTc3MTcxMTV9.lhlAFOUkCEpUyMFpQ0_J4C6wNjq9WGhdovQ4JalMZm8howXzOmeKpAUdTc9gnLwQQUYER_r2yDjqpJ6vzZr5CA`
   console.log(token, "token-===================")
 
   return {

@@ -1,10 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, X, Eye, Pencil, Trash2 } from 'lucide-react';
-import { useAuth } from '@/context/AuthContext';
-
-
+import { Plus, X, Eye, Trash2 } from 'lucide-react';
+import { useWorkspace } from '@/context/WorkspaceContext';
 
 import { TaskListItem } from '@/types/task.types';
 import CommonDataGrid, { GridAction, GridColumn } from '@/components/common/CommonTable';
@@ -14,35 +12,41 @@ import PageFilterBar from '@/components/common/PageFilter';
 import TaskFormDialog from '@/components/tasks/TaskFormDialogue';
 import ConfirmDialog from '@/components/tasks/ConfirmDialog';
 
-// Column definitions live at module scope — they don't depend on component
-// state, so there's no reason to rebuild them (or wrap them in useMemo) on
-// every render.
 const columns: GridColumn<TaskListItem>[] = [
-  { headerName: 'Title', field: 'title', minWidth: 220, flex: 2 },
+  { headerName: 'Title', field: 'title', minWidth: 220, flex: 2, editable: true },
   {
     headerName: 'Client',
     colId: 'client',
     valueGetter: (p) => p.data?.subject?.name ?? '—',
     minWidth: 180,
   },
-  { headerName: 'Task Type', field: 'taskType', minWidth: 130 },
-  { headerName: 'Status', field: 'status', minWidth: 140 },
+  {
+    headerName: 'Task Type',
+    field: 'taskType',
+    minWidth: 150,
+    editable: true,
+    cellEditor: 'agSelectCellEditor',
+    cellEditorParams: {
+      values: ['Tax Filing', 'GST', 'Audit', 'Compliance', 'Accounting'],
+    },
+  },
+  { headerName: 'Status', field: 'status', minWidth: 140, editable: true },
   {
     headerName: 'Due Date',
     field: 'dueDate',
     minWidth: 130,
+    editable: true,
     valueFormatter: (p) => (p.value ? new Date(p.value).toLocaleDateString() : '—'),
   },
 ];
 
 export default function TasksPage() {
-  const { businessId } = useAuth();
+  // Private layout guarantees status === 'ready', so businessId is always set
+  const { businessId } = useWorkspace();
 
-  // ─── Data + CRUD ──────────────────────────────────────────────────────────
   const { tasks, loading, error, setError, refetch, removeTask, deleteLoading } =
-    useTasks(businessId);
+    useTasks(businessId!);
 
-  // ─── Filters ─────────────────────────────────────────────────────────────
   const {
     searchQuery,
     setSearchQuery,
@@ -52,9 +56,6 @@ export default function TasksPage() {
     reset: resetFilters,
   } = useTaskFilters(tasks);
 
-  // ─── Dialog / drawer UI state (page-local, not data) ───────────────────────
-  // One dialog handles both create and edit — `editingTaskId` set means edit
-  // mode, `formDialogOpen` alone (editingTaskId null) means create mode.
   const [formDialogOpen, setFormDialogOpen] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
@@ -77,20 +78,23 @@ export default function TasksPage() {
     setDrawerOpen(false);
   };
 
+  const closeForm = () => {
+    setFormDialogOpen(false);
+    setEditingTaskId(null);
+  };
+
   const handleDeleteConfirm = async () => {
     if (!deleteTarget) return;
     try {
       await removeTask(deleteTarget.id);
       setDeleteTarget(null);
     } catch {
-      // error is already captured in `error` state by useTasks — dialog
-      // stays open so the user can see it and retry or cancel.
+      // error is captured in `error` state by useTasks; dialog stays open for retry/cancel
     }
   };
 
   const actions: GridAction<TaskListItem>[] = [
     { label: 'View', icon: <Eye className="h-4 w-4" />, variant: 'secondary', onClick: (row) => handleView(row.id) },
-    { label: 'Edit', icon: <Pencil className="h-4 w-4" />, variant: 'primary', onClick: (row) => handleEdit(row.id) },
     {
       label: 'Delete',
       icon: <Trash2 className="h-4 w-4" />,
@@ -99,18 +103,9 @@ export default function TasksPage() {
     },
   ];
 
-  if (!businessId) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <span className="loading loading-spinner loading-lg text-navy" />
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-bg py-8">
       <div className="mx-auto max-w-7xl space-y-6 px-4">
-        {/* Header */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-semibold text-txt-main">Tasks</h1>
@@ -126,9 +121,8 @@ export default function TasksPage() {
           </button>
         </div>
 
-        {/* Error */}
         {error && (
-          <div className="alert alert-error flex items-center justify-between text-sm">
+          <div role="alert" className="alert alert-error flex items-center justify-between text-sm">
             <span>{error}</span>
             <button type="button" onClick={() => setError('')} aria-label="Dismiss error">
               <X className="h-4 w-4" />
@@ -136,7 +130,6 @@ export default function TasksPage() {
           </div>
         )}
 
-        {/* Filters */}
         <PageFilterBar
           type="tasks"
           search={searchQuery}
@@ -146,44 +139,36 @@ export default function TasksPage() {
           onReset={resetFilters}
         />
 
-        {/* Results count */}
         {!loading && (
           <p className="text-sm text-txt-sub">
             Showing {filteredTasks.length} of {tasks.length} tasks
           </p>
         )}
 
-        {/* Grid — AG Grid handles its own pagination, so no separate
-            usePagination/page-slicing is needed here anymore. */}
         <CommonDataGrid<TaskListItem>
           rowData={filteredTasks}
           columns={columns}
           actions={actions}
           isLoading={loading}
           onRowClick={(row) => handleView(row.id)}
+          onRowDoubleClick={(row) => handleEdit(row.id)}
+          onCellValueChanged={({ row, field, newValue }) => {
+            // TODO: updateTask(businessId, row.id, { [field]: newValue })
+          }}
           emptyMessage="No tasks found"
         />
 
-        {/* Create / Edit Dialog — same component, driven by editingTaskId */}
         <TaskFormDialog
           open={formDialogOpen}
           taskId={editingTaskId ?? undefined}
-          businessId={businessId}
-          onClose={() => {
-            setFormDialogOpen(false);
-            setEditingTaskId(null);
-          }}
+          businessId={businessId!}
+          onClose={closeForm}
           onSuccess={() => {
             refetch();
-            setFormDialogOpen(false);
-            setEditingTaskId(null);
+            closeForm();
           }}
         />
 
-        {/* Details Drawer */}
-
-
-        {/* Delete Confirmation */}
         <ConfirmDialog
           open={!!deleteTarget}
           title="Delete Task"

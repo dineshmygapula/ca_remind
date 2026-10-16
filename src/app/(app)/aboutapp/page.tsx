@@ -95,8 +95,8 @@ export default function AboutApp() {
                                         <div
                                             key={stat.label}
                                             className={`px-5 py-4 text-center sm:px-6 ${index !== 0
-                                                    ? "border-l border-[var(--border)]"
-                                                    : ""
+                                                ? "border-l border-[var(--border)]"
+                                                : ""
                                                 }`}
                                         >
                                             <div className="text-xl font-extrabold text-[var(--primary)]">
