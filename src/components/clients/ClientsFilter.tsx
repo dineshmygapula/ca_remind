@@ -1,41 +1,33 @@
 'use client';
 
-import {
-  Paper,
-  TextField,
-  MenuItem,
-  Grid,
-  InputAdornment,
-} from '@mui/material';
-import SearchIcon from '@mui/icons-material/Search';
-import{StatusFilter,GstinFilter,ComplianceFilter} from '../../types/subject'
+import { Search, ChevronDown } from 'lucide-react';
+import type {
+  StatusFilter,
+  GstinFilter,
+  ComplianceFilter,
+} from '../../types/subject';
 
-
-// ── Constants ──────────────────────────────────────────
 const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
-  { value: 'ALL',      label: 'All Status' },
-  { value: 'ACTIVE',   label: 'Active'     },
-  { value: 'INACTIVE', label: 'Inactive'   },
+  { value: 'ALL', label: 'All Status' },
+  { value: 'ACTIVE', label: 'Active' },
+  { value: 'INACTIVE', label: 'Inactive' },
 ];
 
 const GSTIN_OPTIONS: { value: GstinFilter; label: string }[] = [
-  { value: 'ALL',          label: 'All Clients'    },
-  { value: 'WITH_GST',     label: 'With GSTIN'     },
-  { value: 'WITHOUT_GST',  label: 'Without GSTIN'  },
+  { value: 'ALL', label: 'All Clients' },
+  { value: 'WITH_GST', label: 'With GSTIN' },
+  { value: 'WITHOUT_GST', label: 'Without GSTIN' },
 ];
 
 const COMPLIANCE_OPTIONS: { value: ComplianceFilter; label: string }[] = [
   { value: 'ALL', label: 'All Clients' },
-  { value: 'GST', label: 'GST'         },
-  { value: 'TDS', label: 'TDS'         },
-  { value: 'ITR', label: 'ITR'         },
-  { value: 'ROC', label: 'ROC'         },
-  { value: 'MSME', label: 'MSME'         },
-  
-  
+  { value: 'GST', label: 'GST' },
+  { value: 'TDS', label: 'TDS' },
+  { value: 'ITR', label: 'ITR' },
+  { value: 'ROC', label: 'ROC' },
+  { value: 'MSME', label: 'MSME' },
 ];
 
-// ── Props ──────────────────────────────────────────────
 interface ClientsFilterProps {
   searchQuery: string;
   onSearchChange: (value: string) => void;
@@ -47,7 +39,6 @@ interface ClientsFilterProps {
   onComplianceChange: (value: ComplianceFilter) => void;
 }
 
-// ── Component ──────────────────────────────────────────
 export default function ClientsFilter({
   searchQuery,
   onSearchChange,
@@ -58,77 +49,93 @@ export default function ClientsFilter({
   complianceFilter,
   onComplianceChange,
 }: ClientsFilterProps) {
-  return (
-    <Paper sx={{ p: 2.5 }}>
-      <Grid container spacing={2}>
+  const selectClass =
+    'select select-bordered select-sm w-full bg-base-100 focus:outline-none focus:ring-2 focus:ring-primary/30';
+  const labelClass = 'label-text text-sm font-medium text-base-content/80';
 
+  return (
+    <section className="rounded-xl border border-base-300 bg-base-100 p-4 shadow-sm sm:p-5">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-12 md:gap-4">
         {/* Search */}
-        <Grid size={{ xs: 12, md: 4 }}>
-          <TextField
-            fullWidth
-            size="small"
-            placeholder="Search clients..."
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon fontSize="small" sx={{ color: 'text.secondary' }} />
-                </InputAdornment>
-              ),
-            }}
-          />
-        </Grid>
+        <div className="md:col-span-4">
+          <label className="input input-bordered input-sm flex w-full items-center gap-2 bg-base-100 focus-within:outline-none focus-within:ring-2 focus-within:ring-primary/30">
+            <Search className="h-4 w-4 shrink-0 text-base-content/60" aria-hidden="true" />
+            <input
+              type="search"
+              className="grow bg-transparent text-sm outline-none"
+              placeholder="Search clients..."
+              value={searchQuery}
+              onChange={(event) => onSearchChange(event.target.value)}
+              aria-label="Search clients"
+            />
+          </label>
+        </div>
 
         {/* Status Filter */}
-        <Grid size={{ xs: 12, sm: 6, md: 2 }}>
-          <TextField
-            select
-            fullWidth
-            size="small"
-            label="Status"
-            value={statusFilter}
-            onChange={(e) => onStatusChange(e.target.value as StatusFilter)}
-          >
-            {STATUS_OPTIONS.map(({ value, label }) => (
-              <MenuItem key={value} value={value}>{label}</MenuItem>
-            ))}
-          </TextField>
-        </Grid>
+        <div className="md:col-span-2">
+          <label className="mb-1 block">
+            <span className={labelClass}>Status</span>
+            <span className="relative mt-1 block">
+              <select
+                className={selectClass}
+                value={statusFilter}
+                onChange={(event) => onStatusChange(event.target.value as StatusFilter)}
+              >
+                {STATUS_OPTIONS.map(({ value, label }) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-base-content/60" aria-hidden="true" />
+            </span>
+          </label>
+        </div>
 
         {/* GSTIN Filter */}
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <TextField
-            select
-            fullWidth
-            size="small"
-            label="GST Status"
-            value={gstinFilter}
-            onChange={(e) => onGstinChange(e.target.value as GstinFilter)}
-          >
-            {GSTIN_OPTIONS.map(({ value, label }) => (
-              <MenuItem key={value} value={value}>{label}</MenuItem>
-            ))}
-          </TextField>
-        </Grid>
+        <div className="md:col-span-3">
+          <label className="mb-1 block">
+            <span className={labelClass}>GST Status</span>
+            <span className="relative mt-1 block">
+              <select
+                className={selectClass}
+                value={gstinFilter}
+                onChange={(event) => onGstinChange(event.target.value as GstinFilter)}
+              >
+                {GSTIN_OPTIONS.map(({ value, label }) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-base-content/60" aria-hidden="true" />
+            </span>
+          </label>
+        </div>
 
         {/* Compliance Type Filter */}
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <TextField
-            select
-            fullWidth
-            size="small"
-            label="Compliance Type"
-            value={complianceFilter}
-            onChange={(e) => onComplianceChange(e.target.value as ComplianceFilter)}
-          >
-            {COMPLIANCE_OPTIONS.map(({ value, label }) => (
-              <MenuItem key={value} value={value}>{label}</MenuItem>
-            ))}
-          </TextField>
-        </Grid>
-
-      </Grid>
-    </Paper>
+        <div className="md:col-span-3">
+          <label className="mb-1 block">
+            <span className={labelClass}>Compliance Type</span>
+            <span className="relative mt-1 block">
+              <select
+                className={selectClass}
+                value={complianceFilter}
+                onChange={(event) =>
+                  onComplianceChange(event.target.value as ComplianceFilter)
+                }
+              >
+                {COMPLIANCE_OPTIONS.map(({ value, label }) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-base-content/60" aria-hidden="true" />
+            </span>
+          </label>
+        </div>
+      </div>
+    </section>
   );
 }

@@ -2,39 +2,31 @@
 
 import { useState, useEffect, useCallback } from "react";
 import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Button,
-  Typography,
-  Box,
-  Stack,
-  CircularProgress,
-  IconButton,
-  Alert,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
-  FormControlLabel,
-  Switch,
-  TextField,
-  MenuItem,
-} from "@mui/material";
-import {
-  Close as CloseIcon,
-  PersonAdd as PersonAddIcon,
-} from "@mui/icons-material";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+  X,
+  UserRoundPlus,
+  ChevronDown,
+  ChevronUp,
+  LoaderCircle,
+  AlertCircle,
+  CheckCircle2,
+  UserRound,
+  Phone,
+  Mail,
+  Building2,
+  FileText,
+  MapPin,
+  Bell,
+  Users,
+  ClipboardList,
+  Plus,
+} from "lucide-react";
 
 import { createSubject } from "@/services/subjectService";
 import { DEFAULT_FORM } from "@/constants/clientConstants";
-import type { CreateSubjectDto } from "@/types/subject";
-import type { AddressType } from "../../types/subject.js";
+import type { CreateSubjectDto, AddressType } from "@/types/subject";
 import { getStaff } from "@/services/staffService";
-import AddStaffDialog from "../staff/AddStaffDialog.js"; // adjust path
 import type { StaffMember } from "@/types/staff.types";
-//const COMPLIANCE_FREQUENCIES = ["MONTHLY", "QUARTERLY", "ANNUALLY"] as const;
+import AddStaffDialog from "../staff/AddStaffDialog";
 
 interface Props {
   businessId: string;
@@ -43,24 +35,28 @@ interface Props {
   onSuccess?: () => void;
 }
 
+type SectionKey = "identifiers" | "compliance" | "addresses" | "notifications" | "team" | "notes";
+
 function StaticLabel({
-  label,
+  children,
   required = false,
 }: {
-  label: string;
+  children: React.ReactNode;
   required?: boolean;
 }) {
   return (
-    <Typography variant="body2" fontWeight={600}>
-      {label}
-      {required && (
-        <Typography component="span" sx={{ color: "error.main", ml: 0.5 }}>
-          *
-        </Typography>
-      )}
-    </Typography>
+    <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+      {children}
+      {required && <span className="ml-1 text-error">*</span>}
+    </label>
   );
 }
+
+const inputClass =
+  "input input-bordered w-full rounded-xl bg-base-100 focus:outline-none focus:ring-2 focus:ring-primary/20";
+const selectClass =
+  "select select-bordered w-full rounded-xl bg-base-100 focus:outline-none focus:ring-2 focus:ring-primary/20";
+const sectionClass = "overflow-hidden rounded-2xl border border-base-300 bg-base-100";
 
 export default function CreateSubjectDialog({
   businessId,
@@ -79,15 +75,19 @@ export default function CreateSubjectDialog({
     companyName: "",
   });
 
-  // Staff related states
   const [staffList, setStaffList] = useState<StaffMember[]>([]);
   const [loadingStaff, setLoadingStaff] = useState(false);
   const [openCreateStaff, setOpenCreateStaff] = useState(false);
-  //Notes this.state.
+  const [notes, setNotes] = useState("");
+  const [expanded, setExpanded] = useState<Record<SectionKey, boolean>>({
+    identifiers: false,
+    compliance: true,
+    addresses: false,
+    notifications: false,
+    team: false,
+    notes: false,
+  });
 
-  const [notes, setNotes] = useState<string>("");
-
-  // ✅ Extracted so it can be called both from useEffect and onSuccess
   const fetchStaff = useCallback(async () => {
     try {
       setLoadingStaff(true);
@@ -103,6 +103,17 @@ export default function CreateSubjectDialog({
   useEffect(() => {
     if (open) fetchStaff();
   }, [open, fetchStaff]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !loading) handleClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+    // handleClose intentionally uses current render state for drawer dismissal.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, loading]);
 
   function setCompliance(
     key: keyof typeof form,
@@ -125,8 +136,10 @@ export default function CreateSubjectDialog({
   const handleClose = () => {
     if (!loading) {
       setForm(DEFAULT_FORM);
+      setNotes("");
       setApiError("");
       setSuccessMessage("");
+      setErrors({ fullName: "", phone: "", email: "", companyName: "" });
       onClose();
     }
   };
@@ -139,9 +152,7 @@ export default function CreateSubjectDialog({
       companyName: "",
     };
 
-    if (!form.fullName.trim()) {
-      newErrors.fullName = "Please enter full name";
-    }
+    if (!form.fullName.trim()) newErrors.fullName = "Please enter full name";
 
     if (!form.phone) {
       newErrors.phone = "Phone number is required";
@@ -160,24 +171,24 @@ export default function CreateSubjectDialog({
     }
 
     setErrors(newErrors);
-    return Object.values(newErrors).every((e) => !e);
+    return Object.values(newErrors).every((error) => !error);
   };
 
-  const isFormValid = () => {
-    return (
+  const isFormValid = () =>
+    Boolean(
       form.fullName.trim() &&
-      form.phone.trim() &&
-      form.email.trim() &&
-      /\S+@\S+\.\S+/.test(form.email) &&
-      form.companyName.trim()
+        form.phone.trim() &&
+        form.email.trim() &&
+        /\S+@\S+\.\S+/.test(form.email) &&
+        form.companyName.trim(),
     );
-  };
 
   const handleSubmit = async () => {
     if (!validateForm()) return;
 
     try {
       setLoading(true);
+      setApiError("");
 
       const dto: CreateSubjectDto = {
         subjectType: "CLIENT",
@@ -198,7 +209,6 @@ export default function CreateSubjectDialog({
         isActive: true,
       };
 
-      // IDENTIFIERS (OPTIONAL)
       if (form.pan || form.tan || form.cin || form.udyam || form.iec) {
         dto.identifiers = {
           pan: form.pan || undefined,
@@ -209,28 +219,23 @@ export default function CreateSubjectDialog({
         };
       }
 
-      // GSTIN MAPPING
       const validGstins = form.gstins.filter(
-        (g) => g.gstin && g.gstin.trim() !== "",
+        (gstin) => gstin.gstin && gstin.gstin.trim() !== "",
       );
       if (validGstins.length > 0) {
         dto.gst = {
-          gstins: validGstins.map((g) => ({
-            gstin: g.gstin.toUpperCase(),
-            state: g.state,
-            registrationType: g.registrationType,
-            status: g.status,
+          gstins: validGstins.map((gstin) => ({
+            gstin: gstin.gstin.toUpperCase(),
+            state: gstin.state,
+            registrationType: gstin.registrationType,
+            status: gstin.status,
           })),
         };
       }
 
-      // ✅ FIX 1: ADDRESSES — was never assigned to dto
-      const validAddresses = form.addresses.filter((a) => a.line1?.trim());
-      if (validAddresses.length > 0) {
-        dto.addresses = validAddresses;
-      }
+      const validAddresses = form.addresses.filter((address) => address.line1?.trim());
+      if (validAddresses.length > 0) dto.addresses = validAddresses;
 
-      // ✅ FIX 2: COMPLIANCE PROFILE — was never mapped to dto
       dto.metadata = {
         complianceProfile: {
           gst: {
@@ -258,7 +263,6 @@ export default function CreateSubjectDialog({
         tags: [],
       };
 
-      // NOTIFICATION PREFERENCES
       dto.notificationPreferences = {
         defaultChannels: form.notifChannels,
         language: form.notifLanguage,
@@ -270,43 +274,14 @@ export default function CreateSubjectDialog({
         },
       };
 
-      // ✅ FIX 3: ASSIGNED TEAM — use || instead of ?? to handle null userName
-      /* if (form.assignedTeam?.primaryAssigneeId) {
-        dto.assignedTeam = {
-          primaryAssignee: {
-            userId: form.assignedTeam.primaryAssigneeId,
-            name:
-              staffList.find(
-                (s) => s.id === form.assignedTeam?.primaryAssigneeId,
-              )?.userName || "",
-          },
-        };
-      }
-       */
-      // ✅ 👉 ADD HERE (Assigned Team Mapping)
-      /* const selectedStaff = staffList.find(
-        (s) => s.id === form.assignedTeam?.primaryAssigneeId,
-      );
-
-      if (selectedStaff && selectedStaff.userName) {
-        dto.assignedTeam = {
-          primaryAssignee: {
-            userId: selectedStaff.id,
-            name: selectedStaff.userName, // ✅ now 100% string
-          },
-        };
-      } */
-      // ✅ CORRECT — build the DTO from already-stored form state
       const selectedStaff = staffList.find(
-        (s) => s.id === form.assignedTeam?.primaryAssigneeId,
+        (staff) => staff.id === form.assignedTeam?.primaryAssigneeId,
       );
-
       if (selectedStaff) {
         const displayName =
           `${selectedStaff.firstName ?? ""} ${selectedStaff.lastName ?? ""}`.trim() ||
           selectedStaff.userName ||
           "";
-
         dto.assignedTeam = {
           primaryAssignee: {
             userId: selectedStaff.id,
@@ -315,28 +290,13 @@ export default function CreateSubjectDialog({
         };
       }
 
-      // ✅ NOTES MAPPING
-      if (notes && notes.trim() !== "") {
-        dto.notes = [
-          {
-            text: notes.trim(),
-          },
-        ];
-      } else {
-        dto.notes = [];
-      }
-      // ✅ DEBUG: Compare this output against your Swagger payload
-      console.log("📦 DTO being sent:", JSON.stringify(dto, null, 2));
-      console.log("staffList at submit time:", staffList);
-      console.log("Assigned Team in DTO:", dto.assignedTeam);
-      console.log("primaryAssigneeId:", form.assignedTeam?.primaryAssigneeId);
+      dto.notes = notes.trim() ? [{ text: notes.trim() }] : [];
 
       await createSubject(businessId, dto);
-
-      setSuccessMessage("Client created successfully 🎉");
-
+      setSuccessMessage("Client created successfully!");
       setTimeout(() => {
         setForm(DEFAULT_FORM);
+        setNotes("");
         onSuccess?.();
         handleClose();
       }, 1000);
@@ -347,800 +307,490 @@ export default function CreateSubjectDialog({
     }
   };
 
-  return (
-    <Dialog
-      open={open}
-      onClose={handleClose}
-      maxWidth="md" // ← change from "lg" to "md" (~900px max)
-      fullWidth
-      PaperProps={{
-        sx: {
-          borderRadius: "20px",
-          height: "85vh",
-          maxHeight: "85vh",
-          display: "flex",
-          flexDirection: "column",
-          overflow: "hidden",
-          padding: "0 !important",
-          background: "#fff",
-        },
-      }}
+  const toggleSection = (section: SectionKey) =>
+    setExpanded((previous) => ({ ...previous, [section]: !previous[section] }));
+
+  const renderSectionHeader = (
+    section: SectionKey,
+    title: string,
+    icon: React.ReactNode,
+  ) => (
+    <button
+      type="button"
+      className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left transition hover:bg-base-200/60"
+      onClick={() => toggleSection(section)}
+      aria-expanded={expanded[section]}
     >
-      {/* HEADER */}
+      <span className="flex items-center gap-3 text-sm font-bold text-base-content">
+        <span className="text-primary">{icon}</span>
+        {title}
+      </span>
+      {expanded[section] ? (
+        <ChevronUp className="h-4 w-4 shrink-0 text-base-content/60" />
+      ) : (
+        <ChevronDown className="h-4 w-4 shrink-0 text-base-content/60" />
+      )}
+    </button>
+  );
 
-      <DialogTitle
-        sx={{
-          px: 3,
-          pt: 2.5,
-          pb: 2,
-          borderBottom: "1px solid #F0F0F0",
-          backgroundColor: "#fff",
-          color: "#0F172A",
-        }}
-      >
-        <Stack
-          direction="row"
-          alignItems="center"
-          justifyContent="space-between"
-        >
-          <Stack direction="row" alignItems="center" spacing={1.5}>
-            <Box
-              sx={{
-                width: 36,
-                height: 36,
-                borderRadius: "10px",
-                backgroundColor: "#EFF6FF",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <PersonAddIcon sx={{ fontSize: 20, color: "#2563EB" }} />
-            </Box>
-            <Typography
-              variant="h6"
-              fontWeight={700}
-              fontSize="1.05rem"
-              lineHeight={1.2}
-              color="#0F172A"
-            >
-              Add Client
-            </Typography>
-          </Stack>
-          <IconButton
-            onClick={handleClose}
-            disabled={loading}
-            size="small"
-            sx={{
-              backgroundColor: "#F8FAFC",
-              border: "1px solid #E2E8F0",
-              borderRadius: "8px",
-              "&:hover": { backgroundColor: "#EEEEEE" },
-            }}
-          >
-            <CloseIcon fontSize="small" />
-          </IconButton>
-        </Stack>
-      </DialogTitle>
+  if (!open) return null;
 
-      {/* CONTENT */}
-      <DialogContent
-        sx={{
-          flex: 1,
-          overflowY: "auto",
-          px: 4,
-          py: 3,
-        }}
-      >
-        {successMessage && (
-          <Alert severity="success" sx={{ mb: 2 }}>
-            {successMessage}
-          </Alert>
-        )}
-
-        {apiError && (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            {apiError}
-          </Alert>
-        )}
-
-        <Stack spacing={2}>
-          {/* Full Name */}
-          <Box>
-            <StaticLabel label="Full Name" required />
-            <input
-              placeholder="Enter full name (e.g., Rama Rao)"
-              style={{ width: "100%", padding: 10 }}
-              value={form.fullName}
-              onChange={(e) => {
-                setForm((f) => ({ ...f, fullName: e.target.value }));
-                setErrors((prev) => ({ ...prev, fullName: "" }));
-              }}
-            />
-            {errors.fullName && (
-              <Typography color="error" variant="caption">
-                {errors.fullName}
-              </Typography>
-            )}
-          </Box>
-
-          {/* Phone */}
-          <Box>
-            <StaticLabel label="Phone" required />
-            <input
-              placeholder="Enter 10-digit mobile number"
-              style={{ width: "100%", padding: 10 }}
-              value={form.phone}
-              onChange={(e) => {
-                const value = e.target.value.replace(/\D/g, "");
-                if (value.length <= 10) {
-                  setForm((f) => ({ ...f, phone: value }));
-                  setErrors((prev) => ({ ...prev, phone: "" }));
-                }
-              }}
-            />
-            {errors.phone && (
-              <Typography color="error" variant="caption">
-                {errors.phone}
-              </Typography>
-            )}
-          </Box>
-
-          {/* Email */}
-          <Box>
-            <StaticLabel label="Email" required />
-            <input
-              placeholder="Enter email address (e.g., name@example.com)"
-              style={{ width: "100%", padding: 10 }}
-              value={form.email}
-              onChange={(e) => {
-                setForm((f) => ({ ...f, email: e.target.value }));
-                setErrors((prev) => ({ ...prev, email: "" }));
-              }}
-            />
-            {errors.email && (
-              <Typography color="error" variant="caption">
-                {errors.email}
-              </Typography>
-            )}
-          </Box>
-
-          {/* Business Name */}
-          <Box>
-            <StaticLabel label="Business Name" required />
-            <input
-              placeholder="Enter business name (e.g., Rama Traders)"
-              style={{ width: "100%", padding: 10 }}
-              value={form.companyName}
-              onChange={(e) => {
-                setForm((f) => ({ ...f, companyName: e.target.value }));
-                setErrors((prev) => ({ ...prev, companyName: "" }));
-              }}
-            />
-            {errors.companyName && (
-              <Typography color="error" variant="caption">
-                {errors.companyName}
-              </Typography>
-            )}
-          </Box>
-
-          {/* IDENTIFIERS */}
-          <Accordion
-            sx={{
-              borderRadius: "12px !important",
-              border: "1px solid",
-              borderColor: "divider",
-              "&:before": { display: "none" },
-            }}
-          >
-            <AccordionSummary
-              expandIcon={<ExpandMoreIcon />}
-              sx={{ px: 2, py: 1 }}
-            >
-              <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                Identifiers (Recommended)
-              </Typography>
-            </AccordionSummary>
-            <AccordionDetails sx={{ px: 2, pb: 2 }}>
-              <Stack spacing={1.5}>
-                <Box>
-                  <Typography variant="body2" fontWeight={600}>
-                    PAN
-                  </Typography>
-                  <input
-                    style={{ width: "100%", padding: 10 }}
-                    placeholder="e.g., ABCDE1234F"
-                    value={form.pan}
-                    onChange={(e) =>
-                      setForm((f) => ({
-                        ...f,
-                        pan: e.target.value.toUpperCase(),
-                      }))
-                    }
-                  />
-                </Box>
-                <Box>
-                  <Typography variant="body2" fontWeight={600}>
-                    GSTIN
-                  </Typography>
-                  <input
-                    style={{ width: "100%", padding: 10 }}
-                    placeholder="e.g., 22AAAAA0000A1Z5"
-                    value={form.gstins[0]?.gstin || ""}
-                    onChange={(e) => {
-                      const value = e.target.value.toUpperCase();
-                      setForm((f) => {
-                        const gstins = [...f.gstins];
-                        if (gstins.length === 0) {
-                          gstins.push({
-                            gstin: value,
-                            state: "",
-                            registrationType: "REGULAR",
-                            status: "ACTIVE",
-                          });
-                        } else {
-                          gstins[0].gstin = value;
-                        }
-                        return { ...f, gstins };
-                      });
-                    }}
-                  />
-                </Box>
-                <Box>
-                  <Typography variant="body2" fontWeight={600}>
-                    TAN
-                  </Typography>
-                  <input
-                    style={{ width: "100%", padding: 10 }}
-                    placeholder="e.g., ABCD12345E"
-                    value={form.tan}
-                    onChange={(e) =>
-                      setForm((f) => ({
-                        ...f,
-                        tan: e.target.value.toUpperCase(),
-                      }))
-                    }
-                  />
-                </Box>
-              </Stack>
-            </AccordionDetails>
-          </Accordion>
-
-          {/* COMPLIANCE SERVICES */}
-
-          <Accordion
-            sx={{
-              borderRadius: "12px !important",
-              border: "1px solid",
-              borderColor: "divider",
-              "&:before": { display: "none" },
-            }}
-          >
-            <AccordionSummary
-              expandIcon={<ExpandMoreIcon />}
-              sx={{ px: 2, py: 1 }}
-            >
-              <Typography variant="body2" fontWeight={600}>
-                Compliance Services
-              </Typography>
-            </AccordionSummary>
-
-            <AccordionDetails sx={{ px: 2, pb: 2 }}>
-              <Stack spacing={2}>
-                {(
-                  [
-                    { key: "complianceGst", label: "GST", icon: "📋" },
-                    { key: "complianceTds", label: "TDS", icon: "🏦" },
-                    { key: "complianceItr", label: "ITR", icon: "📄" },
-                    { key: "complianceRoc", label: "ROC", icon: "🏢" },
-                    { key: "complianceMsme", label: "MSME", icon: "🏭" },
-                  ] as const
-                ).map(({ key, label, icon }) => (
-                  <Box
-                    key={key}
-                    sx={{
-                      border: "1px solid",
-                      borderColor: "divider",
-                      borderRadius: 2,
-                      p: 2,
-                      bgcolor: "background.paper",
-                    }}
-                  >
-                    {/* Service Header — Icon + Name + Toggle */}
-                    <Box
-                      sx={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                      }}
-                    >
-                      {/* Left — Icon + Label */}
-                      <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 1.5 }}
-                      >
-                        <Box
-                          sx={{
-                            width: 36,
-                            height: 36,
-                            borderRadius: "8px",
-                            bgcolor: "secondary.main",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            fontSize: "1.1rem",
-                          }}
-                        >
-                          {icon}
-                        </Box>
-                        <Box>
-                          <Typography variant="body2" fontWeight={700}>
-                            {label}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {form[key].enabled
-                              ? `${label} · Select Frequency`
-                              : `${label} · Inactive`}
-                          </Typography>
-                        </Box>
-                      </Box>
-
-                      {/* Right — Active/Inactive Toggle */}
-                      <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
-                      >
-                        <Typography
-                          variant="caption"
-                          fontWeight={600}
-                          color={
-                            form[key].enabled ? "success.main" : "text.disabled"
-                          }
-                        >
-                          {form[key].enabled ? "Active" : "Inactive"}
-                        </Typography>
-                        <Switch
-                          size="small"
-                          checked={form[key].enabled}
-                          onChange={(e) =>
-                            setCompliance(
-                              key as keyof typeof form,
-                              "enabled",
-                              e.target.checked,
-                            )
-                          }
-                          sx={{
-                            "& .MuiSwitch-switchBase.Mui-checked": {
-                              color: "success.main",
-                            },
-                            "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track":
-                            {
-                              bgcolor: "success.main",
-                            },
-                          }}
-                        />
-                      </Box>
-                    </Box>
-
-                    {/* Frequency Dropdown — only when enabled */}
-                    {form[key].enabled && (
-                      <Box sx={{ mt: 2 }}>
-                        <Typography
-                          variant="caption"
-                          fontWeight={600}
-                          color="text.secondary"
-                          sx={{ display: "block", mb: 0.75 }}
-                        >
-                          Select Filing Frequency
-                        </Typography>
-                        <TextField
-                          select
-                          fullWidth
-                          size="small"
-                          value={form[key].frequency || ""}
-                          onChange={(e) =>
-                            setCompliance(
-                              key as
-                              | "complianceGst"
-                              | "complianceTds"
-                              | "complianceItr"
-                              | "complianceRoc"
-                              | "complianceMsme",
-                              "frequency",
-                              e.target.value,
-                            )
-                          }
-                          sx={{
-                            "& .MuiOutlinedInput-root": { borderRadius: "8px" },
-                          }}
-                        >
-                          <MenuItem value="" disabled>
-                            Select Filing Frequency
-                          </MenuItem>
-                          <MenuItem value="MONTHLY">Monthly</MenuItem>
-                          <MenuItem value="QUARTERLY">Quarterly</MenuItem>
-                          <MenuItem value="ANNUAL">Annual</MenuItem>
-                        </TextField>
-                      </Box>
-                    )}
-                  </Box>
-                ))}
-              </Stack>
-            </AccordionDetails>
-          </Accordion>
-
-          {/* ADDRESSES */}
-          <Accordion
-            sx={{
-              borderRadius: "12px !important",
-              border: "1px solid",
-              borderColor: "divider",
-              "&:before": { display: "none" },
-            }}
-          >
-            <AccordionSummary
-              expandIcon={<ExpandMoreIcon />}
-              sx={{ px: 2, py: 1 }}
-            >
-              <Typography variant="body2" fontWeight={600}>
-                Addresses
-              </Typography>
-            </AccordionSummary>
-            <AccordionDetails sx={{ px: 2, pb: 2 }}>
-              <Stack spacing={2}>
-                <Box>
-                  <Typography variant="body2" fontWeight={600}>
-                    Address Type
-                  </Typography>
-                  <select
-                    style={{ width: "100%", padding: 10 }}
-                    value={form.addresses[0]?.type || "REGISTERED"}
-                    onChange={(e) => {
-                      const value = e.target.value as AddressType;
-                      setForm((f) => {
-                        const addresses = [...f.addresses];
-                        if (addresses.length === 0) {
-                          addresses.push({
-                            type: value,
-                            line1: "",
-                            city: "",
-                            state: "",
-                            pincode: "",
-                          });
-                        } else {
-                          addresses[0].type = value;
-                        }
-                        return { ...f, addresses };
-                      });
-                    }}
-                  >
-                    <option value="REGISTERED">Registered</option>
-                    <option value="COMMUNICATION">Communication</option>
-                    <option value="BRANCH">Branch</option>
-                  </select>
-                </Box>
-
-                <Box>
-                  <Typography variant="body2" fontWeight={600}>
-                    Address Line
-                  </Typography>
-                  <input
-                    style={{ width: "100%", padding: 10 }}
-                    placeholder="e.g., Door No, Street Name"
-                    value={form.addresses[0]?.line1 || ""}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setForm((f) => {
-                        const addresses = [...f.addresses];
-                        if (addresses.length === 0) {
-                          addresses.push({
-                            type: "REGISTERED",
-                            line1: value,
-                            city: "",
-                            state: "",
-                            pincode: "",
-                          });
-                        } else {
-                          addresses[0].line1 = value;
-                        }
-                        return { ...f, addresses };
-                      });
-                    }}
-                  />
-                </Box>
-
-                <Box>
-                  <Typography variant="body2" fontWeight={600}>
-                    City
-                  </Typography>
-                  <input
-                    style={{ width: "100%", padding: 10 }}
-                    placeholder="e.g., Hyderabad"
-                    value={form.addresses[0]?.city || ""}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setForm((f) => {
-                        const addresses = [...f.addresses];
-                        if (addresses.length === 0) {
-                          addresses.push({
-                            type: "REGISTERED",
-                            line1: "",
-                            city: value,
-                            state: "",
-                            pincode: "",
-                          });
-                        } else {
-                          addresses[0].city = value;
-                        }
-                        return { ...f, addresses };
-                      });
-                    }}
-                  />
-                </Box>
-
-                <Box>
-                  <Typography variant="body2" fontWeight={600}>
-                    State
-                  </Typography>
-                  <input
-                    style={{ width: "100%", padding: 10 }}
-                    placeholder="e.g., Telangana"
-                    value={form.addresses[0]?.state || ""}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setForm((f) => {
-                        const addresses = [...f.addresses];
-                        if (addresses.length === 0) {
-                          addresses.push({
-                            type: "REGISTERED",
-                            line1: "",
-                            city: "",
-                            state: value,
-                            pincode: "",
-                          });
-                        } else {
-                          addresses[0].state = value;
-                        }
-                        return { ...f, addresses };
-                      });
-                    }}
-                  />
-                </Box>
-
-                <Box>
-                  <Typography variant="body2" fontWeight={600}>
-                    Pincode
-                  </Typography>
-                  <input
-                    style={{ width: "100%", padding: 10 }}
-                    placeholder="e.g., 500001"
-                    value={form.addresses[0]?.pincode || ""}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setForm((f) => {
-                        const addresses = [...f.addresses];
-                        if (addresses.length === 0) {
-                          addresses.push({
-                            type: "REGISTERED",
-                            line1: "",
-                            city: "",
-                            state: "",
-                            pincode: value,
-                          });
-                        } else {
-                          addresses[0].pincode = value;
-                        }
-                        return { ...f, addresses };
-                      });
-                    }}
-                  />
-                </Box>
-              </Stack>
-            </AccordionDetails>
-          </Accordion>
-
-          {/* NOTIFICATION PREFERENCES */}
-          <Accordion
-            sx={{
-              borderRadius: "12px !important",
-              border: "1px solid",
-              borderColor: "divider",
-              "&:before": { display: "none" },
-            }}
-          >
-            <AccordionSummary
-              expandIcon={<ExpandMoreIcon />}
-              sx={{ px: 2, py: 1 }}
-            >
-              <Typography variant="body2" fontWeight={600}>
-                Notification Preferences
-              </Typography>
-            </AccordionSummary>
-            <AccordionDetails sx={{ px: 2, pb: 2 }}>
-              <Stack spacing={2}>
-                <Box>
-                  <StaticLabel label="Channels" />
-                  <Stack direction="row" spacing={2} sx={{ mt: 0.5 }}>
-                    <FormControlLabel
-                      control={
-                        <Switch
-                          size="small"
-                          checked={form.notifChannels.includes("WHATSAPP")}
-                          onChange={(e) =>
-                            setForm((f) => ({
-                              ...f,
-                              notifChannels: e.target.checked
-                                ? [...f.notifChannels, "WHATSAPP"]
-                                : f.notifChannels.filter(
-                                  (c) => c !== "WHATSAPP",
-                                ),
-                            }))
-                          }
-                        />
-                      }
-                      label={
-                        <Typography variant="body2" fontWeight={600}>
-                          WhatsApp
-                        </Typography>
-                      }
-                    />
-                    <FormControlLabel
-                      control={
-                        <Switch
-                          size="small"
-                          checked={form.notifChannels.includes("EMAIL")}
-                          onChange={(e) =>
-                            setForm((f) => ({
-                              ...f,
-                              notifChannels: e.target.checked
-                                ? [...f.notifChannels, "EMAIL"]
-                                : f.notifChannels.filter((c) => c !== "EMAIL"),
-                            }))
-                          }
-                        />
-                      }
-                      label={
-                        <Typography variant="body2" fontWeight={600}>
-                          Email
-                        </Typography>
-                      }
-                    />
-                  </Stack>
-                </Box>
-              </Stack>
-            </AccordionDetails>
-          </Accordion>
-
-          {/* ASSIGN TEAM */}
-          <Accordion
-            sx={{
-              borderRadius: "12px !important",
-              border: "1px solid",
-              borderColor: "divider",
-              "&:before": { display: "none" },
-            }}
-          >
-            <AccordionSummary
-              expandIcon={<ExpandMoreIcon />}
-              sx={{ px: 2, py: 1 }}
-            >
-              <Typography variant="body2" fontWeight={600}>
-                Assign Team
-              </Typography>
-            </AccordionSummary>
-            <AccordionDetails sx={{ px: 2, pb: 2 }}>
-              <Stack spacing={2}>
-                <Box>
-                  <Typography variant="body2" fontWeight={600}>
-                    Select Staff
-                  </Typography>
-
-                  {loadingStaff ? (
-                    <CircularProgress size={20} />
-                  ) : (
-                    <>
-                      <select
-                        style={{ width: "100%", padding: 10 }}
-                        value={form.assignedTeam?.primaryAssigneeId || ""}
-                        onChange={(e) => {
-                          const value = e.target.value; // ← this line must be first
-                          if (value === "__add_new__") {
-                            setOpenCreateStaff(true);
-                            return;
-                          }
-                          // ✅ Store both id and name at selection time
-                          const selected = staffList.find(
-                            (s) => s.id === value,
-                          );
-                          setForm((f) => ({
-                            ...f,
-                            assignedTeam: {
-                              primaryAssigneeId: value,
-                              primaryAssigneeName: selected?.userName || "", // ✅ capture name now
-                            },
-                          }));
-                        }}
-                      >
-                        <option value="">Select staff</option>
-                        {staffList.map((s) => (
-                          <option key={s.id} value={s.id}>
-                            {s.firstName && s.lastName
-                              ? `${s.firstName} ${s.lastName}`
-                              : s.userName ?? "Unnamed"}
-                          </option>
-                        ))}
-                        {/* ✅ Always show this at the bottom of the dropdown */}
-                        <option value="__add_new__">+ Add new staff</option>
-                      </select>
-
-                      {/* ✅ Fallback button shown when list is empty */}
-                      {staffList.length === 0 && (
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          sx={{ mt: 1 }}
-                          onClick={() => setOpenCreateStaff(true)}
-                        >
-                          + Add Staff
-                        </Button>
-                      )}
-                    </>
-                  )}
-                </Box>
-              </Stack>
-            </AccordionDetails>
-          </Accordion>
-
-          {/* Notes */}
-
-          <Accordion sx={{ mt: 2 }}>
-            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Typography fontWeight={600}>Add Internal Notes</Typography>
-            </AccordionSummary>
-
-            <AccordionDetails>
-              <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                Internal Notes
-              </Typography>
-
-              <TextField
-                fullWidth
-                multiline
-                minRows={4}
-                placeholder="Add any internal notes about this client"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-              />
-            </AccordionDetails>
-          </Accordion>
-        </Stack>
-      </DialogContent>
-
-      {/* FOOTER */}
-      <DialogActions
-        sx={{
-          px: { xs: 2, sm: 3 },
-          py: 2,
-          flexDirection: { xs: "column", sm: "row" },
-          gap: 1,
-        }}
-      >
-        <Button
-          fullWidth
-          variant="outlined"
+  return (
+    <>
+      <div className="fixed inset-0 z-[80]">
+        <button
+          type="button"
+          aria-label="Close create client drawer"
+          className="absolute inset-0 h-full w-full cursor-default bg-slate-950/45 backdrop-blur-[2px]"
           onClick={handleClose}
           disabled={loading}
+        />
+        <aside
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="create-client-title"
+          className="absolute right-0 top-0 flex h-full w-full max-w-2xl flex-col border-l border-base-300 bg-base-100 shadow-2xl animate-in slide-in-from-right duration-300"
         >
-          Cancel
-        </Button>
-        <Button
-          fullWidth
-          variant="contained"
-          onClick={handleSubmit}
-          disabled={loading || !isFormValid()}
-        >
-          {loading ? <CircularProgress size={20} /> : "Save Client"}
-        </Button>
-      </DialogActions>
-      {/* CREATE STAFF DIALOG — mounted at root level, not inside Button */}
+          {/* Header */}
+          <header className="flex shrink-0 items-center justify-between border-b border-base-300 bg-base-100 px-5 py-4 sm:px-7">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <UserRoundPlus className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-primary">
+                  Client management
+                </p>
+                <h2 id="create-client-title" className="text-lg font-bold text-base-content">
+                  Add Client
+                </h2>
+              </div>
+            </div>
+            <button
+              type="button"
+              className="btn btn-ghost btn-square btn-sm"
+              aria-label="Close"
+              onClick={handleClose}
+              disabled={loading}
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </header>
+
+          {/* Scrollable form body */}
+          <div className="flex-1 overflow-y-auto px-5 py-5 sm:px-7">
+            <div className="space-y-4">
+              {successMessage && (
+                <div role="status" className="alert alert-success">
+                  <CheckCircle2 className="h-5 w-5" />
+                  <span>{successMessage}</span>
+                </div>
+              )}
+              {apiError && (
+                <div role="alert" className="alert alert-error">
+                  <AlertCircle className="h-5 w-5" />
+                  <span>{apiError}</span>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-xs"
+                    aria-label="Dismiss error"
+                    onClick={() => setApiError("")}
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
+
+              {/* Required client information */}
+              <section className={`${sectionClass} p-5`}>
+                <div className="mb-4 flex items-center gap-2 border-b border-base-200 pb-3">
+                  <UserRound className="h-4 w-4 text-primary" />
+                  <h3 className="text-sm font-bold uppercase tracking-wide text-base-content">
+                    Client information
+                  </h3>
+                </div>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <StaticLabel required>Full Name</StaticLabel>
+                    <input
+                      className={inputClass}
+                      placeholder="Enter full name (e.g., Rama Rao)"
+                      value={form.fullName}
+                      onChange={(event) => {
+                        setForm((previous) => ({ ...previous, fullName: event.target.value }));
+                        setErrors((previous) => ({ ...previous, fullName: "" }));
+                      }}
+                    />
+                    {errors.fullName && <p className="mt-1 text-xs text-error">{errors.fullName}</p>}
+                  </div>
+                  <div>
+                    <StaticLabel required>Phone</StaticLabel>
+                    <div className="relative">
+                      <Phone className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-base-content/40" />
+                      <input
+                        className={`${inputClass} pl-9`}
+                        placeholder="10-digit mobile number"
+                        inputMode="numeric"
+                        value={form.phone}
+                        onChange={(event) => {
+                          const value = event.target.value.replace(/\D/g, "");
+                          if (value.length <= 10) {
+                            setForm((previous) => ({ ...previous, phone: value }));
+                            setErrors((previous) => ({ ...previous, phone: "" }));
+                          }
+                        }}
+                      />
+                    </div>
+                    {errors.phone && <p className="mt-1 text-xs text-error">{errors.phone}</p>}
+                  </div>
+                  <div>
+                    <StaticLabel required>Email</StaticLabel>
+                    <div className="relative">
+                      <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-base-content/40" />
+                      <input
+                        className={`${inputClass} pl-9`}
+                        type="email"
+                        placeholder="name@example.com"
+                        value={form.email}
+                        onChange={(event) => {
+                          setForm((previous) => ({ ...previous, email: event.target.value }));
+                          setErrors((previous) => ({ ...previous, email: "" }));
+                        }}
+                      />
+                    </div>
+                    {errors.email && <p className="mt-1 text-xs text-error">{errors.email}</p>}
+                  </div>
+                  <div>
+                    <StaticLabel required>Business Name</StaticLabel>
+                    <div className="relative">
+                      <Building2 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-base-content/40" />
+                      <input
+                        className={`${inputClass} pl-9`}
+                        placeholder="e.g., Rama Traders"
+                        value={form.companyName}
+                        onChange={(event) => {
+                          setForm((previous) => ({ ...previous, companyName: event.target.value }));
+                          setErrors((previous) => ({ ...previous, companyName: "" }));
+                        }}
+                      />
+                    </div>
+                    {errors.companyName && <p className="mt-1 text-xs text-error">{errors.companyName}</p>}
+                  </div>
+                </div>
+              </section>
+
+              {/* Identifiers */}
+              <section className={sectionClass}>
+                {renderSectionHeader("identifiers", "Identifiers (Recommended)", <FileText className="h-4 w-4" />)}
+                {expanded.identifiers && (
+                  <div className="grid grid-cols-1 gap-4 border-t border-base-200 p-5 sm:grid-cols-2">
+                    <div>
+                      <StaticLabel>PAN</StaticLabel>
+                      <input
+                        className={inputClass}
+                        placeholder="e.g., ABCDE1234F"
+                        value={form.pan}
+                        onChange={(event) => setForm((previous) => ({ ...previous, pan: event.target.value.toUpperCase() }))}
+                      />
+                    </div>
+                    <div>
+                      <StaticLabel>GSTIN</StaticLabel>
+                      <input
+                        className={inputClass}
+                        placeholder="e.g., 22AAAAA0000A1Z5"
+                        value={form.gstins[0]?.gstin || ""}
+                        onChange={(event) => {
+                          const value = event.target.value.toUpperCase();
+                          setForm((previous) => {
+                            const gstins = [...previous.gstins];
+                            if (gstins.length === 0) {
+                              gstins.push({ gstin: value, state: "", registrationType: "REGULAR", status: "ACTIVE" });
+                            } else {
+                              gstins[0] = { ...gstins[0], gstin: value };
+                            }
+                            return { ...previous, gstins };
+                          });
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <StaticLabel>TAN</StaticLabel>
+                      <input
+                        className={inputClass}
+                        placeholder="e.g., ABCD12345E"
+                        value={form.tan}
+                        onChange={(event) => setForm((previous) => ({ ...previous, tan: event.target.value.toUpperCase() }))}
+                      />
+                    </div>
+                  </div>
+                )}
+              </section>
+
+              {/* Compliance services */}
+              <section className={sectionClass}>
+                {renderSectionHeader("compliance", "Compliance Services", <ClipboardList className="h-4 w-4" />)}
+                {expanded.compliance && (
+                  <div className="space-y-3 border-t border-base-200 p-4">
+                    {(
+                      [
+                        { key: "complianceGst", label: "GST", icon: "📋" },
+                        { key: "complianceTds", label: "TDS", icon: "🏦" },
+                        { key: "complianceItr", label: "ITR", icon: "📄" },
+                        { key: "complianceRoc", label: "ROC", icon: "🏢" },
+                        { key: "complianceMsme", label: "MSME", icon: "🏭" },
+                      ] as const
+                    ).map(({ key, label, icon }) => (
+                      <div key={key} className="rounded-xl border border-base-300 p-4">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-lg">
+                              {icon}
+                            </div>
+                            <div>
+                              <p className="text-sm font-bold text-base-content">{label}</p>
+                              <p className="text-xs text-base-content/60">
+                                {form[key].enabled ? `${label} · Select Frequency` : `${label} · Inactive`}
+                              </p>
+                            </div>
+                          </div>
+                          <label className="flex cursor-pointer items-center gap-2">
+                            <span className={`text-xs font-semibold ${form[key].enabled ? "text-success" : "text-base-content/50"}`}>
+                              {form[key].enabled ? "Active" : "Inactive"}
+                            </span>
+                            <input
+                              type="checkbox"
+                              className="toggle toggle-success"
+                              checked={form[key].enabled}
+                              onChange={(event) => setCompliance(key as keyof typeof form, "enabled", event.target.checked)}
+                            />
+                          </label>
+                        </div>
+                        {form[key].enabled && (
+                          <div className="mt-4">
+                            <StaticLabel>Select Filing Frequency</StaticLabel>
+                            <select
+                              className={selectClass}
+                              value={form[key].frequency || ""}
+                              onChange={(event) =>
+                                setCompliance(
+                                  key as "complianceGst" | "complianceTds" | "complianceItr" | "complianceRoc" | "complianceMsme",
+                                  "frequency",
+                                  event.target.value,
+                                )
+                              }
+                            >
+                              <option value="" disabled>Select Filing Frequency</option>
+                              <option value="MONTHLY">Monthly</option>
+                              <option value="QUARTERLY">Quarterly</option>
+                              <option value="ANNUAL">Annual</option>
+                            </select>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              {/* Address */}
+              <section className={sectionClass}>
+                {renderSectionHeader("addresses", "Addresses", <MapPin className="h-4 w-4" />)}
+                {expanded.addresses && (
+                  <div className="grid grid-cols-1 gap-4 border-t border-base-200 p-5 sm:grid-cols-2">
+                    <div>
+                      <StaticLabel>Address Type</StaticLabel>
+                      <select
+                        className={selectClass}
+                        value={form.addresses[0]?.type || "REGISTERED"}
+                        onChange={(event) => {
+                          const value = event.target.value as AddressType;
+                          setForm((previous) => {
+                            const addresses = [...previous.addresses];
+                            if (addresses.length === 0) {
+                              addresses.push({ type: value, line1: "", city: "", state: "", pincode: "" });
+                            } else {
+                              addresses[0] = { ...addresses[0], type: value };
+                            }
+                            return { ...previous, addresses };
+                          });
+                        }}
+                      >
+                        <option value="REGISTERED">Registered</option>
+                        <option value="COMMUNICATION">Communication</option>
+                        <option value="BRANCH">Branch</option>
+                      </select>
+                    </div>
+                    {(
+                      [
+                        { key: "line1", label: "Address Line", placeholder: "Door No, Street Name" },
+                        { key: "city", label: "City", placeholder: "e.g., Hyderabad" },
+                        { key: "state", label: "State", placeholder: "e.g., Telangana" },
+                        { key: "pincode", label: "Pincode", placeholder: "e.g., 500001" },
+                      ] as const
+                    ).map(({ key, label, placeholder }) => (
+                      <div key={key}>
+                        <StaticLabel>{label}</StaticLabel>
+                        <input
+                          className={inputClass}
+                          placeholder={placeholder}
+                          value={form.addresses[0]?.[key] || ""}
+                          onChange={(event) => {
+                            const value = event.target.value;
+                            setForm((previous) => {
+                              const addresses = [...previous.addresses];
+                              if (addresses.length === 0) {
+                                addresses.push({
+                                  type: "REGISTERED",
+                                  line1: key === "line1" ? value : "",
+                                  city: key === "city" ? value : "",
+                                  state: key === "state" ? value : "",
+                                  pincode: key === "pincode" ? value : "",
+                                });
+                              } else {
+                                addresses[0] = { ...addresses[0], [key]: value };
+                              }
+                              return { ...previous, addresses };
+                            });
+                          }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              {/* Notification preferences */}
+              <section className={sectionClass}>
+                {renderSectionHeader("notifications", "Notification Preferences", <Bell className="h-4 w-4" />)}
+                {expanded.notifications && (
+                  <div className="border-t border-base-200 p-5">
+                    <StaticLabel>Channels</StaticLabel>
+                    <div className="flex flex-wrap gap-3">
+                      {(["WHATSAPP", "EMAIL"] as const).map((channel) => (
+                        <label key={channel} className="flex cursor-pointer items-center gap-3 rounded-xl border border-base-300 px-4 py-3">
+                          <input
+                            type="checkbox"
+                            className="checkbox checkbox-primary checkbox-sm"
+                            checked={form.notifChannels.includes(channel)}
+                            onChange={(event) =>
+                              setForm((previous) => ({
+                                ...previous,
+                                notifChannels: event.target.checked
+                                  ? [...previous.notifChannels, channel]
+                                  : previous.notifChannels.filter((item) => item !== channel),
+                              }))
+                            }
+                          />
+                          <span className="text-sm font-semibold">{channel === "WHATSAPP" ? "WhatsApp" : "Email"}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </section>
+
+              {/* Assign team */}
+              <section className={sectionClass}>
+                {renderSectionHeader("team", "Assign Team", <Users className="h-4 w-4" />)}
+                {expanded.team && (
+                  <div className="border-t border-base-200 p-5">
+                    <StaticLabel>Select Staff</StaticLabel>
+                    {loadingStaff ? (
+                      <div className="flex items-center gap-2 py-2 text-sm text-base-content/60">
+                        <LoaderCircle className="h-4 w-4 animate-spin" /> Loading staff...
+                      </div>
+                    ) : (
+                      <>
+                        <select
+                          className={selectClass}
+                          value={form.assignedTeam?.primaryAssigneeId || ""}
+                          onChange={(event) => {
+                            const value = event.target.value;
+                            if (value === "__add_new__") {
+                              setOpenCreateStaff(true);
+                              return;
+                            }
+                            const selected = staffList.find((staff) => staff.id === value);
+                            setForm((previous) => ({
+                              ...previous,
+                              assignedTeam: {
+                                primaryAssigneeId: value,
+                                primaryAssigneeName: selected?.userName || "",
+                              },
+                            }));
+                          }}
+                        >
+                          <option value="">Select staff</option>
+                          {staffList.map((staff) => (
+                            <option key={staff.id} value={staff.id}>
+                              {staff.firstName && staff.lastName
+                                ? `${staff.firstName} ${staff.lastName}`
+                                : staff.userName ?? "Unnamed"}
+                            </option>
+                          ))}
+                          <option value="__add_new__">+ Add new staff</option>
+                        </select>
+                        {staffList.length === 0 && (
+                          <button
+                            type="button"
+                            className="btn btn-outline btn-sm mt-3 gap-2"
+                            onClick={() => setOpenCreateStaff(true)}
+                          >
+                            <Plus className="h-4 w-4" /> Add Staff
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+              </section>
+
+              {/* Internal notes */}
+              <section className={sectionClass}>
+                {renderSectionHeader("notes", "Add Internal Notes", <FileText className="h-4 w-4" />)}
+                {expanded.notes && (
+                  <div className="border-t border-base-200 p-5">
+                    <StaticLabel>Internal Notes</StaticLabel>
+                    <textarea
+                      className="textarea textarea-bordered min-h-28 w-full rounded-xl bg-base-100"
+                      placeholder="Add any internal notes about this client"
+                      value={notes}
+                      onChange={(event) => setNotes(event.target.value)}
+                    />
+                  </div>
+                )}
+              </section>
+            </div>
+          </div>
+
+          {/* Sticky footer */}
+          <footer className="flex shrink-0 flex-col-reverse gap-3 border-t border-base-300 bg-base-100 px-5 py-4 sm:flex-row sm:justify-end sm:px-7">
+            <button
+              type="button"
+              className="btn btn-outline sm:min-w-32"
+              onClick={handleClose}
+              disabled={loading}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary gap-2 sm:min-w-44"
+              onClick={handleSubmit}
+              disabled={loading || !isFormValid()}
+            >
+              {loading ? (
+                <>
+                  <LoaderCircle className="h-4 w-4 animate-spin" /> Saving...
+                </>
+              ) : (
+                "Save Client"
+              )}
+            </button>
+          </footer>
+        </aside>
+      </div>
+
       <AddStaffDialog
         open={openCreateStaff}
         onClose={() => setOpenCreateStaff(false)}
@@ -1149,11 +799,10 @@ export default function CreateSubjectDialog({
           setOpenCreateStaff(false);
           await fetchStaff();
           if (newStaff?.id) {
-            setForm((f) => ({
-              ...f,
+            setForm((previous) => ({
+              ...previous,
               assignedTeam: {
                 primaryAssigneeId: newStaff.id,
-                //primaryAssigneeName: newStaff.userName || "", // ✅ added missing field
                 primaryAssigneeName:
                   `${newStaff.firstName ?? ""} ${newStaff.lastName ?? ""}`.trim() ||
                   newStaff.userName ||
@@ -1163,6 +812,6 @@ export default function CreateSubjectDialog({
           }
         }}
       />
-    </Dialog>
+    </>
   );
 }

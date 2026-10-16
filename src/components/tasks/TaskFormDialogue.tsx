@@ -1,11 +1,25 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { PlusCircle, Pencil } from 'lucide-react';
-import Modal from '@/components/common/Modal';
+import {
+  PlusCircle,
+  Pencil,
+  ChevronDown,
+  AlertCircle,
+  X,
+  Bell,
+  Calendar,
+  AlignLeft,
+  Tag,
+  Repeat,
+  Mail,
+  Sparkles,
+  User2,
+} from 'lucide-react';
+import Drawer from '@/components/common/Drawer';
 import SearchableSelect from '@/components/common/SearchableSelect';
 
-import { createTask, updateTask } from '@/services/taskService';
+import { createTask, updateTask, getTaskById } from '@/services/taskService';
 import { SubjectListItem } from '@/types/subject';
 import { StaffMember } from '@/types/staff.types';
 import { MessageTemplateListItem } from '@/types/messageTemplate.types';
@@ -13,444 +27,532 @@ import { TASK_TYPES, FREQUENCY_OPTIONS, DELIVERY_CHANNELS } from '@/constants/ta
 import { useTaskFormData } from '@/hooks/tasks/useTasksFormData';
 import { TaskFormData, useTaskForm } from '@/hooks/tasks/useTaskForm';
 
-// ─── Props ──────────────────────────────────────────────────────────────────
+// ─── Props ────────────────────────────────────────────────────────────────────
 
 interface Props {
-    open: boolean;
-    onClose: () => void;
-    businessId: string;
-    onSuccess?: () => void;
-    /** Create a new task when omitted; edit the given task when provided. */
-    taskId?: string;
+  open: boolean;
+  onClose: () => void;
+  businessId: string;
+  onSuccess?: () => void;
+  taskId?: string;
 }
 
-// ─── Shared field styling — matches FilterBar's FIELD_CLASS for consistency ──
+// ─── Field primitives ─────────────────────────────────────────────────────────
 
-const FIELD_CLASS =
-    'h-9 w-full rounded-lg border border-divider bg-surface px-3 text-sm text-txt-main outline-none transition-colors focus:border-navy';
+const INPUT =
+  'w-full h-10 rounded-xl border border-[var(--border)] bg-[var(--surface)] ' +
+  'text-sm font-medium text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 ' +
+  'outline-none transition-all hover:border-[var(--accent)]/50 ' +
+  'focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/20';
 
-function FieldLabel({ children, required }: { children: React.ReactNode; required?: boolean }) {
-    return (
-        <label className="mb-1.5 block text-sm font-semibold text-txt-main">
-            {children}
-            {required && <span className="ml-0.5 text-red-500">*</span>}
-        </label>
-    );
+const TEXTAREA =
+  'w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] ' +
+  'text-sm font-medium text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 resize-none ' +
+  'outline-none transition-all hover:border-[var(--accent)]/50 ' +
+  'focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/20';
+
+const SELECT =
+  'w-full h-10 rounded-xl border border-[var(--border)] bg-[var(--surface)] ' +
+  'text-sm font-medium text-[var(--text-primary)] ' +
+  'outline-none transition-all hover:border-[var(--accent)]/50 appearance-none ' +
+  'focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/20';
+
+// ─── FieldWrap ────────────────────────────────────────────────────────────────
+
+function FieldWrap({
+  label,
+  required,
+  helper,
+  icon: Icon,
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  helper?: string;
+  icon?: React.ElementType;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-wide text-txt-sub">
+        {Icon && <Icon className="w-3 h-3" />}
+        {label}
+        {required && <span className="text-[var(--accent)] ml-0.5">*</span>}
+      </label>
+      {helper && (
+        <p className="text-[11px] text-txt-sub/70 leading-snug -mt-0.5">{helper}</p>
+      )}
+      {children}
+    </div>
+  );
 }
 
-function FieldHelper({ children }: { children: React.ReactNode }) {
-    return <p className="mb-1.5 text-xs text-txt-sub">{children}</p>;
+// ─── SelectWithIcon ───────────────────────────────────────────────────────────
+
+function SelectWithIcon({
+  value,
+  onChange,
+  options,
+  placeholder,
+  disabled,
+  icon: Icon,
+}: {
+  value: string | number;
+  onChange: (val: string) => void;
+  options: { value: string | number; label: string }[];
+  placeholder?: string;
+  disabled?: boolean;
+  icon?: React.ElementType;
+}) {
+  return (
+    <div className="relative">
+      {Icon && (
+        <Icon className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--accent)] pointer-events-none z-10" />
+      )}
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        className={`${SELECT} ${Icon ? 'pl-9' : 'pl-3'} pr-8 ${
+          disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'
+        }`}
+      >
+        {placeholder && (
+          <option value="" disabled>
+            {placeholder}
+          </option>
+        )}
+        {options.map((o) => (
+          <option key={o.value} value={o.value} className="bg-[var(--surface)]">
+            {o.label}
+          </option>
+        ))}
+      </select>
+      <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-txt-sub/60 pointer-events-none" />
+    </div>
+  );
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
+// ─── Section card wrapper ─────────────────────────────────────────────────────
+
+function SectionCard({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div className={`rounded-2xl border border-[var(--border)] bg-[var(--surface)] ${className}`}>
+      {children}
+    </div>
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
 
 export default function TaskFormDialog({ open, onClose, businessId, onSuccess, taskId }: Props) {
-    const mode: 'create' | 'edit' = taskId ? 'edit' : 'create';
+  const mode: 'create' | 'edit' = taskId ? 'edit' : 'create';
 
-    const [submitting, setSubmitting] = useState(false);
-    const [error, setLocalError] = useState('');
-    const [loadingTask, setLoadingTask] = useState(false);
-    const [initialForm, setInitialForm] = useState<TaskFormData | undefined>(undefined);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setLocalError] = useState('');
+  const [loadingTask, setLoadingTask] = useState(false);
+  const [initialForm, setInitialForm] = useState<TaskFormData | undefined>(undefined);
 
-    const [selectedClient, setSelectedClient] = useState<SubjectListItem | null>(null);
-    const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(null);
-    const [selectedTemplate, setSelectedTemplate] = useState<MessageTemplateListItem | null>(null);
+  const [selectedClient, setSelectedClient] = useState<SubjectListItem | null>(null);
+  const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<MessageTemplateListItem | null>(null);
 
-    const {
-        clients,
-        clientsLoading,
-        staff,
-        staffLoading,
-        templates,
-        templatesLoading,
-        taskDefinitions,
-        business,
-        error: fetchError,
-        setError: setFetchError,
-    } = useTaskFormData(businessId, open);
+  const {
+    clients, clientsLoading,
+    staff, staffLoading,
+    templates, templatesLoading,
+    taskDefinitions, business,
+    error: fetchError,
+    setError: setFetchError,
+  } = useTaskFormData(businessId, open);
 
-    const {
-        form,
-        set,
-        setReminder,
-        generatedTaskTitle,
-        getValidDaysBeforeOptions,
-        replaceTemplatePlaceholders,
-        validate,
-        toDto,
-        reset,
+  const {
+    form, set, setReminder,
+    generatedTaskTitle,
+    getValidDaysBeforeOptions,
+    replaceTemplatePlaceholders,
+    validate, toDto, reset,
+  } = useTaskForm({ initialForm, templates, taskDefinitions, selectedClient, business });
 
-    } = useTaskForm({
-        initialForm,
-        templates,
-        taskDefinitions,
-        selectedClient,
-        business,
-    });
+  // ── Edit: fetch task ────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!open) return;
+    if (mode === 'create') { setInitialForm(undefined); return; }
+    if (!taskId) return;
 
-    // ─── Edit mode: fetch the existing task once the dialog opens ────────────
-    useEffect(() => {
-        if (!open) return;
+    (async () => {
+      try {
+        setLoadingTask(true);
+        const task = await getTaskById(businessId, taskId);
+        const firstReminder = task.reminders?.upcoming?.[0];
+        const hasReminders = (task.reminders?.upcoming?.length ?? 0) > 0;
+        setInitialForm({
+          subjectId: task.subject?.id ?? '',
+          taskDefinitionId: '',
+          taskType: task.taskType ?? '',
+          taskPriority: 'MEDIUM',
+          frequency: task.frequency ?? 'ONETIME',
+          dueDate: (task.dates?.dueDate ?? task.dueDate ?? '').slice(0, 10),
+          assignedStaffId: task.assignee?.id ?? '',
+          templateId: firstReminder?.messageTemplateId ?? '',
+          notes: task.notes ?? '',
+          remindersEnabled: hasReminders,
+          reminder: {
+            deliveryChannel: (firstReminder?.deliveryChannel as import('@/types/task.types').DeliveryChannel) ?? 'EMAIL',
+            daysBeforeDueDate: firstReminder?.daysBeforeDueDate ?? 1,
+          },
+        });
+      } catch (err) {
+        setLocalError(err instanceof Error ? err.message : 'Failed to load task');
+      } finally {
+        setLoadingTask(false);
+      }
+    })();
+  }, [open, mode, taskId, businessId]);
 
-        if (mode === 'create') {
-            setInitialForm(undefined);
-            return;
-        }
+  // ── Prefill selects ─────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!initialForm) return;
+    if (initialForm.subjectId && clients.length)
+      setSelectedClient(clients.find((c) => c.id === initialForm.subjectId) ?? null);
+    if (initialForm.assignedStaffId && staff.length)
+      setSelectedStaff(staff.find((s) => s.id === initialForm.assignedStaffId) ?? null);
+    if (initialForm.templateId && templates.length)
+      setSelectedTemplate(templates.find((t) => t.id === initialForm.templateId) ?? null);
+  }, [initialForm, clients, staff, templates]);
 
-        if (!taskId) return;
+  const combinedError = error || fetchError;
 
-        (async () => {
-            try {
-                setLoadingTask(true);
-                const task = await getTask(businessId, taskId);
-                setInitialForm({
-                    subjectId: task.subjectId ?? '',
-                    taskDefinitionId: task.taskDefinitionId ?? '',
-                    taskType: task.taskType ?? '',
-                    taskPriority: task.priority ?? 'MEDIUM',
-                    frequency: task.frequency ?? 'ONETIME',
-                    dueDate: task.dueDate ? task.dueDate.slice(0, 10) : '',
-                    assignedStaffId: task.assignedStaffId ?? '',
-                    templateId: task.remindersScheduled?.[0]?.messageTemplateId ?? '',
-                    notes: task.notes ?? '',
-                    remindersEnabled: (task.remindersScheduled?.length ?? 0) > 0,
-                    reminder: {
-                        deliveryChannel: task.remindersScheduled?.[0]?.deliveryChannel ?? 'EMAIL',
-                        daysBeforeDueDate: task.remindersScheduled?.[0]?.daysBeforeDueDate ?? 1,
-                    },
-                });
-            } catch (err) {
-                setLocalError(err instanceof Error ? err.message : 'Failed to load task');
-            } finally {
-                setLoadingTask(false);
-            }
-        })();
-    }, [open, mode, taskId, businessId]);
+  const handleClose = () => {
+    if (submitting) return;
+    setLocalError(''); setFetchError('');
+    setSelectedClient(null); setSelectedStaff(null); setSelectedTemplate(null);
+    reset(); onClose();
+  };
 
-    // ─── Prefill the searchable-select objects once their option lists + the
-    //     initial form values are both available (edit mode) ─────────────────
-    useEffect(() => {
-        if (!initialForm) return;
-        if (initialForm.subjectId && clients.length) {
-            setSelectedClient(clients.find((c) => c.id === initialForm.subjectId) ?? null);
-        }
-        if (initialForm.assignedStaffId && staff.length) {
-            setSelectedStaff(staff.find((s) => s.id === initialForm.assignedStaffId) ?? null);
-        }
-        if (initialForm.templateId && templates.length) {
-            setSelectedTemplate(templates.find((t) => t.id === initialForm.templateId) ?? null);
-        }
-    }, [initialForm, clients, staff, templates]);
+  const handleSubmit = async () => {
+    const validationError = validate();
+    if (validationError) { setLocalError(validationError); return; }
+    setSubmitting(true); setLocalError('');
+    try {
+      const dto = toDto();
+      if (mode === 'edit' && taskId) await updateTask(businessId, taskId, dto);
+      else await createTask(businessId, dto);
+      handleClose(); onSuccess?.();
+    } catch (err) {
+      setLocalError(err instanceof Error ? err.message : `Failed to ${mode} task`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
-    const combinedError = error || fetchError;
+  const validDaysBeforeOptions = getValidDaysBeforeOptions(form.dueDate);
 
-    const handleClose = () => {
-        if (submitting) return;
-        setLocalError('');
-        setFetchError('');
-        setSelectedClient(null);
-        setSelectedStaff(null);
-        setSelectedTemplate(null);
-        reset();
-        onClose();
-    };
+  return (
+    <Drawer
+      open={open}
+      onClose={handleClose}
+      icon={mode === 'edit' ? <Pencil className="h-4 w-4" /> : <PlusCircle className="h-4 w-4" />}
+      eyebrow={mode === 'edit' ? 'Edit Task' : 'New Task'}
+      title={mode === 'edit' ? 'Update Task Details' : 'Create New Task'}
+      onCancel={handleClose}
+      onSubmit={handleSubmit}
+      submitLabel={mode === 'edit' ? 'Update Task' : 'Save Task'}
+      submitting={submitting || loadingTask}
+      submitVariant="success"
+      width="md"
+    >
+      <div className="space-y-4">
 
-    const handleSubmit = async () => {
-        const validationError = validate();
-        if (validationError) {
-            setLocalError(validationError);
-            return;
-        }
+        {/* ── Error banner ─────────────────────────────────────────────── */}
+        {combinedError && (
+          <div role="alert" className="alert alert-error rounded-xl py-3 px-4 text-sm flex gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span className="flex-1 font-medium">{combinedError}</span>
+            <button
+              type="button"
+              onClick={() => { setLocalError(''); setFetchError(''); }}
+              className="btn btn-ghost btn-xs btn-circle"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
 
-        setSubmitting(true);
-        setLocalError('');
+        {/* ── Client ───────────────────────────────────────────────────── */}
+        <SectionCard>
+          <div className="px-4 py-3 border-b border-[var(--border)] bg-[var(--bg)]">
+            <p className="text-[11px] font-extrabold uppercase tracking-widest text-[var(--accent)]">
+              Client
+            </p>
+          </div>
+          <div className="px-4 py-3">
+            <FieldWrap label="Select Client" required icon={User2}>
+              <SearchableSelect
+                options={clients}
+                value={selectedClient}
+                onChange={(client) => {
+                  setSelectedClient(client);
+                  set('subjectId', client?.id ?? '');
+                }}
+                getOptionLabel={(c) => c.displayName}
+                getOptionKey={(c) => c.id}
+                loading={clientsLoading}
+                placeholder="Search and select client..."
+                emptyMessage={
+                  clients.length === 0
+                    ? 'No clients found. Create a client first.'
+                    : 'No matching clients'
+                }
+              />
+            </FieldWrap>
+          </div>
+        </SectionCard>
 
-        try {
-            const dto = toDto();
-            if (mode === 'edit' && taskId) {
-                await updateTask(businessId, taskId, dto);
-            } else {
-                await createTask(businessId, dto);
-            }
-            handleClose();
-            onSuccess?.();
-        } catch (err) {
-            setLocalError(err instanceof Error ? err.message : `Failed to ${mode} task`);
-        } finally {
-            setSubmitting(false);
-        }
-    };
+        {/* ── Task Details ─────────────────────────────────────────────── */}
+        <SectionCard>
+          <div className="px-4 py-3 border-b border-[var(--border)] bg-[var(--bg)]">
+            <p className="text-[11px] font-extrabold uppercase tracking-widest text-[var(--accent)]">
+              Task Details
+            </p>
+          </div>
+          <div className="px-4 py-4 grid grid-cols-2 gap-4">
+            <FieldWrap label="Task Type" required icon={Tag}>
+              <SelectWithIcon
+                value={form.taskType}
+                onChange={(val) => set('taskType', val)}
+                options={TASK_TYPES}
+                placeholder="Select type"
+                icon={Tag}
+              />
+            </FieldWrap>
 
-    const validDaysBeforeOptions = getValidDaysBeforeOptions(form.dueDate);
+            <FieldWrap label="Frequency" required icon={Repeat}>
+              <SelectWithIcon
+                value={form.frequency}
+                onChange={(val) => set('frequency', val)}
+                options={FREQUENCY_OPTIONS}
+                icon={Repeat}
+              />
+            </FieldWrap>
 
-    return (
-        <Modal
-            open={open}
-            onClose={handleClose}
-            icon={mode === 'edit' ? <Pencil className="h-5 w-5" /> : <PlusCircle className="h-5 w-5" />}
-            eyebrow={mode === 'edit' ? 'Edit Task' : 'New Task'}
-            title={mode === 'edit' ? 'Update Task' : 'Add Task'}
-            onCancel={handleClose}
-            onSubmit={handleSubmit}
-            submitLabel={mode === 'edit' ? 'Update Task' : 'Save Task'}
-            submitting={submitting || loadingTask}
-            submitVariant="success"
-        >
-            <div className="space-y-5">
-                {combinedError && (
-                    <div className="flex items-center justify-between rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-sm text-orange-700">
-                        <span>{combinedError}</span>
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setLocalError('');
-                                setFetchError('');
-                            }}
-                            className="text-orange-700/70 hover:text-orange-700"
-                        >
-                            ✕
-                        </button>
-                    </div>
-                )}
+            <FieldWrap label="Due Date" required icon={Calendar}>
+              <div className="relative">
+                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--accent)] pointer-events-none z-10" />
+                <input
+                  type="date"
+                  value={form.dueDate}
+                  onChange={(e) => {
+                    const d = e.target.value;
+                    set('dueDate', d);
+                    const opts = getValidDaysBeforeOptions(d);
+                    if (!opts.some((o) => o.value === form.reminder.daysBeforeDueDate) && opts.length > 0)
+                      setReminder('daysBeforeDueDate', opts[0].value);
+                  }}
+                  className={`${INPUT} pl-9 pr-3`}
+                />
+              </div>
+            </FieldWrap>
 
-                {/* Client */}
-                <div>
-                    <FieldLabel required>Select Client</FieldLabel>
-                    <SearchableSelect
-                        options={clients}
-                        value={selectedClient}
-                        onChange={(client) => {
-                            setSelectedClient(client);
-                            set('subjectId', client?.id ?? '');
-                        }}
-                        getOptionLabel={(c) => c.displayName}
-                        getOptionKey={(c) => c.id}
-                        loading={clientsLoading}
-                        placeholder="Search and select client..."
-                        emptyMessage={clients.length === 0 ? 'No clients found. Create a client first.' : 'No matching clients'}
-                    />
-                </div>
+            <FieldWrap label="Task Title" icon={Sparkles}>
+              <div className="relative">
+                <Sparkles className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--accent)]/60 pointer-events-none z-10" />
+                <input
+                  readOnly
+                  value={generatedTaskTitle}
+                  placeholder="Auto-generated"
+                  className={`${INPUT} pl-9 pr-3 cursor-default bg-[var(--bg)] ${
+                    generatedTaskTitle ? 'text-txt-main' : 'text-txt-sub/50'
+                  }`}
+                />
+              </div>
+            </FieldWrap>
 
-                {/* Task Type */}
-                <div>
-                    <FieldLabel required>Task Type</FieldLabel>
-                    <select
-                        value={form.taskType}
-                        onChange={(e) => set('taskType', e.target.value)}
-                        className={`${FIELD_CLASS} pl-3 pr-3`}
-                    >
-                        <option value="" disabled>
-                            Select Task Type
-                        </option>
-                        {TASK_TYPES.map((type) => (
-                            <option key={type.value} value={type.value}>
-                                {type.label}
-                            </option>
-                        ))}
-                    </select>
-                </div>
-
-                {/* Frequency */}
-                <div>
-                    <FieldLabel required>Frequency</FieldLabel>
-                    <select
-                        value={form.frequency}
-                        onChange={(e) => set('frequency', e.target.value)}
-                        className={`${FIELD_CLASS} pl-3 pr-3`}
-                    >
-                        {FREQUENCY_OPTIONS.map((opt) => (
-                            <option key={opt.value} value={opt.value}>
-                                {opt.label}
-                            </option>
-                        ))}
-                    </select>
-                </div>
-
-                {/* Auto-generated title (read-only) */}
-                <div>
-                    <FieldLabel>Task title</FieldLabel>
-                    <input
-                        readOnly
-                        value={generatedTaskTitle}
-                        placeholder="Select a due date to generate the task title"
-                        className={`${FIELD_CLASS} px-3 ${generatedTaskTitle ? '' : 'text-txt-sub/60'}`}
-                    />
-                </div>
-
-                {/* Due Date */}
-                <div>
-                    <FieldLabel required>Due Date</FieldLabel>
-                    <input
-                        type="date"
-                        value={form.dueDate}
-                        onChange={(e) => {
-                            const newDueDate = e.target.value;
-                            set('dueDate', newDueDate);
-                            const validOptions = getValidDaysBeforeOptions(newDueDate);
-                            const stillValid = validOptions.some((o) => o.value === form.reminder.daysBeforeDueDate);
-                            if (!stillValid && validOptions.length > 0) {
-                                setReminder('daysBeforeDueDate', validOptions[0].value);
-                            }
-                        }}
-                        className={`${FIELD_CLASS} px-3`}
-                    />
-                </div>
-
-                {/* Assigned To */}
-                <div>
-                    <FieldLabel>Assigned to</FieldLabel>
-                    <SearchableSelect
-                        options={staff}
-                        value={selectedStaff}
-                        onChange={(member) => {
-                            setSelectedStaff(member);
-                            set('assignedStaffId', member?.id ?? '');
-                        }}
-                        getOptionLabel={(m) => [m.firstName, m.lastName].filter(Boolean).join(' ') || m.email || m.id}
-                        getOptionKey={(m) => m.id}
-                        loading={staffLoading}
-                        placeholder="Search and select employee..."
-                        emptyMessage={staff.length === 0 ? 'No staff found. Add a staff member first.' : 'No matching staff'}
-                    />
-                </div>
-
-                {/* Notes */}
-                <div>
-                    <FieldLabel>Notes</FieldLabel>
-                    <textarea
-                        rows={2}
-                        value={form.notes}
-                        onChange={(e) => set('notes', e.target.value)}
-                        placeholder="Add Notes"
-                        className="w-full resize-none rounded-lg border border-divider bg-surface px-3 py-2 text-sm text-txt-main outline-none transition-colors focus:border-navy"
-                    />
-                </div>
-
-                {/* Reminders section */}
-                <div className="overflow-hidden rounded-xl border border-divider bg-surface">
-                    <div className="flex items-center justify-between px-4 py-3">
-                        <span className="text-sm font-semibold text-txt-main">Reminders</span>
-                        <input
-                            type="checkbox"
-                            checked={form.remindersEnabled}
-                            onChange={(e) => set('remindersEnabled', e.target.checked)}
-                            className="toggle toggle-success"
-                        />
-                    </div>
-
-                    {form.remindersEnabled && (
-                        <div className="space-y-4 border-t border-divider px-4 py-4">
-                            {/* Delivery channel */}
-                            <div>
-                                <FieldLabel>Delivery channel</FieldLabel>
-                                <FieldHelper>One channel per task; default is Email.</FieldHelper>
-                                <select
-                                    value={form.reminder.deliveryChannel}
-                                    onChange={(e) => setReminder('deliveryChannel', e.target.value as never)}
-                                    className={`${FIELD_CLASS} pl-3 pr-3`}
-                                >
-                                    {DELIVERY_CHANNELS.map((o) => (
-                                        <option key={o.value} value={o.value}>
-                                            {o.label}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            {/* Days before due */}
-                            <div>
-                                <FieldLabel>Day Before Due</FieldLabel>
-                                <FieldHelper>
-                                    {form.dueDate ? 'Select the days to send reminder before due date' : 'Select a due date first'}
-                                </FieldHelper>
-                                <select
-                                    value={form.reminder.daysBeforeDueDate}
-                                    onChange={(e) => setReminder('daysBeforeDueDate', Number(e.target.value))}
-                                    disabled={!form.dueDate}
-                                    className={`${FIELD_CLASS} pl-3 pr-3 disabled:opacity-60`}
-                                >
-                                    {validDaysBeforeOptions.map((o) => (
-                                        <option key={o.value} value={o.value}>
-                                            {o.label}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            {/* Template */}
-                            <div>
-                                <FieldLabel required>Message template</FieldLabel>
-                                <FieldHelper>
-                                    We pick the matching template from your task type and delivery channel.
-                                </FieldHelper>
-                                <SearchableSelect
-                                    options={templates}
-                                    value={selectedTemplate}
-                                    onChange={(template) => {
-                                        setSelectedTemplate(template);
-                                        set('templateId', template?.id ?? '');
-                                    }}
-                                    getOptionLabel={(t) => t.name}
-                                    getOptionKey={(t) => t.id}
-                                    loading={templatesLoading}
-                                    placeholder="Search and select template..."
-                                    emptyMessage={
-                                        templates.length === 0 ? 'No templates found. Create a template first.' : 'No matching templates'
-                                    }
-                                    renderOption={(t) => (
-                                        <div>
-                                            <p className="font-semibold text-txt-main">{t.name}</p>
-                                            <p className="text-xs text-txt-sub">
-                                                {t.businessCategory}
-                                                {t.channels?.length ? ` · ${t.channels.join(', ')}` : ''}
-                                            </p>
-                                        </div>
-                                    )}
-                                />
-
-                                {selectedTemplate && (
-                                    <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50 p-3">
-                                        <p className="text-xs font-bold text-blue-700">Template Preview</p>
-
-                                        {form.reminder.deliveryChannel === 'EMAIL' && selectedTemplate.templates?.email && (
-                                            <div className="mt-1.5">
-                                                <p className="text-xs font-semibold text-txt-sub">
-                                                    {replaceTemplatePlaceholders(selectedTemplate.templates.email.subject)}
-                                                </p>
-                                                <p className="mt-1 whitespace-pre-line text-xs text-txt-sub">
-                                                    {replaceTemplatePlaceholders(selectedTemplate.templates.email.body)}
-                                                </p>
-                                            </div>
-                                        )}
-                                        {form.reminder.deliveryChannel === 'EMAIL' && !selectedTemplate.templates?.email && (
-                                            <p className="mt-1.5 text-xs text-txt-sub/60">This template has no Email content</p>
-                                        )}
-
-                                        {form.reminder.deliveryChannel === 'WHATSAPP' && selectedTemplate.templates?.whatsapp && (
-                                            <p className="mt-1.5 whitespace-pre-line text-xs text-txt-sub">
-                                                💬 {replaceTemplatePlaceholders(selectedTemplate.templates.whatsapp.body)}
-                                            </p>
-                                        )}
-                                        {form.reminder.deliveryChannel === 'WHATSAPP' && !selectedTemplate.templates?.whatsapp && (
-                                            <p className="mt-1.5 text-xs text-txt-sub/60">This template has no WhatsApp content</p>
-                                        )}
-
-                                        {form.reminder.deliveryChannel !== 'EMAIL' && form.reminder.deliveryChannel !== 'WHATSAPP' && (
-                                            <p className="mt-1.5 text-xs text-txt-sub/60">
-                                                No preview available for {form.reminder.deliveryChannel}
-                                            </p>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    )}
-                </div>
+            <div className="col-span-2">
+              <FieldWrap label="Assigned To" icon={User2}>
+                <SearchableSelect
+                  options={staff}
+                  value={selectedStaff}
+                  onChange={(member) => {
+                    setSelectedStaff(member);
+                    set('assignedStaffId', member?.id ?? '');
+                  }}
+                  getOptionLabel={(m) =>
+                    [m.firstName, m.lastName].filter(Boolean).join(' ') || m.email || m.id
+                  }
+                  getOptionKey={(m) => m.id}
+                  loading={staffLoading}
+                  placeholder="Search and select employee..."
+                  emptyMessage={
+                    staff.length === 0
+                      ? 'No staff found. Add a staff member first.'
+                      : 'No matching staff'
+                  }
+                />
+              </FieldWrap>
             </div>
-        </Modal>
-    );
+
+            <div className="col-span-2">
+              <FieldWrap label="Notes" icon={AlignLeft}>
+                <div className="relative">
+                  <AlignLeft className="absolute left-3 top-3 w-3.5 h-3.5 text-[var(--accent)]/60 pointer-events-none z-10" />
+                  <textarea
+                    rows={2}
+                    value={form.notes}
+                    onChange={(e) => set('notes', e.target.value)}
+                    placeholder="Add any relevant notes..."
+                    className={`${TEXTAREA} pl-9 pr-3 py-2.5`}
+                  />
+                </div>
+              </FieldWrap>
+            </div>
+          </div>
+        </SectionCard>
+
+        {/* ── Reminders ────────────────────────────────────────────────── */}
+        <SectionCard>
+          {/* Toggle header */}
+          <div className="flex items-center justify-between px-4 py-3 bg-[var(--bg)]">
+            <div className="flex items-center gap-2">
+              <div className={`flex items-center justify-center w-7 h-7 rounded-lg transition-colors ${
+                form.remindersEnabled
+                  ? 'bg-[var(--accent)]/15 text-[var(--accent)]'
+                  : 'bg-[var(--border)]/60 text-txt-sub'
+              }`}>
+                <Bell className="w-3.5 h-3.5" />
+              </div>
+              <div>
+                <p className="text-[11px] font-extrabold uppercase tracking-widest text-[var(--accent)]">
+                  Reminders
+                </p>
+                <p className="text-[11px] text-txt-sub leading-none mt-0.5">
+                  {form.remindersEnabled ? 'Enabled — send before due date' : 'Disabled'}
+                </p>
+              </div>
+            </div>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <span className={`text-[11px] font-bold ${form.remindersEnabled ? 'text-[var(--accent)]' : 'text-txt-sub'}`}>
+                {form.remindersEnabled ? 'ON' : 'OFF'}
+              </span>
+              <input
+                type="checkbox"
+                checked={form.remindersEnabled}
+                onChange={(e) => set('remindersEnabled', e.target.checked)}
+                className="toggle toggle-sm toggle-warning"
+              />
+            </label>
+          </div>
+
+          {/* Expanded fields */}
+          {form.remindersEnabled && (
+            <div className="border-t border-[var(--border)] px-4 py-4 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <FieldWrap label="Delivery Channel" helper="One channel per task" icon={Mail}>
+                  <SelectWithIcon
+                    value={form.reminder.deliveryChannel}
+                    onChange={(val) => setReminder('deliveryChannel', val as never)}
+                    options={DELIVERY_CHANNELS}
+                    icon={Mail}
+                  />
+                </FieldWrap>
+
+                <FieldWrap
+                  label="Days Before Due"
+                  helper={form.dueDate ? 'Days ahead to send' : 'Pick a due date first'}
+                  icon={Calendar}
+                >
+                  <SelectWithIcon
+                    value={form.reminder.daysBeforeDueDate}
+                    onChange={(val) => setReminder('daysBeforeDueDate', Number(val))}
+                    options={validDaysBeforeOptions}
+                    disabled={!form.dueDate}
+                    icon={Calendar}
+                  />
+                </FieldWrap>
+              </div>
+
+              {/* Template */}
+              <FieldWrap
+                label="Message Template"
+                required
+                helper="Matched to your task type & channel"
+              >
+                <SearchableSelect
+                  options={templates}
+                  value={selectedTemplate}
+                  onChange={(template) => {
+                    setSelectedTemplate(template);
+                    set('templateId', template?.id ?? '');
+                  }}
+                  getOptionLabel={(t) => t.name}
+                  getOptionKey={(t) => t.id}
+                  loading={templatesLoading}
+                  placeholder="Search and select template..."
+                  emptyMessage={
+                    templates.length === 0
+                      ? 'No templates found. Create a template first.'
+                      : 'No matching templates'
+                  }
+                  renderOption={(t) => (
+                    <div>
+                      <p className="font-semibold text-txt-main">{t.name}</p>
+                      <p className="text-xs text-txt-sub">
+                        {t.businessCategory}
+                        {t.channels?.length ? ` · ${t.channels.join(', ')}` : ''}
+                      </p>
+                    </div>
+                  )}
+                />
+
+                {/* Template preview card */}
+                {selectedTemplate && (
+                  <div className="mt-3 rounded-xl border border-[var(--accent)]/20 bg-[var(--accent)]/8 overflow-hidden">
+                    <div className="px-3 py-2 border-b border-[var(--accent)]/15 flex items-center gap-2">
+                      <Sparkles className="w-3 h-3 text-[var(--accent)]" />
+                      <p className="text-[10px] font-extrabold uppercase tracking-widest text-[var(--accent)]">
+                        Template Preview
+                      </p>
+                    </div>
+                    <div className="px-3 py-2.5">
+                      {form.reminder.deliveryChannel === 'EMAIL' &&
+                        selectedTemplate.templates?.email ? (
+                        <div className="space-y-1">
+                          <p className="text-xs font-semibold text-txt-main">
+                            {replaceTemplatePlaceholders(selectedTemplate.templates.email.subject)}
+                          </p>
+                          <p className="whitespace-pre-line text-xs text-txt-sub leading-relaxed">
+                            {replaceTemplatePlaceholders(selectedTemplate.templates.email.body)}
+                          </p>
+                        </div>
+                      ) : form.reminder.deliveryChannel === 'EMAIL' ? (
+                        <p className="text-xs text-txt-sub/60 italic">No Email content in this template</p>
+                      ) : null}
+
+                      {form.reminder.deliveryChannel === 'WHATSAPP' &&
+                        selectedTemplate.templates?.whatsapp ? (
+                        <p className="whitespace-pre-line text-xs text-txt-sub leading-relaxed">
+                          💬 {replaceTemplatePlaceholders(selectedTemplate.templates.whatsapp.body)}
+                        </p>
+                      ) : form.reminder.deliveryChannel === 'WHATSAPP' ? (
+                        <p className="text-xs text-txt-sub/60 italic">No WhatsApp content in this template</p>
+                      ) : null}
+
+                      {form.reminder.deliveryChannel !== 'EMAIL' &&
+                        form.reminder.deliveryChannel !== 'WHATSAPP' && (
+                          <p className="text-xs text-txt-sub/60 italic">
+                            No preview for {form.reminder.deliveryChannel}
+                          </p>
+                        )}
+                    </div>
+                  </div>
+                )}
+              </FieldWrap>
+            </div>
+          )}
+        </SectionCard>
+      </div>
+    </Drawer>
+  );
 }
 
-function getTask(businessId: string, taskId: string) {
-    throw new Error('Function not implemented.');
-}
+// getTaskById is imported from '@/services/taskService' — no stub needed.

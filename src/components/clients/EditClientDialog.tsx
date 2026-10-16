@@ -6,38 +6,19 @@
 
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import * as React from "react";
 import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Button,
-  TextField,
-  MenuItem,
-  Grid,
-  Typography,
-  Box,
-  Chip,
-  Stack,
-  CircularProgress,
-  IconButton,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
-  Alert,
-  FormControlLabel,
-  Switch,
-  Divider,
-} from "@mui/material";
-import {
-  Close as CloseIcon,
-  Edit as EditIcon,
-  ExpandMore as ExpandMoreIcon,
-  Add as AddIcon,
-  DeleteOutline as DeleteOutlineIcon,
-  ChevronRight as ChevronRightIcon,
-} from "@mui/icons-material";
+  X,
+  Pencil,
+  ChevronDown,
+  Plus,
+  Trash2,
+  ChevronRight,
+  LoaderCircle,
+  CheckCircle2,
+  AlertCircle,
+} from "lucide-react";
+
 import { getSubjectById, updateSubject } from "@/services/subjectService";
 import {
   INDIAN_STATES,
@@ -64,6 +45,7 @@ import {
 
 import { getStaff } from "@/services/staffService";
 import type { StaffMember } from "@/types/staff.types";
+import { useCallback, useEffect, useState } from "react";
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface EditClientDialogProps {
@@ -76,11 +58,139 @@ interface EditClientDialogProps {
 
 // ─── Shared field sx ─────────────────────────────────────────────────────────
 
-const fieldSx = {
-  "& .MuiOutlinedInput-root": { borderRadius: "8px" },
-  "& .MuiOutlinedInput-notchedOutline legend": { display: "none" },
-  "& .MuiOutlinedInput-notchedOutline": { top: 0 },
-} as const;
+const fieldSx = {} as const;
+
+
+// Tailwind + DaisyUI compatibility components. These replace the MUI primitives
+// while keeping the existing form state, service calls, and DTO mapping unchanged.
+type AnyProps = Record<string, any>;
+const clean = (props: AnyProps) => {
+  const { sx, InputLabelProps, inputProps, fontWeight, color, align, ...rest } = props;
+  return rest;
+};
+
+const iconClass = "h-4 w-4 shrink-0";
+function CloseIcon(props: AnyProps) { return <X className={iconClass} />; }
+function EditIcon(props: AnyProps) { return <Pencil className={iconClass} />; }
+function ExpandMoreIcon(props: AnyProps) { return <ChevronDown className={iconClass} />; }
+function AddIcon(props: AnyProps) { return <Plus className={iconClass} />; }
+function DeleteOutlineIcon(props: AnyProps) { return <Trash2 className={iconClass} />; }
+function ChevronRightIcon(props: AnyProps) {
+  return <ChevronRight className={`${iconClass} ${props.className ?? ""}`} />;
+}
+
+function Dialog({ open, onClose, children }: AnyProps) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-[80]">
+      <button
+        type="button"
+        aria-label="Close dialog backdrop"
+        className="absolute inset-0 h-full w-full bg-slate-950/45 backdrop-blur-[2px]"
+        onClick={() => onClose?.({}, "backdropClick")}
+      />
+      <aside
+        role="dialog"
+        aria-modal="true"
+        className="absolute right-0 top-0 flex h-full w-full max-w-3xl flex-col border-l border-base-300 bg-base-100 shadow-2xl animate-in slide-in-from-right duration-300"
+      >
+        {children}
+      </aside>
+    </div>
+  );
+}
+function DialogTitle({ children, ...props }: AnyProps) {
+  return <header className="flex shrink-0 items-center justify-between gap-4 border-b border-base-300 bg-base-100 px-5 py-4 sm:px-7" {...clean(props)}>{children}</header>;
+}
+function DialogContent({ children, ...props }: AnyProps) {
+  return <div className="min-h-0 flex-1 overflow-y-auto bg-base-200/30 px-5 py-5 sm:px-7" {...clean(props)}>{children}</div>;
+}
+function DialogActions({ children, ...props }: AnyProps) {
+  return <footer className="flex shrink-0 flex-col-reverse gap-3 border-t border-base-300 bg-base-100 px-5 py-4 sm:flex-row sm:justify-end sm:px-7" {...clean(props)}>{children}</footer>;
+}
+function Button({ children, variant = "contained", size, startIcon, disabled, onClick, ...props }: AnyProps) {
+  const style = variant === "outlined" ? "btn btn-outline" : variant === "text" ? "btn btn-ghost" : "btn btn-primary";
+  return <button type="button" className={`${style} ${size === "small" ? "btn-sm" : ""} gap-2`} disabled={disabled} onClick={onClick} {...clean(props)}>{startIcon}{children}</button>;
+}
+function TextField({
+  select, children, fullWidth, size, multiline, rows, inputProps, InputLabelProps,
+  value, onChange, className, placeholder, type, disabled, onKeyDown, ...props
+}: AnyProps) {
+  const base = `${fullWidth === false ? "" : "w-full"} ${size === "small" ? "input-sm" : ""} rounded-xl border border-base-300 bg-base-100 focus:outline-none focus:ring-2 focus:ring-primary/20`;
+  if (select) {
+    return <select className={`select select-bordered ${base}`} value={value ?? ""} onChange={onChange} disabled={disabled} {...clean(props)}>{children}</select>;
+  }
+  if (multiline) {
+    return <textarea className={`textarea textarea-bordered ${base}`} rows={rows ?? 3} value={value ?? ""} onChange={onChange} placeholder={placeholder} disabled={disabled} onKeyDown={onKeyDown} {...clean(props)} />;
+  }
+  return <input className={`input input-bordered ${base} ${className ?? ""}`} type={type ?? "text"} value={value ?? ""} onChange={onChange} placeholder={placeholder} disabled={disabled} onKeyDown={onKeyDown} {...inputProps} {...clean(props)} />;
+}
+function MenuItem({ children, value, ...props }: AnyProps) {
+  return <option value={value} {...clean(props)}>{children}</option>;
+}
+function Grid({ container, size, spacing = 2, children, ...props }: AnyProps) {
+  if (container) return <div className={`grid grid-cols-12 gap-${Math.min(Number(spacing) * 2, 8)}`} {...clean(props)}>{children}</div>;
+  const xs = size?.xs ?? 12;
+  const sm = size?.sm;
+  const md = size?.md;
+  return <div className={`${xs === 12 ? "col-span-12" : xs === 6 ? "col-span-6" : xs === 4 ? "col-span-4" : "col-span-12"} ${sm === 12 ? "sm:col-span-12" : sm === 6 ? "sm:col-span-6" : sm === 4 ? "sm:col-span-4" : ""} ${md === 6 ? "md:col-span-6" : ""}`} {...clean(props)}>{children}</div>;
+}
+function Typography({ children, variant = "body2", className = "", ...props }: AnyProps) {
+  const classes: Record<string, string> = {
+    h6: "text-lg font-bold",
+    body2: "text-sm",
+    caption: "text-xs text-base-content/60",
+    overline: "mb-3 block text-xs font-bold uppercase tracking-wider text-base-content/60",
+  };
+  const Tag = variant === "h6" ? "h2" : variant === "overline" ? "div" : "p";
+  return <Tag className={`${classes[variant] ?? ""} ${props.fontWeight === 700 ? "font-bold" : props.fontWeight === 600 ? "font-semibold" : ""} ${className}`} {...clean(props)}>{children}</Tag>;
+}
+function Box({ children, className = "", ...props }: AnyProps) {
+  return <div className={className} {...clean(props)}>{children}</div>;
+}
+function Stack({ children, direction = "column", spacing = 1, className = "", ...props }: AnyProps) {
+  return <div className={`flex ${direction === "row" ? "flex-row" : "flex-col"} ${direction === "row" ? "flex-wrap" : ""} gap-${Math.min(Number(spacing) * 2, 8)} ${className}`} {...clean(props)}>{children}</div>;
+}
+function Chip({ label, onClick, onDelete, variant = "outlined", color, size, ...props }: AnyProps) {
+  return <span className={`badge ${variant === "filled" ? "badge-primary" : "badge-outline"} ${size === "small" ? "badge-sm" : ""} gap-1`} {...clean(props)}>
+    {onClick ? <button type="button" onClick={onClick}>{label}</button> : label}
+    {onDelete && <button type="button" aria-label={`Remove ${label}`} onClick={onDelete}><X className="h-3 w-3" /></button>}
+  </span>;
+}
+function CircularProgress({ size = 20, ...props }: AnyProps) {
+  return <LoaderCircle className="h-5 w-5 animate-spin" style={{ width: size, height: size }} {...clean(props)} />;
+}
+function IconButton({ children, onClick, disabled, ...props }: AnyProps) {
+  return <button type="button" className="btn btn-ghost btn-square btn-sm" onClick={onClick} disabled={disabled} {...clean(props)}>{children}</button>;
+}
+function Accordion({ children, onChange }: AnyProps) {
+  const [expanded, setExpanded] = useState(false);
+  return <section className="overflow-hidden rounded-2xl border border-base-300 bg-base-100">
+    {React.Children.map(children, (child: any) => React.isValidElement(child) ? React.cloneElement(child, { expanded, onToggle: () => { const next = !expanded; setExpanded(next); onChange?.({}, next); } } as any) : child)}
+  </section>;
+}
+function AccordionSummary({ children, expanded, onToggle }: AnyProps) {
+  return <button type="button" className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left hover:bg-base-200/60" onClick={onToggle} aria-expanded={expanded}>
+    <span className="text-xs font-bold uppercase tracking-wider text-base-content/70">{children}</span>
+    {expanded ? <ChevronDown className="h-4 w-4 rotate-180" /> : <ChevronDown className="h-4 w-4" />}
+  </button>;
+}
+function AccordionDetails({ children, expanded }: AnyProps) {
+  return expanded ? <div className="border-t border-base-200 p-5">{children}</div> : null;
+}
+function Alert({ children, severity = "info", onClose }: AnyProps) {
+  const cls = severity === "error" ? "alert-error" : severity === "success" ? "alert-success" : "alert-info";
+  return <div role="alert" className={`alert ${cls} text-sm`}>{children}{onClose && <button type="button" className="btn btn-ghost btn-xs ml-auto" onClick={onClose}><X className="h-4 w-4" /></button>}</div>;
+}
+function Switch({ checked, onChange, ...props }: AnyProps) {
+  return <input type="checkbox" className="toggle toggle-success toggle-sm" checked={checked} onChange={onChange} {...clean(props)} />;
+}
+function FormControlLabel({ control, label }: AnyProps) {
+  return <label className="flex cursor-pointer items-center gap-2 py-1">{control}<span className="text-sm">{label}</span></label>;
+}
+function Divider({ className = "" }: AnyProps) {
+  return <div className={`my-3 h-px w-full bg-base-300 ${className}`} />;
+}
 
 // ─── StaticLabel ─────────────────────────────────────────────────────────────
 
