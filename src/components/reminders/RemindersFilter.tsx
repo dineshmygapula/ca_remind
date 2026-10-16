@@ -1,16 +1,7 @@
 'use client';
 
-import {
-  Paper,
-  TextField,
-  MenuItem,
-  Grid,
-  InputAdornment,
-  Button,
-  
-} from '@mui/material';
-import SearchIcon from '@mui/icons-material/Search';
-import RestartAltIcon from '@mui/icons-material/RestartAlt';
+import { useMemo } from 'react';
+import FilterBar, { FilterSelectConfig, DateRangeConfig } from '@/components/common/Filter';
 import {
   STATUS_FILTER_OPTIONS,
   CHANNEL_FILTER_OPTIONS,
@@ -51,120 +42,56 @@ export default function RemindersFilter({
   onDateToChange,
   onReset,
 }: RemindersFilterProps) {
+  const filters: FilterSelectConfig[] = useMemo(
+    () => [
+      {
+        key: 'status',
+        label: 'Status',
+        value: statusFilter,
+        options: STATUS_FILTER_OPTIONS,
+        onChange: (v) => onStatusChange(v as ReminderStatusFilter),
+        widthClass: 'min-w-[140px]',
+      },
+      {
+        key: 'channel',
+        label: 'Channel',
+        value: channelFilter,
+        options: CHANNEL_FILTER_OPTIONS,
+        onChange: (v) => onChannelChange(v as ReminderChannelFilter),
+        widthClass: 'min-w-[140px]',
+      },
+      {
+        key: 'time',
+        label: 'When',
+        value: timeFilter,
+        options: TIME_FILTER_OPTIONS,
+        onChange: (v) => onTimeChange(v as ReminderTimeFilter),
+        widthClass: 'min-w-[130px]',
+      },
+    ],
+    [statusFilter, channelFilter, timeFilter, onStatusChange, onChannelChange, onTimeChange]
+  );
+
+  const dateRange: DateRangeConfig = useMemo(
+    () => ({
+      fromLabel: 'From Date',
+      toLabel: 'To Date',
+      fromValue: dateFrom,
+      toValue: dateTo,
+      onFromChange: onDateFromChange,
+      onToChange: onDateToChange,
+    }),
+    [dateFrom, dateTo, onDateFromChange, onDateToChange]
+  );
+
   return (
-    <Paper sx={{ p: 2.5 }}>
-      <Grid container spacing={2}>
-        {/* Search */}
-        <Grid size={{ xs: 12, md: 4 }}>
-          <TextField
-            fullWidth
-            size="small"
-            placeholder="Search by task or client name..."
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon fontSize="small" />
-                </InputAdornment>
-              ),
-            }}
-          />
-        </Grid>
-
-        {/* Time Filter — Overdue / Today / Upcoming */}
-        <Grid size={{ xs: 12, sm: 6, md: 2 }}>
-          <TextField
-            select
-            fullWidth
-            size="small"
-            label="When"
-            value={timeFilter}
-            onChange={(e) => onTimeChange(e.target.value as ReminderTimeFilter)}
-          >
-            {TIME_FILTER_OPTIONS.map((opt) => (
-              <MenuItem key={opt.value} value={opt.value}>
-                {opt.label}
-              </MenuItem>
-            ))}
-          </TextField>
-        </Grid>
-
-        {/* Status Filter */}
-        <Grid size={{ xs: 12, sm: 6, md: 2 }}>
-          <TextField
-            select
-            fullWidth
-            size="small"
-            label="Status"
-            value={statusFilter}
-            onChange={(e) => onStatusChange(e.target.value as ReminderStatusFilter)}
-          >
-            {STATUS_FILTER_OPTIONS.map((opt) => (
-              <MenuItem key={opt.value} value={opt.value}>
-                {opt.label}
-              </MenuItem>
-            ))}
-          </TextField>
-        </Grid>
-
-        {/* Channel Filter */}
-        <Grid size={{ xs: 12, sm: 6, md: 2 }}>
-          <TextField
-            select
-            fullWidth
-            size="small"
-            label="Channel"
-            value={channelFilter}
-            onChange={(e) => onChannelChange(e.target.value as ReminderChannelFilter)}
-          >
-            {CHANNEL_FILTER_OPTIONS.map((opt) => (
-              <MenuItem key={opt.value} value={opt.value}>
-                {opt.label}
-              </MenuItem>
-            ))}
-          </TextField>
-        </Grid>
-
-        {/* Reset Button */}
-        <Grid size={{ xs: 12, sm: 6, md: 2 }}>
-          <Button
-            fullWidth
-            variant="outlined"
-            startIcon={<RestartAltIcon fontSize="small" />}
-            onClick={onReset}
-            sx={{ height: '40px', textTransform: 'none', fontWeight: 600 }}
-          >
-            Reset
-          </Button>
-        </Grid>
-
-        {/* Date Range */}
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <TextField
-            type="date"
-            fullWidth
-            size="small"
-            label="From Date"
-            value={dateFrom}
-            onChange={(e) => onDateFromChange(e.target.value)}
-            InputLabelProps={{ shrink: true }}
-          />
-        </Grid>
-
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <TextField
-            type="date"
-            fullWidth
-            size="small"
-            label="To Date"
-            value={dateTo}
-            onChange={(e) => onDateToChange(e.target.value)}
-            InputLabelProps={{ shrink: true }}
-            inputProps={{ min: dateFrom || undefined }}
-          />
-        </Grid>
-      </Grid>
-    </Paper>
+    <FilterBar
+      searchValue={searchQuery}
+      onSearchChange={onSearchChange}
+      searchPlaceholder="Search by task title or client name..."
+      filters={filters}
+      dateRange={dateRange}
+      onReset={onReset}
+    />
   );
 }

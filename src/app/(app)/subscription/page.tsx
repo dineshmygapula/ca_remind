@@ -16,9 +16,14 @@ export default async function SubscriptionPlansPage() {
       organizationId = orgs[0].id;
       plans = await getAvailablePlans(organizationId);
     }
-  } catch {
-    error = 'Failed to load plans. Please try again.';
-  }
+  } catch (err) {
+  console.error('Failed to load subscription plans:', err);
+
+  error =
+    err instanceof Error
+      ? `Failed to load plans: ${err.message}`
+      : 'Failed to load plans due to an unexpected error.';
+}
 
   if (error || !plans) {
     return (

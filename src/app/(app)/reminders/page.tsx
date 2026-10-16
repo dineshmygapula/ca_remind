@@ -1,32 +1,31 @@
-"use client";
+'use client';
 
-import { useState, useEffect, useMemo, useCallback } from "react";
-import { usePagination } from "@/hooks/usePagination";
-import { useWorkspace } from "@/context/WorkspaceContext";
-import { Reminder } from "../../../types/reminders.types";
-import { getReminders, deleteReminder } from "../../../services/reminderService";
-import CreateReminderDialog from "@/components/reminders/CreateReminderDialog";
-import RemindersTable from "@/components/reminders/RemindersTable";
-import RemindersFilter from "@/components/reminders/RemindersFilter";
-import EditReminderDialog from "@/components/reminders/EditReminderDialog";
-import ReminderDetailsDrawer from "@/components/reminders/ReminderDetailsDrawer";
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { Plus, X } from 'lucide-react';
+import { useWorkspace } from '@/context/WorkspaceContext';
+import { ReminderDetail } from '@/types/reminders.types';
+import { getReminders, deleteReminder } from '@/services/reminderService';
+import RemindersTable from '@/components/reminders/RemindersTable';
+import RemindersFilter from '@/components/reminders/RemindersFilter';
+import ReminderFormDrawer from '@/components/reminders/ReminderFormDrawer';
+import ReminderDetailsDrawer from '@/components/reminders/ReminderDetailsDrawer';
+import ConfirmDialog from '@/components/tasks/ConfirmDialog';
 import {
   ReminderStatusFilter,
   ReminderChannelFilter,
   ReminderTimeFilter,
-} from "@/constants/reminderConstants";
+} from '@/constants/reminderConstants';
 
 export default function RemindersPage() {
   const { businessId, orgId } = useWorkspace();
 
   // Data state
-  const [reminders, setReminders] = useState<Reminder[]>([]);
+  const [reminders, setReminders] = useState<ReminderDetail[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [error, setError] = useState('');
 
   // Dialog / drawer state
-  const [openCreateDialog, setOpenCreateDialog] = useState(false);
-  const [openEditDialog, setOpenEditDialog] = useState(false);
+  const [formDrawerOpen, setFormDrawerOpen] = useState(false);
   const [editingReminderId, setEditingReminderId] = useState<string | null>(null);
   const [selectedReminderId, setSelectedReminderId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -38,22 +37,22 @@ export default function RemindersPage() {
   const [deleteLoading, setDeleteLoading] = useState(false);
 
   // Filter state
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<ReminderStatusFilter>("ALL");
-  const [channelFilter, setChannelFilter] = useState<ReminderChannelFilter>("ALL");
-  const [timeFilter, setTimeFilter] = useState<ReminderTimeFilter>("ALL");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<ReminderStatusFilter>('ALL');
+  const [channelFilter, setChannelFilter] = useState<ReminderChannelFilter>('ALL');
+  const [timeFilter, setTimeFilter] = useState<ReminderTimeFilter>('ALL');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
 
-  // Fetch all reminder pages for client-side filtering and pagination.
+  // Fetch all reminder pages for client-side filtering and AG Grid display
   const fetchReminders = useCallback(async () => {
     if (!businessId) return;
 
     try {
       setLoading(true);
-      setError("");
+      setError('');
 
-      let allItems: Reminder[] = [];
+      let allItems: ReminderDetail[] = [];
       let cursor: string | null = null;
 
       do {
@@ -64,7 +63,7 @@ export default function RemindersPage() {
 
       setReminders(allItems);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to fetch reminders");
+      setError(err instanceof Error ? err.message : 'Failed to fetch reminders');
     } finally {
       setLoading(false);
     }
@@ -74,7 +73,7 @@ export default function RemindersPage() {
     if (businessId) fetchReminders();
   }, [businessId, fetchReminders]);
 
-  // Client-side filters
+  // Client-side filtering
   const filteredReminders = useMemo(() => {
     let result = [...reminders];
 
@@ -83,62 +82,52 @@ export default function RemindersPage() {
       result = result.filter(
         (r) =>
           r.task?.title?.toLowerCase().includes(q) ||
-          r.subject?.name?.toLowerCase().includes(q),
+          r.subject?.name?.toLowerCase().includes(q)
       );
     }
 
-    if (statusFilter !== "ALL") {
+    if (statusFilter !== 'ALL') {
       result = result.filter((r) => r.status === statusFilter);
     }
 
-    if (channelFilter !== "ALL") {
+    if (channelFilter !== 'ALL') {
       result = result.filter((r) => r.channel === channelFilter);
     }
 
     // Overdue / today / upcoming filter
-    if (timeFilter !== "ALL") {
+    if (timeFilter !== 'ALL') {
       const now = new Date();
-      const todayStart = new Date(
-        now.getFullYear(),
-        now.getMonth(),
-        now.getDate(),
-      );
-      const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
 
       result = result.filter((r) => {
         if (!r.scheduledAt) return false;
         const scheduled = new Date(r.scheduledAt);
 
-        if (timeFilter === "OVERDUE") {
-          return scheduled < todayStart && r.status === "SCHEDULED";
+        if (timeFilter === 'OVERDUE') {
+          return scheduled < todayStart && r.status === 'SCHEDULED';
         }
-        if (timeFilter === "TODAY") {
-          return scheduled >= todayStart && scheduled < todayEnd;
+        if (timeFilter === 'TODAY') {
+          return scheduled >= todayStart && scheduled <= todayEnd;
         }
-        if (timeFilter === "UPCOMING") {
-          return scheduled >= todayEnd;
+        if (timeFilter === 'UPCOMING') {
+          return scheduled > todayEnd;
         }
         return true;
       });
     }
 
-    // UTC-safe date range boundaries
+    // Date range filter
     if (dateFrom) {
-      const fromBoundary = new Date(`${dateFrom}T00:00:00.000Z`);
-      result = result.filter(
-        (r) =>
-          r.scheduledAt &&
-          new Date(r.scheduledAt).getTime() >= fromBoundary.getTime(),
-      );
+      const from = new Date(dateFrom);
+      from.setHours(0, 0, 0, 0);
+      result = result.filter((r) => r.scheduledAt && new Date(r.scheduledAt) >= from);
     }
 
     if (dateTo) {
-      const toBoundary = new Date(`${dateTo}T23:59:59.999Z`);
-      result = result.filter(
-        (r) =>
-          r.scheduledAt &&
-          new Date(r.scheduledAt).getTime() <= toBoundary.getTime(),
-      );
+      const to = new Date(dateTo);
+      to.setHours(23, 59, 59, 999);
+      result = result.filter((r) => r.scheduledAt && new Date(r.scheduledAt) <= to);
     }
 
     return result;
@@ -152,37 +141,31 @@ export default function RemindersPage() {
     dateTo,
   ]);
 
-  // Client-side pagination
-  const {
-    page,
-    rowsPerPage,
-    paginatedData: paginatedReminders,
-    totalCount,
-    handlePageChange,
-    handleRowsPerPageChange,
-  } = usePagination({
-    data: filteredReminders,
-    defaultRowsPerPage: 10,
-    resetDeps: [
-      searchQuery,
-      statusFilter,
-      channelFilter,
-      timeFilter,
-      dateFrom,
-      dateTo,
-    ],
-  });
-
   // Handlers
   const handleView = (reminderId: string) => {
+    setFormDrawerOpen(false);
+    setEditingReminderId(null);
     setSelectedReminderId(reminderId);
     setDrawerOpen(true);
   };
 
-  const handleEdit = (reminderId: string) => {
-    setEditingReminderId(reminderId);
-    setOpenEditDialog(true);
+  const handleCreate = () => {
+    setSelectedReminderId(null);
     setDrawerOpen(false);
+    setEditingReminderId(null);
+    setFormDrawerOpen(true);
+  };
+
+  const handleEdit = (reminderId: string) => {
+    setSelectedReminderId(null);
+    setDrawerOpen(false);
+    setEditingReminderId(reminderId);
+    setFormDrawerOpen(true);
+  };
+
+  const handleDrawerClose = () => {
+    setDrawerOpen(false);
+    setSelectedReminderId(null);
   };
 
   const handleDeleteRequest = (reminderId: string, taskTitle: string) => {
@@ -194,250 +177,155 @@ export default function RemindersPage() {
 
     try {
       setDeleteLoading(true);
-      setError("");
+      setError('');
       await deleteReminder(businessId, deleteTarget.id);
       setDeleteTarget(null);
       await fetchReminders();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to delete reminder");
+      setError(err instanceof Error ? err.message : 'Failed to delete reminder');
     } finally {
       setDeleteLoading(false);
     }
   };
 
-  const handleDrawerClose = () => {
-    setDrawerOpen(false);
-    setSelectedReminderId(null);
-  };
-
   const handleResetFilters = () => {
-    setSearchQuery("");
-    setStatusFilter("ALL");
-    setChannelFilter("ALL");
-    setTimeFilter("ALL");
-    setDateFrom("");
-    setDateTo("");
+    setSearchQuery('');
+    setStatusFilter('ALL');
+    setChannelFilter('ALL');
+    setTimeFilter('ALL');
+    setDateFrom('');
+    setDateTo('');
   };
 
   // Loading guard
   if (!businessId) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center bg-base-200">
+      <div className="flex min-h-[60vh] items-center justify-center bg-bg">
         <span className="loading loading-spinner loading-lg text-primary" />
       </div>
     );
   }
 
   return (
-    <main className="min-h-screen bg-base-200 py-8">
-      <div className="mx-auto w-full max-w-screen-2xl px-4 sm:px-6 lg:px-8">
-        <div className="space-y-6">
-          {/* Header */}
-          <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h1 className="text-2xl font-semibold tracking-tight text-base-content">
-                Reminders
-              </h1>
-              <p className="mt-1 text-sm text-base-content/70">
-                Manage and monitor all reminder notifications
-              </p>
-            </div>
-
-            <button
-              type="button"
-              className="btn btn-primary gap-2 font-semibold normal-case"
-              onClick={() => setOpenCreateDialog(true)}
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M12 5v14M5 12h14" />
-              </svg>
-              Create Reminder
-            </button>
-          </header>
-
-          {/* Error banner */}
-          {error && (
-            <div role="alert" className="alert alert-error">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5 shrink-0"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                aria-hidden="true"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M12 9v3m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"
-                />
-              </svg>
-              <span>{error}</span>
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                aria-label="Dismiss error"
-                onClick={() => setError("")}
-              >
-                ✕
-              </button>
-            </div>
-          )}
-
-          {/* Filters */}
-          <RemindersFilter
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-            statusFilter={statusFilter}
-            onStatusChange={setStatusFilter}
-            channelFilter={channelFilter}
-            onChannelChange={setChannelFilter}
-            timeFilter={timeFilter}
-            onTimeChange={setTimeFilter}
-            dateFrom={dateFrom}
-            onDateFromChange={(value) => {
-              setDateFrom(value);
-              // Clear To Date if it is now before From Date.
-              if (dateTo && value && new Date(value) > new Date(dateTo)) {
-                setDateTo("");
-              }
-            }}
-            dateTo={dateTo}
-            onDateToChange={setDateTo}
-            onReset={handleResetFilters}
-          />
-
-          {/* Results count */}
-          {!loading && (
-            <p className="text-sm text-base-content/70">
-              Showing {filteredReminders.length} of {reminders.length} reminders
+    <div className="min-h-screen bg-bg py-8">
+      <div className="mx-auto max-w-7xl space-y-6 px-4">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-semibold text-txt-main">Reminders</h1>
+            <p className="mt-1 text-sm text-txt-sub">
+              Manage and monitor all reminder notifications
             </p>
-          )}
+          </div>
 
-          {/* Table */}
-          <RemindersTable
-            reminders={paginatedReminders}
-            loading={loading}
-            onView={handleView}
-            onEdit={handleEdit}
-            onDelete={handleDeleteRequest}
-            totalCount={totalCount}
-            page={page}
-            rowsPerPage={rowsPerPage}
-            onPageChange={handlePageChange}
-            onRowsPerPageChange={handleRowsPerPageChange}
-          />
-        </div>
-      </div>
-
-      {/* Dialogs and drawer remain connected to the existing components */}
-      <CreateReminderDialog
-        open={openCreateDialog}
-        onClose={() => setOpenCreateDialog(false)}
-        businessId={businessId}
-        organizationId={orgId ?? ""}
-        onSuccess={() => {
-          fetchReminders();
-          setOpenCreateDialog(false);
-        }}
-      />
-
-      <EditReminderDialog
-        open={openEditDialog}
-        onClose={() => {
-          setOpenEditDialog(false);
-          setEditingReminderId(null);
-        }}
-        reminderId={editingReminderId}
-        businessId={businessId}
-        onSuccess={() => {
-          fetchReminders();
-          setOpenEditDialog(false);
-        }}
-      />
-
-      <ReminderDetailsDrawer
-        open={drawerOpen}
-        onClose={handleDrawerClose}
-        reminderId={selectedReminderId}
-        businessId={businessId}
-        onEdit={handleEdit}
-      />
-
-      {/* DaisyUI delete confirmation modal */}
-      {deleteTarget && (
-        <div
-          className="modal modal-open"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="delete-reminder-title"
-        >
           <button
             type="button"
-            className="modal-backdrop"
-            aria-label="Close delete confirmation"
-            disabled={deleteLoading}
-            onClick={() => !deleteLoading && setDeleteTarget(null)}
+            className="btn gap-2 border-none bg-navy text-white hover:bg-navy-hover"
+            onClick={handleCreate}
           >
-            Close
+            <Plus className="h-4 w-4" />
+            Create Reminder
           </button>
-
-          <div className="modal-box max-w-md rounded-2xl border border-base-300 p-0 shadow-2xl">
-            <div className="border-b border-base-300 px-6 py-5">
-              <h2
-                id="delete-reminder-title"
-                className="text-lg font-bold text-base-content"
-              >
-                Delete Reminder
-              </h2>
-              <p className="mt-1 text-sm text-base-content/60">
-                This action cannot be undone.
-              </p>
-            </div>
-
-            <div className="px-6 py-5 text-sm leading-6 text-base-content/80">
-              Are you sure you want to delete the reminder for{" "}
-              <strong className="font-semibold text-base-content">
-                {deleteTarget.title}
-              </strong>
-              ?
-            </div>
-
-            <div className="flex flex-col-reverse gap-3 border-t border-base-300 bg-base-200/50 px-6 py-4 sm:flex-row sm:justify-end">
-              <button
-                type="button"
-                className="btn btn-outline"
-                onClick={() => setDeleteTarget(null)}
-                disabled={deleteLoading}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="btn btn-error text-white"
-                onClick={handleDeleteConfirm}
-                disabled={deleteLoading}
-              >
-                {deleteLoading && (
-                  <span className="loading loading-spinner loading-sm" />
-                )}
-                {deleteLoading ? "Deleting..." : "Delete"}
-              </button>
-            </div>
-          </div>
         </div>
-      )}
-    </main>
+
+        {/* Error Alert */}
+        {error && (
+          <div role="alert" className="alert alert-error flex items-center justify-between text-sm">
+            <span>{error}</span>
+            <button
+              type="button"
+              className="btn btn-ghost btn-xs btn-circle"
+              aria-label="Dismiss error"
+              onClick={() => setError('')}
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+
+        {/* Filters */}
+        <RemindersFilter
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          statusFilter={statusFilter}
+          onStatusChange={setStatusFilter}
+          channelFilter={channelFilter}
+          onChannelChange={setChannelFilter}
+          timeFilter={timeFilter}
+          onTimeChange={setTimeFilter}
+          dateFrom={dateFrom}
+          onDateFromChange={(value) => {
+            setDateFrom(value);
+            if (dateTo && value && new Date(value) > new Date(dateTo)) {
+              setDateTo('');
+            }
+          }}
+          dateTo={dateTo}
+          onDateToChange={setDateTo}
+          onReset={handleResetFilters}
+        />
+
+        {/* Results count */}
+        {!loading && (
+          <p className="text-sm text-txt-sub">
+            Showing {filteredReminders.length} of {reminders.length} reminders
+          </p>
+        )}
+
+        {/* Table using CommonDataGrid */}
+        <RemindersTable
+          reminders={filteredReminders}
+          loading={loading}
+          businessId={businessId}
+          onView={handleView}
+          onEdit={handleEdit}
+          onDelete={handleDeleteRequest}
+          onRefresh={fetchReminders}
+        />
+
+        {/* View Details Drawer */}
+        <ReminderDetailsDrawer
+          open={drawerOpen}
+          onClose={handleDrawerClose}
+          reminderId={selectedReminderId}
+          businessId={businessId}
+          onEdit={handleEdit}
+        />
+
+        {/* Unified Form Drawer (Create & Update) */}
+        <ReminderFormDrawer
+          open={formDrawerOpen}
+          onClose={() => {
+            setFormDrawerOpen(false);
+            setEditingReminderId(null);
+          }}
+          reminderId={editingReminderId}
+          businessId={businessId}
+          organizationId={orgId ?? ''}
+          onSuccess={() => {
+            fetchReminders();
+            setFormDrawerOpen(false);
+            setEditingReminderId(null);
+          }}
+        />
+
+        {/* Delete Confirmation Dialog */}
+        <ConfirmDialog
+          open={!!deleteTarget}
+          title="Delete Reminder"
+          description={
+            <>
+              Are you sure you want to delete the reminder for{' '}
+              <strong>{deleteTarget?.title}</strong>? This action cannot be undone.
+            </>
+          }
+          confirmLabel="Delete"
+          variant="danger"
+          loading={deleteLoading}
+          onConfirm={handleDeleteConfirm}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      </div>
+    </div>
   );
 }

@@ -1,342 +1,191 @@
-"use client";
+'use client';
 
-import {
-  Paper,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  IconButton,
-  Chip,
-  Tooltip,
-  Typography,
-  Stack,
-  CircularProgress,
-  //TablePagination,
-} from "@mui/material";
-import {
-  Visibility as ViewIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-} from "@mui/icons-material";
-import { SubjectListItem } from "@/types/subject";
-import TablePaginationBar from "@/components/common/TablePaginationBar";
+import { useMemo } from 'react';
+import { Eye, Pencil, Trash2 } from 'lucide-react';
+import CommonDataGrid, { GridAction, GridColumn } from '@/components/common/CommonTable';
+import { SubjectListItem } from '@/types/subject';
+import { updateSubject } from '@/services/subjectService';
+
 interface ClientsTableProps {
   clients: SubjectListItem[];
   loading: boolean;
+  businessId: string;
   onView: (clientId: string) => void;
   onEdit: (clientId: string) => void;
   onDelete: (clientId: string, clientName: string) => void;
-  totalCount: number;
-  page: number;
-  rowsPerPage: number;
-  onPageChange: (event: unknown, newPage: number) => void;
-  onRowsPerPageChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  onRefresh?: () => void;
 }
+
+const COMPLIANCE_STYLES: Record<string, { bg: string; text: string; border: string }> = {
+  gst: { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' },
+  tds: { bg: 'bg-slate-100', text: 'text-slate-700', border: 'border-slate-200' },
+  itr: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' },
+  roc: { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200' },
+  msme: { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' },
+};
 
 export default function ClientsTable({
   clients,
   loading,
+  businessId,
   onView,
   onEdit,
   onDelete,
-  totalCount,
-  page,
-  rowsPerPage,
-  onPageChange,
-  onRowsPerPageChange,
+  onRefresh,
 }: ClientsTableProps) {
-  // ── Loading ──────────────────────────────────────────
-  if (loading) {
-    return (
-      <Paper
-        sx={{
-          p: 8,
-          textAlign: "center",
-          boxShadow: "none",
-          border: "1px solid",
-          borderColor: "divider", // ✅ theme token
-        }}
-      >
-        <CircularProgress size={32} thickness={4} />{" "}
-        {/* ✅ removed hardcoded color */}
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-          Loading clients...
-        </Typography>
-      </Paper>
-    );
-  }
-
-  // ── Empty State────────────────────────────────────────────
-  if (clients.length === 0) {
-    return (
-      <Paper
-        sx={{
-          p: 8,
-          textAlign: "center",
-          boxShadow: "none",
-          border: "1px solid",
-          borderColor: "divider", // ✅ theme token
-        }}
-      >
-        <Typography variant="h6" color="text.secondary">
-          No clients found
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-          Add your first client to get started
-        </Typography>
-      </Paper>
-    );
-  }
-  // added this part on 25/04/26
-  // ─── Helper Functions ─────────────────────────────────────────────────────
-  const getComplianceChips = (activeCompliances: string[] | undefined) => {
-    if (!activeCompliances || activeCompliances.length === 0) {
-      return (
-        <Typography variant="caption" color="text.disabled">
-          None
-        </Typography>
-      );
-    }
-
-    const complianceStyles: Record<string, { bg: string; color: string }> = {
-      gst: {
-        bg: "#E8F5E9",
-        color: "#2E7D32",
+  const columns: GridColumn<SubjectListItem>[] = useMemo(
+    () => [
+      {
+        headerName: 'Client Name',
+        field: 'displayName',
+        minWidth: 200,
+        flex: 2,
+        cellRenderer: (p) => (
+          <span className="font-semibold text-txt-main">
+            {p.value || '—'}
+          </span>
+        ),
       },
-
-      tds: {
-        bg: "#F1F5F9",
-        color: "#475569",
+      {
+        headerName: 'Business Name',
+        field: 'businessName',
+        minWidth: 170,
+        cellRenderer: (p) => (
+          <span className="text-txt-sub">
+            {p.value || '—'}
+          </span>
+        ),
       },
-
-      itr: {
-        bg: "#E3F2FD",
-        color: "#1565C0",
+      {
+        headerName: 'Email',
+        field: 'email',
+        minWidth: 180,
+        cellRenderer: (p) => (
+          <span className="text-txt-sub">
+            {p.value || '—'}
+          </span>
+        ),
       },
-
-      roc: {
-        bg: "#F3E8FF",
-        color: "#7E22CE",
+      {
+        headerName: 'Phone',
+        field: 'phone',
+        minWidth: 140,
+        cellRenderer: (p) => (
+          <span className="font-mono text-xs text-txt-main">
+            {p.value || '—'}
+          </span>
+        ),
       },
-    };
-    return (
-      <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
-        {activeCompliances.map((comp) => (
-          <Chip
-            key={comp}
-            label={comp.toUpperCase()}
-            size="small"
-            sx={{
-              bgcolor: complianceStyles[comp.toLowerCase()]?.bg || "#F1F5F9",
-
-              color: complianceStyles[comp.toLowerCase()]?.color || "#475569",
-
-              fontWeight: 600,
-              fontSize: "0.72rem",
-              height: "24px",
-              borderRadius: "6px",
-
-              border: "1px solid",
-              borderColor: "divider",
-            }}
-          />
-        ))}
-      </Stack>
-    );
-  };
-
-  // ── Table ────────────────────────────────────────────
-  return (
-    <TableContainer component={Paper}>
-      <Table>
-        <TableHead>
-          <TableRow>
-            <TableCell>Client Name</TableCell>
-            <TableCell>Business Name</TableCell>
-            <TableCell>Email</TableCell>
-            <TableCell>Phone</TableCell>
-            <TableCell>GSTIN</TableCell>
-            <TableCell>Compliances</TableCell>
-            {/*  <TableCell>Assigned Team</TableCell> */}
-            <TableCell>Status</TableCell>
-            <TableCell align="right">Actions</TableCell>
-          </TableRow>
-        </TableHead>
-
-        <TableBody>
-          {clients.map((client) => (
-            <TableRow
-              key={client.id}
-              hover
-              onClick={() => onView(client.id)}
-              sx={{ cursor: "pointer" }}
+      {
+        headerName: 'GSTIN',
+        field: 'gstin',
+        minWidth: 160,
+        cellRenderer: (p) => {
+          if (!p.value) return <span className="text-txt-sub/50">—</span>;
+          return (
+            <span className="inline-flex font-mono text-[11px] font-semibold px-2 py-0.5 rounded border border-[var(--border)] bg-[var(--surface-subtle)] text-txt-main">
+              {p.value}
+            </span>
+          );
+        },
+      },
+      {
+        headerName: 'Compliances',
+        field: 'activeCompliances',
+        minWidth: 190,
+        cellRenderer: (p) => {
+          const list: string[] = Array.isArray(p.value) ? p.value : [];
+          if (list.length === 0) {
+            return <span className="text-txt-sub/40 text-xs">No services</span>;
+          }
+          return (
+            <div className="flex flex-wrap items-center gap-1 py-1">
+              {list.map((c) => {
+                const style = COMPLIANCE_STYLES[c.toLowerCase()] || {
+                  bg: 'bg-slate-50',
+                  text: 'text-slate-700',
+                  border: 'border-slate-200',
+                };
+                return (
+                  <span
+                    key={c}
+                    className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${style.bg} ${style.text} ${style.border}`}
+                  >
+                    {c}
+                  </span>
+                );
+              })}
+            </div>
+          );
+        },
+      },
+      {
+        headerName: 'Status',
+        field: 'isActive',
+        minWidth: 120,
+        editable: true,
+        cellEditor: 'agSelectCellEditor',
+        cellEditorParams: {
+          values: ['Active', 'Inactive'],
+        },
+        valueFormatter: (p) => (p.value ? 'Active' : 'Inactive'),
+        cellRenderer: (p) => {
+          const active = Boolean(p.data?.isActive);
+          return (
+            <span
+              className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${
+                active
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                  : 'bg-slate-100 text-slate-600 border-slate-200'
+              }`}
             >
-              {/* Client Name */}
-              <TableCell>
-                <Typography
-                  variant="body2"
-                  fontWeight={600}
-                  color="text.primary"
-                >
-                  {client.displayName || "—"}
-                </Typography>
-              </TableCell>
+              {active ? 'Active' : 'Inactive'}
+            </span>
+          );
+        },
+      },
+    ],
+    []
+  );
 
-              {/* Business Name */}
-              <TableCell>
-                <Typography variant="body2" color="text.primary">
-                  {client.businessName || "—"}
-                </Typography>
-              </TableCell>
+  const actions: GridAction<SubjectListItem>[] = [
+    {
+      label: 'View',
+      icon: <Eye className="h-4 w-4" />,
+      variant: 'primary',
+      onClick: (row) => onView(row.id),
+    },
+    {
+      label: 'Edit',
+      icon: <Pencil className="h-4 w-4" />,
+      variant: 'secondary',
+      onClick: (row) => onEdit(row.id),
+    },
+    {
+      label: 'Delete',
+      icon: <Trash2 className="h-4 w-4" />,
+      variant: 'danger',
+      onClick: (row) => onDelete(row.id, row.displayName || 'Client'),
+    },
+  ];
 
-              {/* Email */}
-              <TableCell>
-                <Typography variant="body2" color="text.secondary">
-                  {client.email || "—"}
-                </Typography>
-              </TableCell>
-
-              {/* Phone */}
-              <TableCell>
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{ fontFamily: "monospace" }}
-                >
-                  {client.phone || "—"}
-                </Typography>
-              </TableCell>
-
-              {/* GSTIN */}
-              <TableCell>
-                {client.gstin ? (
-                  <Chip
-                    label={client.gstin}
-                    size="small"
-                    variant="outlined"
-                    sx={{
-                      fontFamily: "monospace",
-                      fontSize: "0.72rem",
-                      fontWeight: 600,
-                      borderColor: "divider", // ✅ theme token
-                    }}
-                  />
-                ) : (
-                  <Typography variant="body2" color="text.disabled">
-                    —
-                  </Typography>
-                )}
-              </TableCell>
-              {/* Active Compliances */}
-              <TableCell>
-                {getComplianceChips(client.activeCompliances)}
-              </TableCell>
-
-              {/* Assigned Team — backend must return assignedTeam field */}
-              {/* Assigned Team */}
-              {/*   <TableCell>
-                {client.assignedTeam?.primaryAssignee?.name ? (
-                  <Chip
-                    label={client.assignedTeam.primaryAssignee.name} // ✅ drill into the object
-                    size="small"
-                    color="primary"
-                    variant="outlined"
-                    sx={{ fontWeight: 600, fontSize: "0.75rem" }}
-                  />
-                ) : (
-                  <Typography variant="body2" color="text.disabled">
-                    Unassigned
-                  </Typography>
-                )}
-              </TableCell>
-           */}
-
-              {/* Status */}
-              <TableCell>
-                {/* ✅ color prop uses theme — no hardcoded colors */}
-                <Chip
-                  label={client.isActive ? "Active" : "Inactive"}
-                  size="small"
-                  color={client.isActive ? "success" : "default"}
-                  variant="outlined"
-                  sx={{ fontWeight: 600, fontSize: "0.75rem" }}
-                />
-              </TableCell>
-
-              {/* Actions */}
-              <TableCell align="right" onClick={(e) => e.stopPropagation()}>
-                <Tooltip title="View Details">
-                  <IconButton
-                    size="small"
-                    onClick={() => onView(client.id)}
-                    sx={{
-                      color: "text.secondary", // ✅ theme token
-                      "&:hover": {
-                        color: "text.primary", // ✅ theme token
-                        bgcolor: "action.hover", // ✅ theme token
-                      },
-                    }}
-                  >
-                    <ViewIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-
-                <Tooltip title="Edit Client">
-                  <IconButton
-                    size="small"
-                    onClick={() => onEdit(client.id)}
-                    sx={{
-                      color: "text.secondary", // ✅ theme token
-                      "&:hover": {
-                        color: "text.primary", // ✅ theme token
-                        bgcolor: "action.hover", // ✅ theme token
-                      },
-                    }}
-                  >
-                    <EditIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-
-                <Tooltip title="Delete Client">
-                  {/* ✅ color prop on IconButton — correct way */}
-                  <IconButton
-                    size="small"
-                    color="error"
-                    onClick={() => onDelete(client.id, client.displayName)}
-                  >
-                    <DeleteIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-
-      {/* <TablePagination
-        component="div"
-        count={totalCount}
-        page={page}
-        rowsPerPage={rowsPerPage}
-        onPageChange={onPageChange}
-        onRowsPerPageChange={onRowsPerPageChange}
-        rowsPerPageOptions={[5, 10, 25, 50]}
-        sx={{
-          borderTop: '1px solid',
-          borderColor: 'divider',
-        }}
-      /> */}
-
-     <TablePaginationBar
-  totalCount={totalCount}
-  page={page}
-  rowsPerPage={rowsPerPage}
-  onPageChange={onPageChange}
-  onRowsPerPageChange={onRowsPerPageChange}
-/>
-    </TableContainer>
+  return (
+    <CommonDataGrid<SubjectListItem>
+      rowData={clients}
+      columns={columns}
+      actions={actions}
+      isLoading={loading}
+      onRowClick={(row) => onView(row.id)}
+      onRowDoubleClick={(row) => onEdit(row.id)}
+      onUpdateCell={async ({ row, field, newValue }) => {
+        if (!businessId) return;
+        const valToSave = field === 'isActive' ? newValue === 'Active' : newValue;
+        await updateSubject(businessId, row.id, {
+          [field]: valToSave,
+        });
+        onRefresh?.();
+      }}
+      emptyMessage="No clients found"
+    />
   );
 }

@@ -1,352 +1,220 @@
-"use client";
+'use client';
 
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
-  IconButton,
-  Chip,
-  Skeleton,
-  Tooltip,
-  Typography,
-  Box,
-} from "@mui/material";
-import {
-  Visibility as ViewIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-} from "@mui/icons-material";
-import { ReminderDetail } from "../../types/reminders.types";
-import TablePaginationBar from "@/components/common/TablePaginationBar";
+import { useMemo } from 'react';
+import { Eye, Pencil, Trash2, Mail, MessageSquare, Smartphone, Bell } from 'lucide-react';
+import CommonDataGrid, { GridAction, GridColumn } from '@/components/common/CommonTable';
+import { ReminderDetail, ReminderStatus } from '@/types/reminders.types';
+import { updateReminder } from '@/services/reminderService';
 import {
   REMINDER_STATUS_LABELS,
   REMINDER_CHANNEL_LABELS,
-} from "../../constants/reminderConstants";
+} from '@/constants/reminderConstants';
 
 interface RemindersTableProps {
   reminders: ReminderDetail[];
   loading: boolean;
+  businessId: string;
   onView: (id: string) => void;
   onEdit: (id: string) => void;
   onDelete: (id: string, taskTitle: string) => void;
-  totalCount: number;
-  page: number;
-  rowsPerPage: number;
-  onPageChange: (event: unknown, newPage: number) => void;
-  onRowsPerPageChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  onRefresh?: () => void;
 }
 
-/* const statusColorMap: Record<string, "warning" | "success" | "error" | "default"> = {
-  SCHEDULED: "warning",
-  SENT: "success",
-  FAILED: "error",
-  CANCELLED: "default",
-}; */
+const getStatusBadge = (status?: ReminderStatus) => {
+  switch (status) {
+    case 'SENT':
+      return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+    case 'SCHEDULED':
+      return 'bg-amber-50 text-amber-700 border-amber-200';
+    case 'FAILED':
+      return 'bg-red-50 text-red-700 border-red-200';
+    case 'CANCELLED':
+      return 'bg-slate-100 text-slate-600 border-slate-200';
+    default:
+      return 'bg-slate-50 text-slate-600 border-slate-200';
+  }
+};
+
+const ChannelRenderer = ({ channel }: { channel?: string }) => {
+  switch (channel?.toUpperCase()) {
+    case 'EMAIL':
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+          <Mail className="h-3.5 w-3.5 text-blue-500" />
+          <span>Email</span>
+        </span>
+      );
+    case 'WHATSAPP':
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+          <MessageSquare className="h-3.5 w-3.5 text-emerald-500" />
+          <span>WhatsApp</span>
+        </span>
+      );
+    case 'SMS':
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+          <Smartphone className="h-3.5 w-3.5 text-indigo-500" />
+          <span>SMS</span>
+        </span>
+      );
+    default:
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-semibold bg-slate-50 text-slate-700 border border-slate-200">
+          <Bell className="h-3.5 w-3.5 text-slate-500" />
+          <span>{channel ?? '—'}</span>
+        </span>
+      );
+  }
+};
+
+const getRelativeScheduledText = (scheduledAt?: string) => {
+  if (!scheduledAt) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const target = new Date(scheduledAt);
+  target.setHours(0, 0, 0, 0);
+  const diffDays = Math.ceil((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDays < 0) return { text: `${Math.abs(diffDays)}d overdue`, color: 'text-red-600 font-bold' };
+  if (diffDays === 0) return { text: 'Today', color: 'text-amber-600 font-bold' };
+  if (diffDays === 1) return { text: 'Tomorrow', color: 'text-blue-600 font-bold' };
+  return { text: `in ${diffDays}d`, color: 'text-txt-sub' };
+};
 
 export default function RemindersTable({
   reminders,
   loading,
+  businessId,
   onView,
   onEdit,
   onDelete,
-  totalCount,
-  page,
-  rowsPerPage,
-  onPageChange,
-  onRowsPerPageChange,
+  onRefresh,
 }: RemindersTableProps) {
-  // ─── Loading Skeleton ───────────────────────────────────────────────────
-  if (loading) {
-    return (
-      <TableContainer component={Paper} variant="outlined">
-        <Table>
-          <TableHead>
-            <TableRow>
-              {[
-                "Task",
-                "Subject",
-                "Task Type",
-                "Channel",
-                "Status",
-                "Scheduled At",
-                "Actions",
-              ].map((h) => (
-                <TableCell key={h}>
-                  <strong>{h}</strong>
-                </TableCell>
-              ))}
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {Array.from({ length: 5 }).map((_, i) => (
-              <TableRow key={i}>
-                {Array.from({ length: 7 }).map((_, j) => (
-                  <TableCell key={j}>
-                    <Skeleton variant="text" />
-                  </TableCell>
-                ))}
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
-    );
-  }
+  const columns: GridColumn<ReminderDetail>[] = useMemo(
+    () => [
+      {
+        headerName: 'Task',
+        colId: 'taskTitle',
+        valueGetter: (p) => p.data?.task?.title ?? '—',
+        minWidth: 220,
+        flex: 2,
+      },
+      {
+        headerName: 'Subject',
+        colId: 'subjectName',
+        valueGetter: (p) => p.data?.subject?.name ?? '—',
+        minWidth: 160,
+      },
+      {
+        headerName: 'Task Type',
+        field: 'taskType',
+        minWidth: 130,
+        cellRenderer: (p) => (
+          <span className="text-xs font-medium text-txt-main">
+            {p.value || '—'}
+          </span>
+        ),
+      },
+      {
+        headerName: 'Channel',
+        field: 'channel',
+        minWidth: 130,
+        cellRenderer: (p) => <ChannelRenderer channel={p.data?.channel} />,
+      },
+      {
+        headerName: 'Status',
+        field: 'status',
+        minWidth: 140,
+        editable: true,
+        cellEditor: 'agSelectCellEditor',
+        cellEditorParams: {
+          values: ['SCHEDULED', 'SENT', 'FAILED', 'CANCELLED'],
+        },
+        cellRenderer: (p) => {
+          const status = p.data?.status;
+          return (
+            <span
+              className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${getStatusBadge(
+                status
+              )}`}
+            >
+              {REMINDER_STATUS_LABELS[status ?? ''] ?? status}
+            </span>
+          );
+        },
+      },
+      {
+        headerName: 'Scheduled At',
+        field: 'scheduledAt',
+        minWidth: 180,
+        cellRenderer: (p) => {
+          if (!p.data?.scheduledAt) {
+            return <span className="text-xs text-txt-sub">Not scheduled</span>;
+          }
+          const date = new Date(p.data.scheduledAt);
+          const dateStr = date.toLocaleDateString('en-IN');
+          const timeStr = date.toLocaleTimeString('en-IN', {
+            hour: '2-digit',
+            minute: '2-digit',
+          });
+          const rel = getRelativeScheduledText(p.data.scheduledAt);
 
-  // ─── Empty State ────────────────────────────────────────────────────────
-  if (reminders.length === 0) {
-    return (
-      <Box sx={{ textAlign: "center", py: 8 }}>
-        <Typography variant="body1" color="text.secondary">
-          No reminders found. Create one to get started.
-        </Typography>
-      </Box>
-    );
-  }
+          return (
+            <div className="flex flex-col justify-center py-1 leading-tight">
+              <div className="flex items-center gap-1.5 font-mono text-xs font-semibold text-txt-main">
+                <span>{dateStr}</span>
+                <span className="text-[10px] text-txt-sub">{timeStr}</span>
+              </div>
+              {rel && (
+                <span className={`text-[10px] ${rel.color}`}>
+                  {rel.text}
+                </span>
+              )}
+            </div>
+          );
+        },
+      },
+    ],
+    []
+  );
 
-  const getTimeAgo = (dateStr: string) => {
-    const date = new Date(dateStr);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const actions: GridAction<ReminderDetail>[] = [
+    {
+      label: 'View',
+      icon: <Eye className="h-4 w-4" />,
+      variant: 'primary',
+      onClick: (row) => onView(row.id),
+    },
+    {
+      label: 'Edit',
+      icon: <Pencil className="h-4 w-4" />,
+      variant: 'secondary',
+      onClick: (row) => onEdit(row.id),
+    },
+    {
+      label: 'Delete',
+      icon: <Trash2 className="h-4 w-4" />,
+      variant: 'danger',
+      onClick: (row) => onDelete(row.id, row.task?.title || 'Reminder'),
+    },
+  ];
 
-    if (diffDays === 0) return "Today";
-    if (diffDays === 1) return "1 day ago";
-    if (diffDays > 1) return `${diffDays} days ago`;
-    if (diffDays === -1) return "Tomorrow";
-    return `in ${Math.abs(diffDays)} days`;
-  };
-
-  // ─── Table ──────────────────────────────────────────────────────────────
   return (
-    <TableContainer component={Paper} variant="outlined">
-      <Table>
-        <TableHead>
-          <TableRow
-            sx={{
-              backgroundColor: "#F8FAFC",
-            }}
-          >
-            {[
-              "Task",
-              "Subject",
-              "Task Type",
-              "Channel",
-              "Status",
-              "Scheduled At",
-              "Actions",
-            ].map((h) => (
-              <TableCell key={h}>
-                <Typography
-                  variant="caption"
-                  sx={{
-                    fontWeight: 700,
-                    color: "#475569",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.04em",
-                  }}
-                >
-                  {h}
-                </Typography>
-              </TableCell>
-            ))}
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {reminders.map((reminder) => (
-            <TableRow key={reminder.id} hover sx={{ cursor: "pointer" }}>
-              <TableCell>
-                <Typography variant="body2" fontWeight={500}>
-                  {reminder.task?.title ?? "—"}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Due:{" "}
-                  {reminder.task?.dueDate
-                    ? new Date(reminder.task.dueDate).toLocaleDateString()
-                    : "—"}
-                </Typography>
-              </TableCell>
-
-              <TableCell>
-                <Typography variant="body2">
-                  {reminder.subject?.name ?? "—"}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  {reminder.subject?.type ?? ""}
-                </Typography>
-              </TableCell>
-
-              <TableCell>
-                {reminder.taskType ? (
-                  <Chip
-                    label={reminder.taskType}
-                    size="small"
-                    sx={{
-                      bgcolor: "#EFF6FF",
-                      color: "#2563EB",
-                      border: "1px solid #DBEAFE",
-                      fontWeight: 600,
-                      fontSize: "0.72rem",
-                    }}
-                  />
-                ) : (
-                  <Typography variant="body2" color="text.disabled">
-                    —
-                  </Typography>
-                )}
-              </TableCell>
-
-              <TableCell>
-                <Chip
-                  label={
-                    REMINDER_CHANNEL_LABELS[
-                      reminder.channel as keyof typeof REMINDER_CHANNEL_LABELS
-                    ] ?? reminder.channel
-                  }
-                  size="small"
-                  sx={{
-                    bgcolor: "#F8FAFC",
-                    color: "#475569",
-
-                    border: "1px solid",
-                    borderColor: "divider",
-
-                    fontWeight: 600,
-                    fontSize: "0.72rem",
-                  }}
-                />
-              </TableCell>
-
-              <TableCell>
-                <Chip
-                  label={
-                    REMINDER_STATUS_LABELS[
-                      reminder.status as keyof typeof REMINDER_STATUS_LABELS
-                    ] ?? reminder.status
-                  }
-                  size="small"
-                  sx={{
-                    bgcolor:
-                      reminder.status === "SENT"
-                        ? "#E8F5E9"
-                        : reminder.status === "SCHEDULED"
-                          ? "#FFF7ED"
-                          : reminder.status === "FAILED"
-                            ? "#FEF2F2"
-                            : "#F1F5F9",
-
-                    color:
-                      reminder.status === "SENT"
-                        ? "#2E7D32"
-                        : reminder.status === "SCHEDULED"
-                          ? "#EA580C"
-                          : reminder.status === "FAILED"
-                            ? "#DC2626"
-                            : "#64748B",
-
-                    border: "1px solid",
-                    borderColor: "divider",
-
-                    fontWeight: 600,
-                    fontSize: "0.72rem",
-                  }}
-                />
-              </TableCell>
-
-              <TableCell>
-                {reminder.scheduledAt ? (
-                  <Box>
-                    <Typography variant="body2" fontWeight={500}>
-                      {new Date(reminder.scheduledAt).toLocaleDateString(
-                        "en-IN",
-                        {
-                          day: "2-digit",
-                          month: "short",
-                          year: "numeric",
-                        },
-                      )}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {getTimeAgo(reminder.scheduledAt)}
-                    </Typography>
-                  </Box>
-                ) : (
-                  "—"
-                )}
-              </TableCell>
-
-              <TableCell>
-                <Tooltip title="View Details">
-                  <IconButton
-                    size="small"
-                    onClick={() => onView(reminder.id)}
-                    sx={{
-                      color: "text.secondary",
-
-                      "&:hover": {
-                        color: "primary.main",
-                        backgroundColor: "#F1F5F9",
-                      },
-                    }}
-                  >
-                    <ViewIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-                <Tooltip title="Edit">
-                  <IconButton
-                    size="small"
-                    onClick={() => onEdit(reminder.id)}
-                    sx={{
-                      color: "text.secondary",
-
-                      "&:hover": {
-                        color: "primary.main",
-                        backgroundColor: "#F1F5F9",
-                      },
-                    }}
-                  >
-                    {" "}
-                    <EditIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-                <Tooltip title="Delete">
-                  <IconButton
-                    size="small"
-                    onClick={() =>
-                      onDelete(
-                        reminder.id,
-                        reminder.task?.title ?? "this reminder",
-                      )
-                    }
-                    sx={{
-                      color: "#94A3B8",
-                      "&:hover": {
-                        color: "#DC2626",
-                        backgroundColor: "#FEF2F2",
-                      },
-                    }}
-                  >
-                    <DeleteIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-
-      <TablePaginationBar
-        totalCount={totalCount}
-        page={page}
-        rowsPerPage={rowsPerPage}
-        onPageChange={onPageChange}
-        onRowsPerPageChange={onRowsPerPageChange}
-      />
-    </TableContainer>
+    <CommonDataGrid<ReminderDetail>
+      rowData={reminders}
+      columns={columns}
+      actions={actions}
+      isLoading={loading}
+      onRowClick={(row) => onView(row.id)}
+      onRowDoubleClick={(row) => onEdit(row.id)}
+      onUpdateCell={async ({ row, field, newValue }) => {
+        if (!businessId) return;
+        await updateReminder(businessId, row.id, {
+          [field]: newValue,
+        });
+        onRefresh?.();
+      }}
+      emptyMessage="No reminders found"
+    />
   );
 }
-   

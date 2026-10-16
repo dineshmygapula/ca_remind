@@ -66,9 +66,9 @@ function FieldWrapper({
     children: ReactNode;
 }) {
     return (
-        <div className={`flex flex-col gap-1 ${widthClass ?? 'min-w-[160px] flex-1'}`}>
+        <div className={`flex flex-col gap-1.5 ${widthClass ?? 'min-w-[160px] flex-1'}`}>
             {label && (
-                <label className="text-xs font-semibold text-[var(--text-secondary)] tracking-wide">
+                <label className="text-xs font-semibold text-slate-700 dark:text-txt-main tracking-wide">
                     {label}
                 </label>
             )}
@@ -92,22 +92,24 @@ export default function FilterBar({
 }: FilterBarProps) {
     return (
         <div
-            className={`rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 py-4 shadow-sm ${className}`}
+            className={`rounded-2xl border border-slate-200/80 dark:border-divider bg-white dark:bg-surface px-5 py-4 shadow-xs ${className}`}
         >
             <div className="flex flex-wrap items-end gap-4">
                 {/* Search */}
                 {showSearch && (
-                    <div className="min-w-[220px] flex-[2]">
-                        <div className="relative">
-                            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-secondary)]" />
-                            <input
-                                type="text"
-                                value={searchValue}
-                                onChange={(e) => onSearchChange(e.target.value)}
-                                placeholder={searchPlaceholder}
-                                className="h-10 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] pl-9 pr-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/15 transition-colors"
-                            />
-                        </div>
+                    <div className="min-w-[240px] flex-[2]">
+                        <FieldWrapper label="Search" widthClass="w-full">
+                            <div className="relative">
+                                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                                <input
+                                    type="text"
+                                    value={searchValue}
+                                    onChange={(e) => onSearchChange(e.target.value)}
+                                    placeholder={searchPlaceholder}
+                                    className="h-10 w-full rounded-xl border border-slate-200 dark:border-divider bg-white dark:bg-surface pl-9 pr-3 text-sm text-slate-900 dark:text-txt-main placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/15 transition-colors"
+                                />
+                            </div>
+                        </FieldWrapper>
                     </div>
                 )}
 
@@ -118,7 +120,7 @@ export default function FilterBar({
                             <select
                                 value={filter.value}
                                 onChange={(e) => filter.onChange(e.target.value)}
-                                className="h-10 w-full appearance-none rounded-xl border border-[var(--border)] bg-[var(--surface)] pl-3 pr-8 text-sm font-medium text-[var(--text-primary)] focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/15 transition-colors cursor-pointer"
+                                className="h-10 w-full appearance-none rounded-xl border border-slate-200 dark:border-divider bg-white dark:bg-surface pl-3 pr-8 text-sm font-medium text-slate-900 dark:text-txt-main focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/15 transition-colors cursor-pointer"
                             >
                                 {filter.options.map((opt) => (
                                     <option key={opt.value} value={opt.value}>
@@ -127,7 +129,7 @@ export default function FilterBar({
                                 ))}
                             </select>
                             {/* Chevron */}
-                            <svg className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-secondary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <svg className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                             </svg>
                         </div>
@@ -141,9 +143,9 @@ export default function FilterBar({
                     <button
                         type="button"
                         onClick={onReset}
-                        className="flex items-center gap-1.5 h-10 px-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-sm font-semibold text-[var(--text-primary)] hover:border-[var(--primary)]/50 hover:bg-[var(--bg)] transition-colors cursor-pointer self-end"
+                        className="flex items-center gap-2 h-10 px-4 rounded-xl border border-slate-200 dark:border-divider bg-white dark:bg-surface text-sm font-medium text-slate-700 dark:text-txt-main hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer self-end shrink-0"
                     >
-                        <RotateCcw className="h-4 w-4" />
+                        <RotateCcw className="h-4 w-4 text-slate-600 dark:text-slate-400" />
                         Reset
                     </button>
                 )}

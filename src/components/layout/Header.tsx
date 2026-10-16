@@ -27,8 +27,6 @@ import { signOut } from "firebase/auth";
 import { auth } from "@/config/firebase";
 import { useAuth } from "@/context/AuthContext";
 import { Logo } from "../common/Logo";
-import UserProfileDialog from "../users/UserProfileDialog";
-import BusinessProfileDialog from "../business/BusinessProfileDialog";
 import { useClickOutside } from "@/hooks/useClickOutside";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -157,15 +155,11 @@ function PeopleDropdown({ pathname, onNavigate }: PeopleDropdownProps) {
 interface ProfileDropdownProps {
   email: string;
   onNavigate: (href: string) => void;
-  onUserProfile: () => void;
-  onBusinessProfile: () => void;
 }
 
 function ProfileDropdown({
   email,
   onNavigate,
-  onUserProfile,
-  onBusinessProfile,
 }: ProfileDropdownProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -183,8 +177,8 @@ function ProfileDropdown({
     {
       heading: "PROFILE",
       items: [
-        { label: "User Profile", icon: User, onClick: onUserProfile },
-        { label: "Business Profile", icon: Building2, onClick: onBusinessProfile },
+        { label: "User Profile", icon: User, href: "/user-profile" },
+        { label: "Business Profile", icon: Building2, href: "/business-profile" },
       ],
     },
     {
@@ -286,8 +280,6 @@ function ProfileDropdown({
 
 export function Header() {
   const [isDark, setIsDark] = useState(false);
-  const [isUserProfileOpen, setIsUserProfileOpen] = useState(false);
-  const [isBusinessProfileOpen, setIsBusinessProfileOpen] = useState(false);
 
   const { user } = useAuth();
   const router = useRouter();
@@ -347,8 +339,6 @@ export function Header() {
           <ProfileDropdown
             email={user.email ?? "U"}
             onNavigate={goTo}
-            onUserProfile={() => setIsUserProfileOpen(true)}
-            onBusinessProfile={() => setIsBusinessProfileOpen(true)}
           />
         ) : (
           <button
@@ -360,16 +350,6 @@ export function Header() {
           </button>
         )}
       </div>
-
-      {/* Modals */}
-      <UserProfileDialog
-        open={isUserProfileOpen}
-        onClose={() => setIsUserProfileOpen(false)}
-      />
-      <BusinessProfileDialog
-        open={isBusinessProfileOpen}
-        onClose={() => setIsBusinessProfileOpen(false)}
-      />
     </header>
   );
 }

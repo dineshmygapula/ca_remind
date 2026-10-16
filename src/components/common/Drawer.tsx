@@ -13,13 +13,22 @@ export interface DrawerProps {
   eyebrow?: string;
   title: string;
 
+  /** Badge displayed beside title (e.g. status) */
+  badge?: ReactNode;
+
   /** Icon rendered in the coloured icon badge in the header */
   icon?: ReactNode;
+
+  /** Extra action buttons rendered in header beside close button (e.g. edit button) */
+  headerActions?: ReactNode;
 
   /** Width of the drawer panel. Defaults to 'md'. */
   width?: 'sm' | 'md' | 'lg' | 'xl';
 
   children: ReactNode;
+
+  /** Custom footer node. If provided, replaces default onCancel/onSubmit footer buttons. */
+  footer?: ReactNode;
 
   // ── Footer (omit both to skip footer entirely) ──────────────────────────────
   onCancel?: () => void;
@@ -54,9 +63,12 @@ export default function Drawer({
   onClose,
   eyebrow,
   title,
+  badge,
   icon,
+  headerActions,
   width = 'md',
   children,
+  footer,
   onCancel,
   onSubmit,
   cancelLabel = 'Cancel',
@@ -75,7 +87,7 @@ export default function Drawer({
   }, [open]);
 
   const handleCancel = onCancel ?? onClose;
-  const showFooter = Boolean(onSubmit || onCancel);
+  const showFooter = Boolean(footer || onSubmit || onCancel);
 
   return (
     <>
@@ -116,21 +128,27 @@ export default function Drawer({
                   {eyebrow}
                 </p>
               )}
-              <h2 className="text-base font-extrabold leading-tight tracking-tight truncate">
-                {title}
-              </h2>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-base font-extrabold leading-tight tracking-tight truncate">
+                  {title}
+                </h2>
+                {badge}
+              </div>
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={submitting}
-            aria-label="Close drawer"
-            className="z-10 ml-4 shrink-0 rounded-xl bg-white/10 border border-white/20 p-1.5 transition-all hover:bg-white/25 hover:scale-105 disabled:opacity-40"
-          >
-            <X className="h-4 w-4" />
-          </button>
+          <div className="z-10 ml-4 flex items-center gap-1.5 shrink-0">
+            {headerActions}
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={submitting}
+              aria-label="Close drawer"
+              className="rounded-xl bg-white/10 border border-white/20 p-1.5 transition-all hover:bg-white/25 hover:scale-105 disabled:opacity-40"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
         {/* ── Body ────────────────────────────────────────────────────────── */}
@@ -139,7 +157,11 @@ export default function Drawer({
         </div>
 
         {/* ── Footer ──────────────────────────────────────────────────────── */}
-        {showFooter && (
+        {footer ? (
+          <div className="shrink-0 border-t border-[var(--border)] bg-[var(--surface)] px-6 py-4">
+            {footer}
+          </div>
+        ) : showFooter ? (
           <div className="shrink-0 flex gap-3 border-t border-[var(--border)] bg-[var(--surface)] px-6 py-4">
             <button
               type="button"
@@ -161,7 +183,7 @@ export default function Drawer({
               </button>
             )}
           </div>
-        )}
+        ) : null}
       </div>
     </>
   );

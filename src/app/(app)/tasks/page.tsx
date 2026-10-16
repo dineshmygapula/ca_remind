@@ -10,6 +10,7 @@ import { useTasks } from '@/hooks/tasks/useTasks';
 import { useTaskFilters } from '@/hooks/tasks/useTaskFilters';
 import PageFilterBar from '@/components/common/PageFilter';
 import TaskFormDialog from '@/components/tasks/TaskFormDialogue';
+import TaskDetailsDrawer from '@/components/tasks/TaskDetailsDrawer';
 import ConfirmDialog from '@/components/tasks/ConfirmDialog';
 import { updateTask } from '@/services/taskService';
 import { TASK_TYPES } from '@/constants/taskConstants';
@@ -74,19 +75,24 @@ export default function TasksPage() {
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
 
   const handleView = (taskId: string) => {
+    setFormDialogOpen(false);
+    setEditingTaskId(null);
     setSelectedTaskId(taskId);
     setDrawerOpen(true);
   };
 
   const handleCreate = () => {
+    setSelectedTaskId(null);
+    setDrawerOpen(false);
     setEditingTaskId(null);
     setFormDialogOpen(true);
   };
 
   const handleEdit = (taskId: string) => {
+    setSelectedTaskId(null);
+    setDrawerOpen(false);
     setEditingTaskId(taskId);
     setFormDialogOpen(true);
-    setDrawerOpen(false);
   };
 
   const closeForm = () => {
@@ -187,6 +193,18 @@ export default function TasksPage() {
             refetch();
           }}
           emptyMessage="No tasks found"
+        />
+
+        <TaskDetailsDrawer
+          open={drawerOpen}
+          taskId={selectedTaskId}
+          businessId={businessId!}
+          onClose={() => {
+            setDrawerOpen(false);
+            setSelectedTaskId(null);
+          }}
+          onEdit={handleEdit}
+          onRefresh={refetch}
         />
 
         <TaskFormDialog

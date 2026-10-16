@@ -25,8 +25,6 @@ import InfoIcon from "@mui/icons-material/Info";
 import PolicyIcon from "@mui/icons-material/Policy";
 import HelpIcon from "@mui/icons-material/Help";
 import { useRouter } from "next/navigation";
-import UserProfileDialog from "../../users/UserProfileDialog";
-import BusinessProfileDialog from "../../business/BusinessProfileDialog";
 
 interface Props {
   userName: string;
@@ -35,8 +33,6 @@ interface Props {
 
 export default function UserDropdown({ userName, onLogout }: Props) {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const [profileDialogOpen, setProfileDialogOpen] = useState(false);
-  const [businessDialogOpen, setBusinessDialogOpen] = useState(false);
 
   const open = Boolean(anchorEl);
   const router = useRouter();
@@ -45,7 +41,7 @@ export default function UserDropdown({ userName, onLogout }: Props) {
 
   const handleProfileClick = () => {
     handleClose();
-    setProfileDialogOpen(true);
+    router.push("/user-profile");
   };
 
   const navigate = (path: string) => {
@@ -83,21 +79,24 @@ export default function UserDropdown({ userName, onLogout }: Props) {
         anchorEl={anchorEl}
         open={open}
         onClose={handleClose}
-        PaperProps={{
-          sx: {
-            width: 260,
-            maxHeight: 500,
-            mt: 1, // ✅ ADDED: small gap between AppBar and menu
-            boxShadow: "0 4px 16px rgba(26,47,94,0.14)", // ✅ ADDED: themed navy shadow
-            border: "1px solid",
-            borderColor: "divider", // ✅ ADDED: subtle border around dropdown
+        slotProps={{
+          paper: {
+            sx: {
+              width: 260,
+              maxHeight: 500,
+              mt: 1, // ✅ ADDED: small gap between AppBar and menu
+              boxShadow: "0 4px 16px rgba(26,47,94,0.14)", // ✅ ADDED: themed navy shadow
+              border: "1px solid",
+              borderColor: "divider", // ✅ ADDED: subtle border around dropdown
+            },
           },
         }}
       >
         {/* PROFILE */}
-        <Box px={2} pt={1}>
+        <Box sx={{ px: 2, pt: 1 }}>
           <Typography
             variant="caption"
+            component="div"
             sx={{
               color: "primary.main", // ✅ CHANGED: "text.secondary" → primary navy for section labels
               fontWeight: 700,
@@ -119,7 +118,7 @@ export default function UserDropdown({ userName, onLogout }: Props) {
         <MenuItem
           onClick={() => {
             handleClose();
-            setBusinessDialogOpen(true);
+            router.push("/business-profile");
           }}
         >
           <ListItemIcon>
@@ -132,9 +131,10 @@ export default function UserDropdown({ userName, onLogout }: Props) {
         <Divider />
 
         {/* MANAGEMENT */}
-        <Box px={2} pt={1}>
+        <Box sx={{ px: 2, pt: 1 }}>
           <Typography
             variant="caption"
+            component="div"
             sx={{
               color: "primary.main", // ✅ CHANGED: "text.secondary" → primary navy
               fontWeight: 700,
@@ -171,9 +171,10 @@ export default function UserDropdown({ userName, onLogout }: Props) {
         <Divider />
 
         {/* PREFERENCES */}
-        <Box px={2} pt={1}>
+        <Box sx={{ px: 2, pt: 1 }}>
           <Typography
             variant="caption"
+            component="div"
             sx={{
               color: "primary.main", // ✅ CHANGED: "text.secondary" → primary navy
               fontWeight: 700,
@@ -205,9 +206,10 @@ export default function UserDropdown({ userName, onLogout }: Props) {
 
         <Divider />
           {/* Support */}
-        <Box px={2} pt={1}>
+        <Box sx={{ px: 2, pt: 1 }}>
           <Typography
             variant="caption"
+            component="div"
             sx={{
               color: "primary.main", // ✅ CHANGED: "text.secondary" → primary navy
               fontWeight: 700,
@@ -269,15 +271,6 @@ export default function UserDropdown({ userName, onLogout }: Props) {
           Sign Out
         </MenuItem>
       </Menu>
-
-      <UserProfileDialog
-        open={profileDialogOpen}
-        onClose={() => setProfileDialogOpen(false)}
-      />
-      <BusinessProfileDialog
-        open={businessDialogOpen}
-        onClose={() => setBusinessDialogOpen(false)}
-      />
     </>
   );
 }

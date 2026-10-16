@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { useAuth } from "@/context/AuthContext";
-import { TaskDefinitionListItem } from "../../../types/taskDefinition.types";
+import { X } from "lucide-react";
+import { TaskDefinitionListItem } from "@/types/taskDefinition.types";
 import {
   getTaskDefinitions,
   deleteTaskDefinition,
@@ -10,7 +10,8 @@ import {
 import TaskDefinitionsTable from "@/components/task-definitions/TaskDefinitionsTable";
 import TaskDefinitionsFilter from "@/components/task-definitions/TaskDefinitionsFilter";
 import TaskDefinitionDetailsDrawer from "@/components/task-definitions/TaskDefinitionDetailsDrawer";
-import EditTaskDefinitionDialog from "@/components/task-definitions/EditTaskDefinitionDialog";
+import TaskDefinitionFormDrawer from "@/components/task-definitions/TaskDefinitionFormDrawer";
+import ConfirmDialog from "@/components/tasks/ConfirmDialog";
 import { useWorkspace } from "@/context/WorkspaceContext";
 
 export default function TaskDefinitionsPage() {
@@ -21,13 +22,14 @@ export default function TaskDefinitionsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const [selectedDefinitionId, setSelectedDefinitionId] = useState<string | null>(
-    null,
-  );
+  const [selectedDefinitionId, setSelectedDefinitionId] = useState<string | null>(null);
   const [drawerRefreshKey, setDrawerRefreshKey] = useState(0);
 
   // Drawer and dialog state
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [formDrawerOpen, setFormDrawerOpen] = useState(false);
+  const [editingDefinitionId, setEditingDefinitionId] = useState<string | null>(null);
+
   const [deleteTarget, setDeleteTarget] = useState<{
     id: string;
     name: string;
@@ -36,17 +38,9 @@ export default function TaskDefinitionsPage() {
 
   // Filter state
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"ALL" | "ACTIVE" | "INACTIVE">(
-    "ALL",
-  );
+  const [statusFilter, setStatusFilter] = useState<"ALL" | "ACTIVE" | "INACTIVE">("ALL");
   const [scheduleFilter, setScheduleFilter] = useState("");
-  const [autoCreateFilter, setAutoCreateFilter] = useState<"ALL" | "ON" | "OFF">(
-    "ALL",
-  );
-  const [openEditDialog, setOpenEditDialog] = useState(false);
-  const [editingDefinitionId, setEditingDefinitionId] = useState<string | null>(
-    null,
-  );
+  const [autoCreateFilter, setAutoCreateFilter] = useState<"ALL" | "ON" | "OFF">("ALL");
 
   const fetchDefinitions = useCallback(async () => {
     if (!businessId) return;
@@ -59,7 +53,7 @@ export default function TaskDefinitionsPage() {
       setDrawerRefreshKey((prev) => prev + 1);
     } catch (err: unknown) {
       setError(
-        err instanceof Error ? err.message : "Failed to load task definitions",
+        err instanceof Error ? err.message : "Failed to load task definitions"
       );
     } finally {
       setLoading(false);
@@ -78,7 +72,7 @@ export default function TaskDefinitionsPage() {
       result = result.filter(
         (def) =>
           def.name?.toLowerCase().includes(q) ||
-          def.taskType?.toLowerCase().includes(q),
+          def.taskType?.toLowerCase().includes(q)
       );
     }
 
@@ -124,7 +118,7 @@ export default function TaskDefinitionsPage() {
       await fetchDefinitions();
     } catch (err: unknown) {
       setError(
-        err instanceof Error ? err.message : "Failed to delete task definition",
+        err instanceof Error ? err.message : "Failed to delete task definition"
       );
     } finally {
       setDeleteLoading(false);
@@ -132,6 +126,8 @@ export default function TaskDefinitionsPage() {
   };
 
   const handleView = (definitionId: string) => {
+    setFormDrawerOpen(false);
+    setEditingDefinitionId(null);
     setSelectedDefinitionId(definitionId);
     setDrawerOpen(true);
   };
@@ -142,182 +138,130 @@ export default function TaskDefinitionsPage() {
   };
 
   const handleEdit = (definitionId: string) => {
-    setEditingDefinitionId(definitionId);
-    setOpenEditDialog(true);
     setDrawerOpen(false);
+    setSelectedDefinitionId(null);
+    setEditingDefinitionId(definitionId);
+    setFormDrawerOpen(true);
   };
 
   if (!businessId) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center bg-base-200">
+      <div className="flex min-h-[60vh] items-center justify-center bg-bg">
         <span className="loading loading-spinner loading-lg text-primary" />
       </div>
     );
   }
 
   return (
-    <main className="min-h-screen bg-base-200 py-8">
-      <div className="mx-auto w-full max-w-screen-2xl px-4 sm:px-6 lg:px-8">
-        <div className="space-y-6">
-          {/* Header */}
-          <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h1 className="text-2xl font-semibold tracking-tight text-base-content">
-                Automatic Task &amp; Reminders
-              </h1>
-              <p className="mt-1 text-sm text-base-content/70">
-                Configure rules to automatically create recurring tasks and reminders.
-              </p>
-            </div>
-          </header>
-
-          {/* Error */}
-          {error && (
-            <div role="alert" className="alert alert-error">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5 shrink-0"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M12 9v3m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"
-                />
-              </svg>
-              <span>{error}</span>
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                aria-label="Dismiss error"
-                onClick={() => setError("")}
-              >
-                ✕
-              </button>
-            </div>
-          )}
-
-          {/* Filters */}
-          <TaskDefinitionsFilter
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-            statusFilter={statusFilter}
-            onStatusChange={setStatusFilter}
-            scheduleFilter={scheduleFilter}
-            onScheduleChange={setScheduleFilter}
-            autoCreateFilter={autoCreateFilter}
-            onAutoCreateChange={setAutoCreateFilter}
-          />
-
-          {/* Results count */}
-          {!loading && (
-            <p className="text-sm text-base-content/70">
-              Showing {filteredDefinitions.length} of {definitions.length} definitions
+    <div className="min-h-screen bg-bg py-8">
+      <div className="mx-auto max-w-7xl space-y-6 px-4">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-semibold text-txt-main">
+              Automatic Task &amp; Reminders
+            </h1>
+            <p className="mt-1 text-sm text-txt-sub">
+              Configure rules to automatically create recurring tasks and reminders
             </p>
-          )}
-
-          {/* Table */}
-          <TaskDefinitionsTable
-            definitions={filteredDefinitions}
-            loading={loading}
-            businessId={businessId}
-            onView={handleView}
-            onEdit={handleEdit}
-            onDelete={handleDeleteRequest}
-            onRefresh={fetchDefinitions}
-          />
-
-          {/* Existing details drawer */}
-          <TaskDefinitionDetailsDrawer
-            open={drawerOpen}
-            onClose={handleDrawerClose}
-            definitionId={selectedDefinitionId}
-            businessId={businessId}
-            onEdit={handleEdit}
-            onRefresh={fetchDefinitions}
-            refreshKey={drawerRefreshKey}
-          />
-
-          {/* Existing edit flow */}
-          <EditTaskDefinitionDialog
-            open={openEditDialog}
-            onClose={() => setOpenEditDialog(false)}
-            definitionId={editingDefinitionId}
-            businessId={businessId}
-            onSuccess={() => {
-              fetchDefinitions();
-              setOpenEditDialog(false);
-            }}
-          />
-
-          {/* DaisyUI delete confirmation modal */}
-          {deleteTarget && (
-            <div
-              className="modal modal-open"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="delete-definition-title"
-            >
-              <button
-                type="button"
-                className="modal-backdrop"
-                aria-label="Close delete confirmation"
-                disabled={deleteLoading}
-                onClick={() => !deleteLoading && setDeleteTarget(null)}
-              >
-                Close
-              </button>
-
-              <div className="modal-box max-w-md rounded-2xl border border-base-300 p-0 shadow-2xl">
-                <div className="border-b border-base-300 px-6 py-5">
-                  <h2
-                    id="delete-definition-title"
-                    className="text-lg font-bold text-base-content"
-                  >
-                    Delete Task Definition
-                  </h2>
-                  <p className="mt-1 text-sm text-base-content/60">
-                    This action cannot be undone.
-                  </p>
-                </div>
-
-                <div className="px-6 py-5 text-sm leading-6 text-base-content/80">
-                  Are you sure you want to delete{" "}
-                  <strong className="font-semibold text-base-content">
-                    {deleteTarget.name}
-                  </strong>
-                  ?
-                </div>
-
-                <div className="flex flex-col-reverse gap-3 border-t border-base-300 bg-base-200/50 px-6 py-4 sm:flex-row sm:justify-end">
-                  <button
-                    type="button"
-                    className="btn btn-outline"
-                    onClick={() => setDeleteTarget(null)}
-                    disabled={deleteLoading}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-error text-white"
-                    onClick={handleDeleteConfirm}
-                    disabled={deleteLoading}
-                  >
-                    {deleteLoading && (
-                      <span className="loading loading-spinner loading-sm" />
-                    )}
-                    {deleteLoading ? "Deleting..." : "Delete"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
+          </div>
         </div>
+
+        {/* Error Alert */}
+        {error && (
+          <div role="alert" className="alert alert-error flex items-center justify-between text-sm">
+            <span>{error}</span>
+            <button
+              type="button"
+              className="btn btn-ghost btn-xs btn-circle"
+              aria-label="Dismiss error"
+              onClick={() => setError("")}
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+
+        {/* Filters */}
+        <TaskDefinitionsFilter
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          statusFilter={statusFilter}
+          onStatusChange={setStatusFilter}
+          scheduleFilter={scheduleFilter}
+          onScheduleChange={setScheduleFilter}
+          autoCreateFilter={autoCreateFilter}
+          onAutoCreateChange={setAutoCreateFilter}
+          onReset={() => {
+            setSearchQuery("");
+            setStatusFilter("ALL");
+            setScheduleFilter("");
+            setAutoCreateFilter("ALL");
+          }}
+        />
+
+        {/* Results count */}
+        {!loading && (
+          <p className="text-sm text-txt-sub">
+            Showing {filteredDefinitions.length} of {definitions.length} definitions
+          </p>
+        )}
+
+        {/* Table using CommonDataGrid */}
+        <TaskDefinitionsTable
+          definitions={filteredDefinitions}
+          loading={loading}
+          businessId={businessId}
+          onView={handleView}
+          onEdit={handleEdit}
+          onDelete={handleDeleteRequest}
+          onRefresh={fetchDefinitions}
+        />
+
+        {/* View Details Drawer */}
+        <TaskDefinitionDetailsDrawer
+          open={drawerOpen}
+          onClose={handleDrawerClose}
+          definitionId={selectedDefinitionId}
+          businessId={businessId}
+          onEdit={handleEdit}
+          onRefresh={fetchDefinitions}
+          refreshKey={drawerRefreshKey}
+        />
+
+        {/* Unified Right-Side Form Drawer (Edit / Create) */}
+        <TaskDefinitionFormDrawer
+          open={formDrawerOpen}
+          onClose={() => {
+            setFormDrawerOpen(false);
+            setEditingDefinitionId(null);
+          }}
+          definitionId={editingDefinitionId}
+          businessId={businessId}
+          onSuccess={() => {
+            fetchDefinitions();
+            setFormDrawerOpen(false);
+            setEditingDefinitionId(null);
+          }}
+        />
+
+        {/* Delete Confirmation Dialog */}
+        <ConfirmDialog
+          open={!!deleteTarget}
+          title="Delete Task Definition"
+          description={
+            <>
+              Are you sure you want to delete <strong>{deleteTarget?.name}</strong>? This
+              action cannot be undone.
+            </>
+          }
+          confirmLabel="Delete"
+          variant="danger"
+          loading={deleteLoading}
+          onConfirm={handleDeleteConfirm}
+          onCancel={() => setDeleteTarget(null)}
+        />
       </div>
-    </main>
+    </div>
   );
 }
