@@ -1,13 +1,13 @@
 'use client';
 
-import { useMemo } from 'react';
-import { Eye, Pencil, Trash2, Mail, MessageSquare, Smartphone, Bell } from 'lucide-react';
+import React, { useMemo } from 'react';
+import { Eye, Pencil, Trash2, Mail, Smartphone, Bell, Calendar } from 'lucide-react';
 import CommonDataGrid, { GridAction, GridColumn } from '@/components/common/CommonTable';
 import { ReminderDetail, ReminderStatus } from '@/types/reminders.types';
 import { updateReminder } from '@/services/reminderService';
+import WhatsAppIcon from '@/components/common/WhatsAppIcon';
 import {
   REMINDER_STATUS_LABELS,
-  REMINDER_CHANNEL_LABELS,
 } from '@/constants/reminderConstants';
 
 interface RemindersTableProps {
@@ -20,67 +20,133 @@ interface RemindersTableProps {
   onRefresh?: () => void;
 }
 
-const getStatusBadge = (status?: ReminderStatus) => {
+// ─── Task Type Styling Helpers (Matching Task Definitions) ───
+function getTaskTypePrefix(val?: string) {
+  if (!val) return 'TASK';
+  const upper = val.toUpperCase();
+  if (upper.includes('GST')) return 'GST';
+  if (upper.includes('TDS')) return 'TDS';
+  if (upper.includes('ITR')) return 'ITR';
+  if (upper.includes('ROC')) return 'ROC';
+  if (upper.includes('MSME')) return 'MSME';
+  return val.split('_')[0] || 'TASK';
+}
+
+function getTaskTypeBadgeClass(val?: string) {
+  const prefix = getTaskTypePrefix(val);
+  if (prefix === 'TDS') return 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300';
+  if (prefix === 'ITR') return 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300';
+  if (prefix === 'GST') return 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300';
+  if (prefix === 'ROC') return 'bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300';
+  return 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300';
+}
+
+// ─── Channel Badge Renderer with authentic WhatsApp Icon ─────
+function ChannelBadge({ channel }: { channel?: string }) {
+  const ch = (channel || '').toUpperCase();
+
+  if (ch === 'WHATSAPP') {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[#ecfdf5] text-[#047857] dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/40 shadow-2xs">
+        <WhatsAppIcon size={14} className="fill-current shrink-0 text-[#047857] dark:text-emerald-300" />
+        <span>WhatsApp</span>
+      </span>
+    );
+  }
+
+  if (ch === 'EMAIL') {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[#eff6ff] text-[#1d4ed8] dark:bg-blue-950/50 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800/40 shadow-2xs">
+        <Mail className="h-3.5 w-3.5 shrink-0" />
+        <span>Email</span>
+      </span>
+    );
+  }
+
+  if (ch === 'SMS') {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[#eef2ff] text-[#4338ca] dark:bg-indigo-950/50 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/40 shadow-2xs">
+        <Smartphone className="h-3.5 w-3.5 shrink-0" />
+        <span>SMS</span>
+      </span>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200/60 shadow-2xs">
+      <Bell className="h-3.5 w-3.5 shrink-0" />
+      <span>{channel || '—'}</span>
+    </span>
+  );
+}
+
+// ─── Status Badge Renderer (Matching DaisyUI & Task Definitions) ───
+function StatusBadge({ status }: { status?: ReminderStatus }) {
   switch (status) {
     case 'SENT':
-      return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#ecfdf5] text-[#047857] dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200/60">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#10b981]" />
+          <span>Sent</span>
+        </span>
+      );
     case 'SCHEDULED':
-      return 'bg-amber-50 text-amber-700 border-amber-200';
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#fffbeb] text-[#b45309] dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200/60">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#f59e0b]" />
+          <span>Scheduled</span>
+        </span>
+      );
     case 'FAILED':
-      return 'bg-red-50 text-red-700 border-red-200';
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#fef2f2] text-[#dc2626] dark:bg-rose-950/40 dark:text-rose-400 border border-rose-200/60">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#ef4444]" />
+          <span>Failed</span>
+        </span>
+      );
     case 'CANCELLED':
-      return 'bg-slate-100 text-slate-600 border-slate-200';
-    default:
-      return 'bg-slate-50 text-slate-600 border-slate-200';
-  }
-};
-
-const ChannelRenderer = ({ channel }: { channel?: string }) => {
-  switch (channel?.toUpperCase()) {
-    case 'EMAIL':
       return (
-        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
-          <Mail className="h-3.5 w-3.5 text-blue-500" />
-          <span>Email</span>
-        </span>
-      );
-    case 'WHATSAPP':
-      return (
-        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-          <MessageSquare className="h-3.5 w-3.5 text-emerald-500" />
-          <span>WhatsApp</span>
-        </span>
-      );
-    case 'SMS':
-      return (
-        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
-          <Smartphone className="h-3.5 w-3.5 text-indigo-500" />
-          <span>SMS</span>
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border border-slate-200/60">
+          <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+          <span>Cancelled</span>
         </span>
       );
     default:
       return (
-        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-semibold bg-slate-50 text-slate-700 border border-slate-200">
-          <Bell className="h-3.5 w-3.5 text-slate-500" />
-          <span>{channel ?? '—'}</span>
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-50 text-slate-600 dark:bg-slate-800/50 dark:text-slate-400 border border-slate-200">
+          <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+          <span>{status || '—'}</span>
         </span>
       );
   }
-};
+}
 
-const getRelativeScheduledText = (scheduledAt?: string) => {
+// ─── Date Difference Helper ─────────────────────────────────
+function getRelativeDateDiff(scheduledAt?: string) {
   if (!scheduledAt) return null;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const target = new Date(scheduledAt);
   target.setHours(0, 0, 0, 0);
-  const diffDays = Math.ceil((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-  if (diffDays < 0) return { text: `${Math.abs(diffDays)}d overdue`, color: 'text-red-600 font-bold' };
-  if (diffDays === 0) return { text: 'Today', color: 'text-amber-600 font-bold' };
-  if (diffDays === 1) return { text: 'Tomorrow', color: 'text-blue-600 font-bold' };
-  return { text: `in ${diffDays}d`, color: 'text-txt-sub' };
-};
+  return Math.ceil((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+}
 
+function formatScheduledDate(dateStr?: string) {
+  if (!dateStr) return null;
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return null;
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = d.toLocaleDateString('en-US', { month: 'short' });
+    const year = d.getFullYear();
+    const time = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    return { formattedDate: `${day} ${month} ${year}`, time };
+  } catch {
+    return null;
+  }
+}
+
+// ─── Reminders Table Component ──────────────────────────────
 export default function RemindersTable({
   reminders,
   loading,
@@ -93,82 +159,121 @@ export default function RemindersTable({
   const columns: GridColumn<ReminderDetail>[] = useMemo(
     () => [
       {
-        headerName: 'Task',
-        colId: 'taskTitle',
-        valueGetter: (p) => p.data?.task?.title ?? '—',
-        minWidth: 220,
-        flex: 2,
+        headerName: 'Task & Client',
+        field: 'task',
+        minWidth: 260,
+        flex: 2.5,
+        cellRenderer: (p) => {
+          const row = p.data;
+          if (!row) return null;
+
+          const taskTitle = row.task?.title || 'Reminder Notification';
+          const clientName = row.subject?.name;
+          const taskType = row.taskType || row.task?.title || '';
+          const prefix = getTaskTypePrefix(taskType);
+          const badgeClass = getTaskTypeBadgeClass(taskType);
+
+          return (
+            <div className="flex items-center gap-3 py-1">
+              <span
+                className={`w-11 h-9 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 ${badgeClass}`}
+              >
+                {prefix}
+              </span>
+              <div className="flex flex-col min-w-0">
+                <span className="font-bold text-sm text-[var(--primary)] dark:text-slate-100 truncate">
+                  {taskTitle}
+                </span>
+                <span className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                  {clientName ? `Client: ${clientName}` : 'General reminder'}
+                </span>
+              </div>
+            </div>
+          );
+        },
       },
       {
-        headerName: 'Subject',
-        colId: 'subjectName',
-        valueGetter: (p) => p.data?.subject?.name ?? '—',
-        minWidth: 160,
+        headerName: 'Channel',
+        field: 'channel',
+        minWidth: 140,
+        flex: 1.1,
+        cellRenderer: (p) => <ChannelBadge channel={p.data?.channel} />,
       },
       {
         headerName: 'Task Type',
         field: 'taskType',
         minWidth: 130,
-        cellRenderer: (p) => (
-          <span className="text-xs font-medium text-txt-main">
-            {p.value || '—'}
-          </span>
-        ),
-      },
-      {
-        headerName: 'Channel',
-        field: 'channel',
-        minWidth: 130,
-        cellRenderer: (p) => <ChannelRenderer channel={p.data?.channel} />,
-      },
-      {
-        headerName: 'Status',
-        field: 'status',
-        minWidth: 140,
-        editable: true,
-        cellEditor: 'agSelectCellEditor',
-        cellEditorParams: {
-          values: ['SCHEDULED', 'SENT', 'FAILED', 'CANCELLED'],
-        },
+        flex: 1,
         cellRenderer: (p) => {
-          const status = p.data?.status;
+          const val = p.value || p.data?.task?.title;
+          const prefix = getTaskTypePrefix(val);
           return (
-            <span
-              className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${getStatusBadge(
-                status
-              )}`}
-            >
-              {REMINDER_STATUS_LABELS[status ?? ''] ?? status}
+            <span className="inline-block px-3 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+              {prefix}
             </span>
           );
         },
       },
       {
+        headerName: 'Status',
+        field: 'status',
+        minWidth: 140,
+        flex: 1.1,
+        editable: true,
+        cellEditor: 'agSelectCellEditor',
+        cellEditorParams: {
+          values: ['SCHEDULED', 'SENT', 'FAILED', 'CANCELLED'],
+        },
+        cellRenderer: (p) => <StatusBadge status={p.data?.status} />,
+      },
+      {
         headerName: 'Scheduled At',
         field: 'scheduledAt',
-        minWidth: 180,
+        minWidth: 190,
+        flex: 1.5,
         cellRenderer: (p) => {
           if (!p.data?.scheduledAt) {
-            return <span className="text-xs text-txt-sub">Not scheduled</span>;
+            return <span className="text-xs text-slate-400">—</span>;
           }
-          const date = new Date(p.data.scheduledAt);
-          const dateStr = date.toLocaleDateString('en-IN');
-          const timeStr = date.toLocaleTimeString('en-IN', {
-            hour: '2-digit',
-            minute: '2-digit',
-          });
-          const rel = getRelativeScheduledText(p.data.scheduledAt);
+
+          const parsed = formatScheduledDate(p.data.scheduledAt);
+          const diffDays = getRelativeDateDiff(p.data.scheduledAt);
+
+          if (!parsed) {
+            return <span className="text-xs text-slate-400">{p.data.scheduledAt}</span>;
+          }
 
           return (
             <div className="flex flex-col justify-center py-1 leading-tight">
-              <div className="flex items-center gap-1.5 font-mono text-xs font-semibold text-txt-main">
-                <span>{dateStr}</span>
-                <span className="text-[10px] text-txt-sub">{timeStr}</span>
-              </div>
-              {rel && (
-                <span className={`text-[10px] ${rel.color}`}>
-                  {rel.text}
+              <div className="flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                <span className="font-bold text-xs sm:text-sm text-slate-900 dark:text-slate-100">
+                  {parsed.formattedDate}
                 </span>
+                <span className="text-[11px] text-slate-400">
+                  {parsed.time}
+                </span>
+              </div>
+              {diffDays !== null && (
+                <div className="mt-0.5">
+                  {diffDays < 0 ? (
+                    <span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#fef2f2] text-[#dc2626] dark:bg-rose-950/40 dark:text-rose-400">
+                      {Math.abs(diffDays)}d overdue
+                    </span>
+                  ) : diffDays === 0 ? (
+                    <span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#fffbeb] text-[#b45309] dark:bg-amber-950/40 dark:text-amber-400">
+                      Scheduled today
+                    </span>
+                  ) : diffDays === 1 ? (
+                    <span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#eef2ff] text-[#4f46e5] dark:bg-indigo-950/40 dark:text-indigo-400">
+                      Tomorrow
+                    </span>
+                  ) : (
+                    <span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#eef2ff] text-[#4f46e5] dark:bg-indigo-950/40 dark:text-indigo-400">
+                      In {diffDays} days
+                    </span>
+                  )}
+                </div>
               )}
             </div>
           );
@@ -205,6 +310,7 @@ export default function RemindersTable({
       columns={columns}
       actions={actions}
       isLoading={loading}
+      rowHeight={64}
       onRowClick={(row) => onView(row.id)}
       onRowDoubleClick={(row) => onEdit(row.id)}
       onUpdateCell={async ({ row, field, newValue }) => {

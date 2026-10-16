@@ -18,8 +18,7 @@ import { TASK_TYPES } from "@/constants/taskConstants";
 import { compareDates, compareStrings, SortOption, useSortedItems } from "@/hooks/useSortedItems";
 import { useResourcePageState } from "@/hooks/useResourcePageState";
 import { useAsyncAction } from "@/hooks/useAnyAction";
-import { formatDueDate } from "@/utils/formatDate";
-import { TaskStatusBadge, TaskTypeBadge } from "@/components/tasks/TaskBadges";
+import PageSkeleton from "@/components/common/PageSkeleton";
 
 const STATUS_VALUES = ["OPEN", "PENDING", "IN_PROGRESS", "COMPLETED", "CLOSED", "CANCELLED"];
 
@@ -30,16 +29,140 @@ const SORT_OPTIONS: SortOption<TaskListItem>[] = [
   { key: "client_asc", label: "Sort by client (A-Z)", compare: compareStrings((t) => t.subject?.name) },
 ];
 
+function getTaskTypePrefix(val?: string | null) {
+  if (!val) return 'TASK';
+  const upper = val.toUpperCase();
+  if (upper.includes('GST')) return 'GST';
+  if (upper.includes('TDS')) return 'TDS';
+  if (upper.includes('ITR')) return 'ITR';
+  if (upper.includes('ROC')) return 'ROC';
+  if (upper.includes('MSME')) return 'MSME';
+  return val.split('_')[0] || 'TASK';
+}
+
+function getTaskTypeBadgeClass(val?: string | null) {
+  const prefix = getTaskTypePrefix(val);
+  if (prefix === 'TDS') return 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300';
+  if (prefix === 'ITR') return 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300';
+  if (prefix === 'GST') return 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300';
+  if (prefix === 'ROC') return 'bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300';
+  return 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300';
+}
+
+function formatTaskDueDate(dateStr?: string | null) {
+  if (!dateStr) return null;
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return null;
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = d.toLocaleDateString('en-US', { month: 'short' });
+    const year = d.getFullYear();
+    return `${day} ${month} ${year}`;
+  } catch {
+    return null;
+  }
+}
+
+function getTaskDueDiffDays(dateStr?: string | null) {
+  if (!dateStr) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const due = new Date(dateStr);
+  due.setHours(0, 0, 0, 0);
+  return Math.ceil((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+function StatusPill({ status }: { status?: string }) {
+  const s = (status || '').toUpperCase();
+  if (s === 'COMPLETED') {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#ecfdf5] text-[#047857] dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200/60">
+        <span className="w-1.5 h-1.5 rounded-full bg-[#10b981]" />
+        <span>Completed</span>
+      </span>
+    );
+  }
+  if (s === 'IN_PROGRESS') {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#fffbeb] text-[#b45309] dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200/60">
+        <span className="w-1.5 h-1.5 rounded-full bg-[#f59e0b]" />
+        <span>In Progress</span>
+      </span>
+    );
+  }
+  if (s === 'OPEN') {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#eff6ff] text-[#1d4ed8] dark:bg-blue-950/40 dark:text-blue-400 border border-blue-200/60">
+        <span className="w-1.5 h-1.5 rounded-full bg-[#3b82f6]" />
+        <span>Open</span>
+      </span>
+    );
+  }
+  if (s === 'PENDING') {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#f5f3ff] text-[#6d28d9] dark:bg-purple-950/40 dark:text-purple-400 border border-purple-200/60">
+        <span className="w-1.5 h-1.5 rounded-full bg-[#8b5cf6]" />
+        <span>Pending</span>
+      </span>
+    );
+  }
+  if (s === 'CLOSED') {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200/60">
+        <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+        <span>Closed</span>
+      </span>
+    );
+  }
+  if (s === 'CANCELLED') {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#fef2f2] text-[#dc2626] dark:bg-rose-950/40 dark:text-rose-400 border border-rose-200/60">
+        <span className="w-1.5 h-1.5 rounded-full bg-[#ef4444]" />
+        <span>Cancelled</span>
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border border-slate-200/60">
+      <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+      <span>{status || '—'}</span>
+    </span>
+  );
+}
+
 const columns: GridColumn<TaskListItem>[] = [
   {
-    headerName: "Title",
+    headerName: "Task",
     field: "title",
-    minWidth: 220,
-    flex: 2,
+    minWidth: 260,
+    flex: 2.5,
     editable: true,
-    cellRenderer: (p) => (
-      <span className="text-sm font-medium text-slate-900 dark:text-slate-100">{p.value || "—"}</span>
-    ),
+    cellRenderer: (p) => {
+      const row = p.data;
+      if (!row) return null;
+      const taskType = row.taskType || row.title || '';
+      const prefix = getTaskTypePrefix(taskType);
+      const badgeClass = getTaskTypeBadgeClass(taskType);
+      const clientName = row.subject?.name;
+
+      return (
+        <div className="flex items-center gap-3 py-1">
+          <span
+            className={`w-11 h-9 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 ${badgeClass}`}
+          >
+            {prefix}
+          </span>
+          <div className="flex flex-col min-w-0">
+            <span className="font-bold text-sm text-[var(--primary)] dark:text-slate-100 truncate">
+              {row.title || '—'}
+            </span>
+            <span className="text-xs text-slate-500 dark:text-slate-400 truncate">
+              {clientName ? `Client: ${clientName}` : 'General task'}
+            </span>
+          </div>
+        </div>
+      );
+    },
   },
   {
     headerName: "Client",
@@ -47,42 +170,97 @@ const columns: GridColumn<TaskListItem>[] = [
     valueGetter: (p) => p.data?.subject?.name ?? "—",
     minWidth: 160,
     flex: 1.2,
-    cellRenderer: (p) => (
-      <span className="text-sm font-normal text-slate-700 dark:text-slate-300">{p.value || "—"}</span>
-    ),
+    cellRenderer: (p) => {
+      const name = p.data?.subject?.name;
+      if (!name) return <span className="text-xs text-slate-400">—</span>;
+      const initial = name.charAt(0).toUpperCase();
+
+      return (
+        <div className="flex items-center gap-2">
+          <span className="w-6 h-6 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-[10px] font-bold text-slate-600 dark:text-slate-300 shrink-0">
+            {initial}
+          </span>
+          <span className="font-semibold text-xs sm:text-sm text-slate-800 dark:text-slate-200 truncate">
+            {name}
+          </span>
+        </div>
+      );
+    },
   },
   {
     headerName: "Task Type",
     field: "taskType",
-    minWidth: 140,
+    minWidth: 130,
+    flex: 1,
     editable: true,
     cellEditor: "agSelectCellEditor",
     cellEditorParams: { values: TASK_TYPES.map((t) => t.label) },
-    cellRenderer: (p) => <TaskTypeBadge type={p.value} />,
+    cellRenderer: (p) => {
+      const val = p.value;
+      const prefix = getTaskTypePrefix(val);
+      return (
+        <span className="inline-block px-3 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+          {prefix}
+        </span>
+      );
+    },
   },
   {
     headerName: "Status",
     field: "status",
-    minWidth: 150,
+    minWidth: 145,
+    flex: 1.1,
     editable: true,
     cellEditor: "agSelectCellEditor",
     cellEditorParams: { values: STATUS_VALUES },
-    cellRenderer: (p) => <TaskStatusBadge status={p.value} />,
+    cellRenderer: (p) => <StatusPill status={p.value} />,
   },
   {
     headerName: "Due Date",
     field: "dueDate",
-    minWidth: 150,
+    minWidth: 180,
+    flex: 1.4,
     editable: true,
-    cellRenderer: (p) =>
-      p.value ? (
-        <div className="inline-flex items-center gap-2 text-sm font-normal text-slate-700 dark:text-slate-300">
-          <Calendar className="h-4 w-4 shrink-0 text-slate-400" />
-          <span>{formatDueDate(p.value)}</span>
+    cellRenderer: (p) => {
+      if (!p.value) {
+        return <span className="text-xs text-slate-400">—</span>;
+      }
+      const formatted = formatTaskDueDate(p.value);
+      const diffDays = getTaskDueDiffDays(p.value);
+      const isCompleted = p.data?.status === 'COMPLETED' || p.data?.status === 'CLOSED';
+
+      return (
+        <div className="flex flex-col justify-center py-1 leading-tight">
+          <div className="flex items-center gap-1.5">
+            <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <span className="font-bold text-xs sm:text-sm text-slate-900 dark:text-slate-100">
+              {formatted || p.value}
+            </span>
+          </div>
+          {diffDays !== null && !isCompleted && (
+            <div className="mt-0.5">
+              {diffDays < 0 ? (
+                <span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#fef2f2] text-[#dc2626] dark:bg-rose-950/40 dark:text-rose-400">
+                  {Math.abs(diffDays)}d overdue
+                </span>
+              ) : diffDays === 0 ? (
+                <span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#fffbeb] text-[#b45309] dark:bg-amber-950/40 dark:text-amber-400">
+                  Due today
+                </span>
+              ) : diffDays <= 7 ? (
+                <span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#fffbeb] text-[#b45309] dark:bg-amber-950/40 dark:text-amber-400">
+                  Due in {diffDays} days
+                </span>
+              ) : (
+                <span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#eef2ff] text-[#4f46e5] dark:bg-indigo-950/40 dark:text-indigo-400">
+                  In {diffDays} days
+                </span>
+              )}
+            </div>
+          )}
         </div>
-      ) : (
-        <span className="text-sm text-slate-400">—</span>
-      ),
+      );
+    },
   },
 ];
 
@@ -135,6 +313,10 @@ export default function TasksPage() {
     ],
     [page.openView, page.openEdit, page.requestDelete]
   );
+
+  if (!businessId || loading) {
+    return <PageSkeleton />;
+  }
 
   return (
     <ResourcePageLayout
@@ -204,6 +386,7 @@ export default function TasksPage() {
         columns={columns}
         actions={actions}
         isLoading={loading}
+        rowHeight={64}
         onRowClick={(row) => page.openView(row.id)}
         onRowDoubleClick={(row) => page.openEdit(row.id)}
         onUpdateCell={handleUpdateCell}

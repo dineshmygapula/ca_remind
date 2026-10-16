@@ -1,7 +1,7 @@
 'use client';
 
-import { useMemo } from 'react';
-import { Eye, Pencil, Trash2 } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Eye, Pencil, Trash2, Mail, Phone, Building2, X, ShieldCheck } from 'lucide-react';
 import CommonDataGrid, { GridAction, GridColumn } from '@/components/common/CommonTable';
 import { SubjectListItem } from '@/types/subject';
 import { updateSubject } from '@/services/subjectService';
@@ -16,14 +16,79 @@ interface ClientsTableProps {
   onRefresh?: () => void;
 }
 
-const COMPLIANCE_STYLES: Record<string, { bg: string; text: string; border: string }> = {
-  gst: { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' },
-  tds: { bg: 'bg-slate-100', text: 'text-slate-700', border: 'border-slate-200' },
-  itr: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' },
-  roc: { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200' },
-  msme: { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' },
+// ─── Helpers ─────────────────────────────────────────────────
+const getInitials = (name?: string) => {
+  if (!name) return 'CL';
+  return name
+    .split(' ')
+    .filter(Boolean)
+    .map((n) => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
 };
 
+const COMPLIANCE_STYLES: Record<
+  string,
+  { bg: string; text: string; border: string }
+> = {
+  gst: {
+    bg: 'bg-slate-100 dark:bg-slate-800',
+    text: 'text-slate-700 dark:text-slate-300',
+    border: 'border-slate-200/60 dark:border-slate-700',
+  },
+  tds: {
+    bg: 'bg-blue-50 dark:bg-blue-950/40',
+    text: 'text-blue-700 dark:text-blue-300',
+    border: 'border-blue-200/60 dark:border-blue-800/40',
+  },
+  itr: {
+    bg: 'bg-indigo-50 dark:bg-indigo-950/40',
+    text: 'text-indigo-700 dark:text-indigo-300',
+    border: 'border-indigo-200/60 dark:border-indigo-800/40',
+  },
+  roc: {
+    bg: 'bg-purple-50 dark:bg-purple-950/40',
+    text: 'text-purple-700 dark:text-purple-300',
+    border: 'border-purple-200/60 dark:border-purple-800/40',
+  },
+  msme: {
+    bg: 'bg-amber-50 dark:bg-amber-950/40',
+    text: 'text-amber-700 dark:text-amber-300',
+    border: 'border-amber-200/60 dark:border-amber-800/40',
+  },
+};
+
+function getComplianceStyle(name: string) {
+  const key = name.toLowerCase();
+  return (
+    COMPLIANCE_STYLES[key] || {
+      bg: 'bg-slate-100 dark:bg-slate-800',
+      text: 'text-slate-700 dark:text-slate-300',
+      border: 'border-slate-200/60 dark:border-slate-700',
+    }
+  );
+}
+
+function StatusBadge({ active }: { active: boolean }) {
+  if (active) {
+    return (
+      <span className="inline-flex items-center justify-center h-6 gap-1.5 px-2.5 rounded-full text-xs font-semibold leading-none bg-[#ecfdf5] text-[#047857] dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200/60 shrink-0">
+        <span className="w-1.5 h-1.5 rounded-full bg-[#10b981]" />
+        <span>Active</span>
+      </span>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center justify-center h-6 gap-1.5 px-2.5 rounded-full text-xs font-semibold leading-none bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border border-slate-200/60 shrink-0">
+      <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+      <span>Inactive</span>
+    </span>
+  );
+}
+
+// ─── Main Component ──────────────────────────────────────────
 export default function ClientsTable({
   clients,
   loading,
@@ -33,57 +98,92 @@ export default function ClientsTable({
   onDelete,
   onRefresh,
 }: ClientsTableProps) {
+  // Popover state for showing all compliances when user clicks "+N more"
+  const [compliancesModal, setCompliancesModal] = useState<{
+    clientName: string;
+    compliances: string[];
+  } | null>(null);
+
   const columns: GridColumn<SubjectListItem>[] = useMemo(
     () => [
       {
-        headerName: 'Client Name',
+        headerName: 'Client',
         field: 'displayName',
-        minWidth: 200,
-        flex: 2,
-        cellRenderer: (p) => (
-          <span className="font-semibold text-txt-main">
-            {p.value || '—'}
-          </span>
-        ),
+        minWidth: 250,
+        flex: 2.2,
+        cellRenderer: (p) => {
+          const row = p.data;
+          if (!row) return null;
+
+          const displayName = row.displayName || row.name || 'Unnamed Client';
+          const businessName = row.businessName;
+          const initials = getInitials(displayName);
+
+          return (
+            <div className="flex items-center gap-3 py-1">
+              <span className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border border-blue-200/60">
+                {initials}
+              </span>
+              <div className="flex flex-col min-w-0">
+                <span className="font-bold text-sm text-[var(--primary)] dark:text-slate-100 truncate">
+                  {displayName}
+                </span>
+                <span className="text-xs text-slate-500 dark:text-slate-400 truncate flex items-center gap-1">
+                  {businessName ? (
+                    <>
+                      <Building2 className="w-3 h-3 text-slate-400 shrink-0" />
+                      <span>{businessName}</span>
+                    </>
+                  ) : (
+                    'Individual Client'
+                  )}
+                </span>
+              </div>
+            </div>
+          );
+        },
       },
       {
-        headerName: 'Business Name',
-        field: 'businessName',
-        minWidth: 170,
-        cellRenderer: (p) => (
-          <span className="text-txt-sub">
-            {p.value || '—'}
-          </span>
-        ),
-      },
-      {
-        headerName: 'Email',
+        headerName: 'Email Address',
         field: 'email',
-        minWidth: 180,
-        cellRenderer: (p) => (
-          <span className="text-txt-sub">
-            {p.value || '—'}
-          </span>
-        ),
+        minWidth: 200,
+        flex: 1.3,
+        cellRenderer: (p) => {
+          const email = p.value;
+          if (!email) return <span className="text-slate-400 text-xs">—</span>;
+          return (
+            <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-700 dark:text-slate-300">
+              <Mail className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+              <span className="truncate">{email}</span>
+            </div>
+          );
+        },
       },
       {
-        headerName: 'Phone',
+        headerName: 'Phone Number',
         field: 'phone',
-        minWidth: 140,
-        cellRenderer: (p) => (
-          <span className="font-mono text-xs text-txt-main">
-            {p.value || '—'}
-          </span>
-        ),
+        minWidth: 170,
+        flex: 1.1,
+        cellRenderer: (p) => {
+          const phone = p.value;
+          if (!phone) return <span className="text-slate-400 text-xs">—</span>;
+          return (
+            <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-700 dark:text-slate-300 font-mono">
+              <Phone className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+              <span>{phone}</span>
+            </div>
+          );
+        },
       },
       {
         headerName: 'GSTIN',
         field: 'gstin',
-        minWidth: 160,
+        minWidth: 155,
+        flex: 1,
         cellRenderer: (p) => {
-          if (!p.value) return <span className="text-txt-sub/50">—</span>;
+          if (!p.value) return <span className="text-slate-400 text-xs">—</span>;
           return (
-            <span className="inline-flex font-mono text-[11px] font-semibold px-2 py-0.5 rounded border border-[var(--border)] bg-[var(--surface-subtle)] text-txt-main">
+            <span className="inline-flex items-center justify-center h-6 font-mono text-xs font-semibold px-2.5 rounded-lg leading-none border border-divider bg-bg/80 text-txt-main shrink-0">
               {p.value}
             </span>
           );
@@ -92,29 +192,49 @@ export default function ClientsTable({
       {
         headerName: 'Compliances',
         field: 'activeCompliances',
-        minWidth: 190,
+        minWidth: 210,
+        flex: 1.4,
         cellRenderer: (p) => {
           const list: string[] = Array.isArray(p.value) ? p.value : [];
           if (list.length === 0) {
-            return <span className="text-txt-sub/40 text-xs">No services</span>;
+            return <span className="text-slate-400 text-xs">No services</span>;
           }
+
+          // Show maximum 2 items, then "+N more" button on overflow
+          const MAX_VISIBLE = 2;
+          const visible = list.slice(0, MAX_VISIBLE);
+          const remaining = list.length - MAX_VISIBLE;
+
           return (
-            <div className="flex flex-wrap items-center gap-1 py-1">
-              {list.map((c) => {
-                const style = COMPLIANCE_STYLES[c.toLowerCase()] || {
-                  bg: 'bg-slate-50',
-                  text: 'text-slate-700',
-                  border: 'border-slate-200',
-                };
+            <div className="flex items-center h-full gap-1.5 whitespace-nowrap overflow-hidden py-1">
+              {visible.map((c) => {
+                const style = getComplianceStyle(c);
                 return (
                   <span
                     key={c}
-                    className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${style.bg} ${style.text} ${style.border}`}
+                    className={`inline-flex items-center justify-center h-6 px-2.5 rounded-full text-xs font-semibold leading-none border shrink-0 ${style.bg} ${style.text} ${style.border}`}
                   >
                     {c}
                   </span>
                 );
               })}
+
+              {remaining > 0 && (
+                <button
+                  type="button"
+                  title="Click to view all compliances"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setCompliancesModal({
+                      clientName: p.data?.displayName || p.data?.name || 'Client',
+                      compliances: list,
+                    });
+                  }}
+                  className="cursor-pointer inline-flex items-center justify-center h-6 px-2.5 rounded-full text-xs font-semibold leading-none bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-300/80 dark:border-slate-700 transition-colors shrink-0 shadow-2xs"
+                >
+                  +{remaining} more
+                </button>
+              )}
             </div>
           );
         },
@@ -123,26 +243,14 @@ export default function ClientsTable({
         headerName: 'Status',
         field: 'isActive',
         minWidth: 120,
+        flex: 0.9,
         editable: true,
         cellEditor: 'agSelectCellEditor',
         cellEditorParams: {
           values: ['Active', 'Inactive'],
         },
         valueFormatter: (p) => (p.value ? 'Active' : 'Inactive'),
-        cellRenderer: (p) => {
-          const active = Boolean(p.data?.isActive);
-          return (
-            <span
-              className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${
-                active
-                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                  : 'bg-slate-100 text-slate-600 border-slate-200'
-              }`}
-            >
-              {active ? 'Active' : 'Inactive'}
-            </span>
-          );
-        },
+        cellRenderer: (p) => <StatusBadge active={Boolean(p.data?.isActive)} />,
       },
     ],
     []
@@ -170,22 +278,88 @@ export default function ClientsTable({
   ];
 
   return (
-    <CommonDataGrid<SubjectListItem>
-      rowData={clients}
-      columns={columns}
-      actions={actions}
-      isLoading={loading}
-      onRowClick={(row) => onView(row.id)}
-      onRowDoubleClick={(row) => onEdit(row.id)}
-      onUpdateCell={async ({ row, field, newValue }) => {
-        if (!businessId) return;
-        const valToSave = field === 'isActive' ? newValue === 'Active' : newValue;
-        await updateSubject(businessId, row.id, {
-          [field]: valToSave,
-        });
-        onRefresh?.();
-      }}
-      emptyMessage="No clients found"
-    />
+    <>
+      <CommonDataGrid<SubjectListItem>
+        rowData={clients}
+        columns={columns}
+        actions={actions}
+        isLoading={loading}
+        rowHeight={64}
+        onRowClick={(row) => onView(row.id)}
+        onRowDoubleClick={(row) => onEdit(row.id)}
+        onUpdateCell={async ({ row, field, newValue }) => {
+          if (!businessId) return;
+          const valToSave = field === 'isActive' ? newValue === 'Active' : newValue;
+          await updateSubject(businessId, row.id, {
+            [field]: valToSave,
+          });
+          onRefresh?.();
+        }}
+        emptyMessage="No clients found"
+      />
+
+      {/* ── Compliances Popup Modal on Click of "+N more" ── */}
+      {compliancesModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-fade-in"
+          onClick={() => setCompliancesModal(null)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl border border-divider bg-surface p-6 shadow-xl space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-divider">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-navy dark:text-gold" />
+                <h3 className="font-bold text-base text-txt-main">
+                  Active Compliances
+                </h3>
+              </div>
+              <button
+                type="button"
+                aria-label="Close"
+                onClick={() => setCompliancesModal(null)}
+                className="cursor-pointer rounded-full p-1.5 text-txt-sub hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div>
+              <p className="text-xs text-txt-sub mb-3">
+                All registered compliances for{' '}
+                <strong className="text-txt-main">
+                  {compliancesModal.clientName}
+                </strong>
+                :
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {compliancesModal.compliances.map((c) => {
+                  const style = getComplianceStyle(c);
+                  return (
+                    <span
+                      key={c}
+                      className={`inline-flex px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border ${style.bg} ${style.text} ${style.border}`}
+                    >
+                      {c}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="pt-2 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setCompliancesModal(null)}
+                className="cursor-pointer rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 px-4 py-2 text-xs font-semibold text-txt-main transition-colors"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

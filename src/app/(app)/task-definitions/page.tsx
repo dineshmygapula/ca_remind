@@ -16,6 +16,7 @@ import { useAsyncAction } from "@/hooks/useAnyAction";
 import { useTaskDefinitionFilters } from "@/hooks/task-definitions/useTaskDefinitions";
 import { getTaskDefinitionStats } from "@/lib/task-definitons/taskDefinitionStat";
 import StatCard from "@/components/task-definitions/StatCard";
+import PageSkeleton from "@/components/common/PageSkeleton";
 
 
 export default function TaskDefinitionsPage() {
@@ -62,12 +63,8 @@ export default function TaskDefinitionsPage() {
     });
   };
 
-  if (!businessId) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center bg-bg">
-        <span className="loading loading-spinner loading-lg text-primary" />
-      </div>
-    );
+  if (!businessId || (fetchAction.loading && definitions.length === 0)) {
+    return <PageSkeleton hasStats={true} />;
   }
 
   return (

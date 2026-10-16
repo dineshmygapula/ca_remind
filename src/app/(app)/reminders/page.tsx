@@ -15,6 +15,7 @@ import {
   ReminderChannelFilter,
   ReminderTimeFilter,
 } from '@/constants/reminderConstants';
+import PageSkeleton from '@/components/common/PageSkeleton';
 
 export default function RemindersPage() {
   const { businessId, orgId } = useWorkspace();
@@ -198,12 +199,8 @@ export default function RemindersPage() {
   };
 
   // Loading guard
-  if (!businessId) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center bg-bg">
-        <span className="loading loading-spinner loading-lg text-primary" />
-      </div>
-    );
+  if (!businessId || (loading && reminders.length === 0)) {
+    return <PageSkeleton filterCount={4} />;
   }
 
   return (

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { Eye, Pencil, Trash2, Mail, Phone, UserX } from 'lucide-react';
 import CommonDataGrid, { GridAction, GridColumn } from '@/components/common/CommonTable';
 import { StaffMember } from '@/types/staff.types';
@@ -41,28 +41,28 @@ function StaffRoleBadge({ role }: { role?: string }) {
 
   if (upper === 'ADMIN' || upper === 'OWNER') {
     return (
-      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+      <span className="inline-block px-3 py-0.5 rounded-full text-xs font-semibold bg-[#f5f3ff] text-[#6d28d9] dark:bg-purple-950/40 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/40">
         {upper}
       </span>
     );
   }
   if (upper === 'MANAGER') {
     return (
-      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+      <span className="inline-block px-3 py-0.5 rounded-full text-xs font-semibold bg-[#eff6ff] text-[#1d4ed8] dark:bg-blue-950/40 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800/40">
         {upper}
       </span>
     );
   }
   if (upper === 'ACCOUNTANT') {
     return (
-      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+      <span className="inline-block px-3 py-0.5 rounded-full text-xs font-semibold bg-[#ecfdf5] text-[#047857] dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/40">
         {upper}
       </span>
     );
   }
 
   return (
-    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+    <span className="inline-block px-3 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700">
       {role}
     </span>
   );
@@ -71,15 +71,15 @@ function StaffRoleBadge({ role }: { role?: string }) {
 function StaffStatusBadge({ status }: { status: 'ACTIVE' | 'INACTIVE' }) {
   if (status === 'ACTIVE') {
     return (
-      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
-        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#ecfdf5] text-[#047857] dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200/60">
+        <span className="h-1.5 w-1.5 rounded-full bg-[#10b981]" />
         <span>Active</span>
       </span>
     );
   }
 
   return (
-    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border border-slate-200/60">
       <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
       <span>Inactive</span>
     </span>
@@ -98,8 +98,8 @@ export default function StaffTable({
       {
         headerName: 'Staff Member',
         field: 'userName',
-        minWidth: 240,
-        flex: 1.5,
+        minWidth: 260,
+        flex: 2.2,
         cellRenderer: (params) => {
           const member = params.data;
           if (!member) return null;
@@ -109,24 +109,24 @@ export default function StaffTable({
 
           return (
             <div className="flex items-center gap-3 py-1">
-              <div
-                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl font-bold text-xs ${
+              <span
+                className={`w-11 h-9 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 ${
                   isActive
-                    ? 'bg-[var(--primary)]/10 text-[var(--primary)] dark:bg-[var(--accent)]/15 dark:text-[var(--accent)]'
-                    : 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500'
+                    ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border border-blue-200/50'
+                    : 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500 border border-slate-200/50'
                 }`}
               >
                 {isActive ? initials : <UserX className="h-4 w-4" />}
-              </div>
-              <div className="min-w-0">
-                <div className="font-bold text-sm text-[var(--heading)] truncate">
+              </span>
+              <div className="flex flex-col min-w-0">
+                <span className="font-bold text-sm text-[var(--primary)] dark:text-slate-100 truncate">
                   {fullName}
-                </div>
-                {member.userName && member.userName !== fullName && (
-                  <div className="text-[11px] text-[var(--text-secondary)] truncate">
-                    @{member.userName}
-                  </div>
-                )}
+                </span>
+                <span className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                  {member.userName && member.userName !== fullName
+                    ? `@${member.userName}`
+                    : member.email || 'Team member'}
+                </span>
               </div>
             </div>
           );
@@ -136,12 +136,12 @@ export default function StaffTable({
         headerName: 'Email Address',
         field: 'email',
         minWidth: 200,
-        flex: 1.2,
+        flex: 1.4,
         cellRenderer: (params) => {
           const email = params.data?.email;
           if (!email) return <span className="text-slate-400 text-xs">—</span>;
           return (
-            <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+            <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-700 dark:text-slate-300">
               <Mail className="h-3.5 w-3.5 text-slate-400 shrink-0" />
               <span className="truncate">{email}</span>
             </div>
@@ -152,14 +152,14 @@ export default function StaffTable({
         headerName: 'Phone Number',
         field: 'phone',
         minWidth: 160,
-        flex: 1,
+        flex: 1.1,
         cellRenderer: (params) => {
           const phone = params.data?.phone || params.data?.phoneMasked;
           if (!phone) return <span className="text-slate-400 text-xs">—</span>;
           return (
-            <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+            <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-700 dark:text-slate-300">
               <Phone className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-              <span>{phone}</span>
+              <span className="font-mono">{phone}</span>
             </div>
           );
         },
@@ -168,7 +168,7 @@ export default function StaffTable({
         headerName: 'Role',
         field: 'role',
         minWidth: 140,
-        flex: 0.9,
+        flex: 1,
         cellRenderer: (params) => {
           const role = params.data?.roles?.[0] || params.data?.role;
           return <StaffRoleBadge role={role} />;
@@ -178,7 +178,7 @@ export default function StaffTable({
         headerName: 'Status',
         field: 'status',
         minWidth: 120,
-        flex: 0.8,
+        flex: 0.9,
         cellRenderer: (params) => {
           const status = params.data?.status || 'ACTIVE';
           return <StaffStatusBadge status={status} />;
@@ -191,19 +191,19 @@ export default function StaffTable({
   const actions: GridAction<StaffMember>[] = useMemo(
     () => [
       {
-        label: 'View Details',
+        label: 'View',
         icon: <Eye className="h-4 w-4" />,
-        variant: 'secondary',
+        variant: 'primary',
         onClick: (member) => onView(member.id),
       },
       {
-        label: 'Edit Role & Info',
+        label: 'Edit',
         icon: <Pencil className="h-4 w-4" />,
         variant: 'secondary',
         onClick: (member) => onEdit(member.id),
       },
       {
-        label: 'Remove Staff',
+        label: 'Delete',
         icon: <Trash2 className="h-4 w-4" />,
         variant: 'danger',
         onClick: (member) => onDelete(member.id, getFullName(member)),
@@ -213,17 +213,15 @@ export default function StaffTable({
   );
 
   return (
-    <div className="w-full">
-      <CommonDataGrid
-        rowData={staff}
-        columns={columns}
-        actions={actions}
-        isLoading={loading}
-        onRowClick={(row) => onView(row.id)}
-        emptyMessage="No staff members found matching your search or filters."
-        paginationPageSize={10}
-        rowHeight={56}
-      />
-    </div>
+    <CommonDataGrid<StaffMember>
+      rowData={staff}
+      columns={columns}
+      actions={actions}
+      isLoading={loading}
+      onRowClick={(row) => onView(row.id)}
+      onRowDoubleClick={(row) => onEdit(row.id)}
+      emptyMessage="No staff members found matching your search or filters."
+      rowHeight={64}
+    />
   );
 }

@@ -12,6 +12,7 @@ import EditClientDialog from '@/components/clients/EditClientDialog';
 import CreateSubjectDialog from '@/components/clients/CreateSubjectDialog';
 import ConfirmDialog from '@/components/tasks/ConfirmDialog';
 import { useToast } from '@/context/ToastContext';
+import PageSkeleton from '@/components/common/PageSkeleton';
 
 export default function ClientsPage() {
   const { businessId } = useWorkspace();
@@ -156,12 +157,8 @@ export default function ClientsPage() {
     setComplianceFilter('ALL');
   };
 
-  if (!businessId) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center bg-bg">
-        <span className="loading loading-spinner loading-lg text-primary" />
-      </div>
-    );
+  if (!businessId || (loading && clients.length === 0)) {
+    return <PageSkeleton filterCount={4} />;
   }
 
   return (
