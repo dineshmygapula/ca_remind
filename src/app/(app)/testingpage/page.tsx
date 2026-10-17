@@ -14,7 +14,7 @@ import {
 
 import AddIcon from "@mui/icons-material/Add";
 
-import AddTask from "../../../components/tasks/AddTask";
+import TaskFormDialog from "@/components/tasks/TaskFormDialogue";
 
 // import your auth hook correctly
 import { useAuth } from "@/context/AuthContext";
@@ -100,11 +100,11 @@ export default function TestingPage() {
           {loading && <CircularProgress />}
 
           {/* Create Task Dialog */}
-         <AddTask
-  open={openCreateDialog}
-  onClose={() => setOpenCreateDialog(false)}
-  businessId={businessId}
-/>
+          <TaskFormDialog
+            open={openCreateDialog}
+            onClose={() => setOpenCreateDialog(false)}
+            businessId={businessId || ""}
+          />
 
         </Stack>
       </Container>

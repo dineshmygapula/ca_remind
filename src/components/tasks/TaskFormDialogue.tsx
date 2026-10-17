@@ -1,35 +1,27 @@
-'use client';
+"use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from "react";
+import { useFormContext } from "react-hook-form";
+import { Plus, Pencil, AlertCircle, X, Loader2 } from "lucide-react";
+import Drawer from "@/components/common/Drawer";
+import { FormWrapper } from "@/components/wrappers/FormWrapper";
+import { useAsyncAction } from "@/hooks/useAnyAction";
+import { createTask, updateTask, getTaskById } from "@/services/taskService";
+import { SubjectListItem } from "@/types/subject";
+import { StaffMember } from "@/types/staff.types";
+import { MessageTemplateListItem } from "@/types/messageTemplate.types";
 import {
-  Plus,
-  Pencil,
-  ChevronDown,
-  AlertCircle,
-  X,
-  Mail,
-  Sparkles,
-  Loader2,
-  Check,
-  Building2,
-  Smartphone,
-} from 'lucide-react';
-import Drawer from '@/components/common/Drawer';
-import DrawerSection from '@/components/common/DrawerSection';
-import WhatsAppIcon from '@/components/common/WhatsAppIcon';
-import SearchableSelect from '@/components/common/SearchableSelect';
-import { useAsyncAction } from '@/hooks/useAnyAction';
+  DeliveryChannel,
+  TaskPriority,
+  CreateTaskDto,
+  UpdateTaskDto,
+} from "@/types/task.types";
+import { useTaskFormData } from "@/hooks/tasks/useTasksFormData";
+import { taskFormSchema, TaskFormValues } from "@/utils/schema";
 
-import { createTask, updateTask, getTaskById } from '@/services/taskService';
-import { SubjectListItem } from '@/types/subject';
-import { StaffMember } from '@/types/staff.types';
-import { MessageTemplateListItem } from '@/types/messageTemplate.types';
-import { DeliveryChannel, TaskPriority } from '@/types/task.types';
-import { TASK_TYPES, FREQUENCY_OPTIONS, DELIVERY_CHANNELS } from '@/constants/taskConstants';
-import { useTaskFormData } from '@/hooks/tasks/useTasksFormData';
-import { TaskFormData, useTaskForm } from '@/hooks/tasks/useTaskForm';
-
-// ─── Props ────────────────────────────────────────────────────────────────────
+import TaskClientSection from "./task-form/TaskClientSection";
+import TaskDetailsSection from "./task-form/TaskDetailsSection";
+import TaskRemindersSection from "./task-form/TaskRemindersSection";
 
 interface Props {
   open: boolean;
@@ -39,51 +31,110 @@ interface Props {
   taskId?: string;
 }
 
-// ─── Field primitives ─────────────────────────────────────────────────────────
+const TASK_FORM_ID = "task-form";
 
-const INPUT =
-  'w-full h-11 rounded-xl border border-divider bg-bg/50 px-3.5 ' +
-  'text-sm font-medium text-txt-main placeholder:text-txt-sub/60 ' +
-  'focus:bg-surface focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/15 transition-all';
+const DEFAULT_FORM_VALUES: TaskFormValues = {
+  subjectId: "",
+  taskDefinitionId: "",
+  taskType: "",
+  priority: "MEDIUM",
+  frequency: "one_time",
+  dueDate: "",
+  assignedStaffId: "",
+  notes: "",
+  remindersEnabled: true,
+  templateId: "",
+  deliveryChannel: "EMAIL",
+  daysBeforeDueDate: 1,
+};
 
-const TEXTAREA =
-  'w-full rounded-xl border border-divider bg-bg/50 p-3 ' +
-  'text-sm font-medium text-txt-main placeholder:text-txt-sub/60 resize-none ' +
-  'focus:bg-surface focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/15 transition-all';
+function computeTitle(type?: string, date?: string) {
+  if (!type) return "";
+  if (!date) return type;
+  const d = new Date(date).toLocaleDateString("en-IN", {
+    month: "short",
+    year: "numeric",
+  });
+  return `${type} – ${d}`;
+}
 
-const SELECT =
-  'w-full h-11 rounded-xl border border-divider bg-bg/50 px-3.5 ' +
-  'text-sm font-medium text-txt-main appearance-none cursor-pointer ' +
-  'focus:bg-surface focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/15 transition-all';
-
-function FieldWrap({
-  label,
-  required,
-  helper,
-  children,
+function TaskFormContent({
+  clients,
+  clientsLoading,
+  selectedClient,
+  setSelectedClient,
+  staff,
+  staffLoading,
+  selectedStaff,
+  setSelectedStaff,
+  templates,
+  templatesLoading,
+  selectedTemplate,
+  setSelectedTemplate,
+  taskDefinitions,
+  business,
+  onTitleCalculated,
 }: {
-  label: string;
-  required?: boolean;
-  helper?: string;
-  children: React.ReactNode;
+  clients: SubjectListItem[];
+  clientsLoading: boolean;
+  selectedClient: SubjectListItem | null;
+  setSelectedClient: (client: SubjectListItem | null) => void;
+  staff: StaffMember[];
+  staffLoading: boolean;
+  selectedStaff: StaffMember | null;
+  setSelectedStaff: (staff: StaffMember | null) => void;
+  templates: MessageTemplateListItem[];
+  templatesLoading: boolean;
+  selectedTemplate: MessageTemplateListItem | null;
+  setSelectedTemplate: (tpl: MessageTemplateListItem | null) => void;
+  taskDefinitions: any[];
+  business: any;
+  onTitleCalculated: (title: string) => void;
 }) {
+  const { watch } = useFormContext<TaskFormValues>();
+  const watchedTaskType = watch("taskType");
+  const watchedDueDate = watch("dueDate");
+
+  const calculatedTitle = useMemo(
+    () => computeTitle(watchedTaskType, watchedDueDate),
+    [watchedTaskType, watchedDueDate],
+  );
+
+  useEffect(() => {
+    onTitleCalculated(calculatedTitle);
+  }, [calculatedTitle, onTitleCalculated]);
+
   return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex items-center justify-between">
-        <label className="text-xs font-semibold text-txt-main">
-          {label}
-          {required && <span className="text-red-500 ml-0.5">*</span>}
-        </label>
-      </div>
-      {helper && (
-        <p className="text-[11px] text-txt-sub leading-snug -mt-0.5">{helper}</p>
-      )}
-      {children}
+    <div className="space-y-4">
+      <TaskClientSection
+        clients={clients}
+        clientsLoading={clientsLoading}
+        selectedClient={selectedClient}
+        onSelectClient={setSelectedClient}
+      />
+
+      <TaskDetailsSection
+        staff={staff}
+        staffLoading={staffLoading}
+        selectedStaff={selectedStaff}
+        onSelectStaff={setSelectedStaff}
+        taskDefinitions={taskDefinitions}
+        templates={templates}
+        onAutoSelectTemplate={setSelectedTemplate}
+        generatedTitle={calculatedTitle}
+      />
+
+      <TaskRemindersSection
+        templates={templates}
+        templatesLoading={templatesLoading}
+        selectedTemplate={selectedTemplate}
+        onSelectTemplate={setSelectedTemplate}
+        selectedClient={selectedClient}
+        business={business}
+      />
     </div>
   );
 }
-
-// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function TaskFormDialog({
   open,
@@ -92,18 +143,23 @@ export default function TaskFormDialog({
   onSuccess,
   taskId,
 }: Props) {
-  const mode: 'create' | 'edit' = taskId ? 'edit' : 'create';
+  const mode: "create" | "edit" = taskId ? "edit" : "create";
 
-  const [localError, setLocalError] = useState('');
-  const [loadingTask, setLoadingTask] = useState(false);
-  const [initialForm, setInitialForm] = useState<TaskFormData | undefined>(undefined);
+  const [initialFormValues, setInitialFormValues] = useState<
+    TaskFormValues | undefined
+  >(undefined);
+  const [headerTitle, setHeaderTitle] = useState("");
 
-  const [selectedClient, setSelectedClient] = useState<SubjectListItem | null>(null);
+  const [selectedClient, setSelectedClient] = useState<SubjectListItem | null>(
+    null,
+  );
   const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(null);
-  const [selectedTemplate, setSelectedTemplate] = useState<MessageTemplateListItem | null>(null);
+  const [selectedTemplate, setSelectedTemplate] =
+    useState<MessageTemplateListItem | null>(null);
 
-  // Hook for async submit loading & toasts
+  // Reusable actions from useAnyAction
   const saveAction = useAsyncAction();
+  const fetchTaskAction = useAsyncAction();
 
   const {
     clients,
@@ -118,201 +174,149 @@ export default function TaskFormDialog({
     setError: setFetchError,
   } = useTaskFormData(businessId, open);
 
-  const {
-    form,
-    set,
-    setReminder,
-    generatedTaskTitle,
-    getValidDaysBeforeOptions,
-    replaceTemplatePlaceholders,
-    validate,
-    toDto,
-    reset,
-  } = useTaskForm({ initialForm, templates, taskDefinitions, selectedClient, business });
-
-  // ── Edit: fetch task ────────────────────────────────────────────────────────
+  // ── Edit Mode: fetch task details directly without complex mappers ─────────
   useEffect(() => {
     if (!open) return;
-    if (mode === 'create') {
-      setInitialForm(undefined);
+    if (mode === "create") {
+      setInitialFormValues(undefined);
       setSelectedClient(null);
       setSelectedStaff(null);
       setSelectedTemplate(null);
+      setHeaderTitle("");
       return;
     }
     if (!taskId) return;
 
-    (async () => {
-      try {
-        setLoadingTask(true);
-        setLocalError('');
+    fetchTaskAction.run(
+      async () => {
         const task = await getTaskById(businessId, taskId);
         const firstReminder =
-          (task.reminders?.upcoming?.[0] as any) ?? (task as any).remindersScheduled?.[0];
-        const hasReminders =
-          (task.reminders?.upcoming?.length ?? 0) > 0 ||
-          Boolean((task as any).remindersScheduled?.length);
+          (task.reminders?.upcoming?.[0] as any) ??
+          (task as any).remindersScheduled?.[0];
 
-        const rawTaskType = task.taskType ?? '';
-        const matchedType = TASK_TYPES.find(
-          (t) =>
-            t.value === rawTaskType ||
-            t.apiValue === rawTaskType ||
-            t.label.toUpperCase() === rawTaskType.toUpperCase()
-        );
-        const resolvedTaskType = matchedType ? matchedType.value : rawTaskType;
-
-        const rawFrequency = (task.frequency ?? '').toLowerCase();
-        const matchedFreq = FREQUENCY_OPTIONS.find(
-          (f) =>
-            f.value.toLowerCase() === rawFrequency ||
-            f.value.replace('_', '').toLowerCase() === rawFrequency.replace('_', '').toLowerCase()
-        );
-        const resolvedFrequency = matchedFreq ? matchedFreq.value : 'one_time';
-
-        const rawDueDate = task.dates?.dueDate ?? task.dueDate ?? '';
-        const resolvedDueDate = rawDueDate ? rawDueDate.slice(0, 10) : '';
-        const resolvedAssigneeId =
-          task.assignee?.id ?? (task as any).assignedStaffId ?? '';
-        const resolvedSubjectId = task.subject?.id ?? (task as any).subjectId ?? '';
-        const resolvedTemplateId =
-          firstReminder?.messageTemplateId ?? firstReminder?.templateId ?? '';
-
-        setInitialForm({
-          subjectId: resolvedSubjectId,
-          taskDefinitionId: (task as any).taskDefinitionId ?? '',
-          taskType: resolvedTaskType,
-          taskPriority:
-            (task as any).priority ?? (task as any).taskPriority ?? 'MEDIUM',
-          frequency: resolvedFrequency,
-          dueDate: resolvedDueDate,
-          assignedStaffId: resolvedAssigneeId,
-          templateId: resolvedTemplateId,
-          notes: task.notes ?? (task as any).description ?? '',
-          remindersEnabled: hasReminders,
-          reminder: {
-            deliveryChannel:
-              ((firstReminder?.channel ??
-                (firstReminder as any)?.deliveryChannel ??
-                'EMAIL').toUpperCase() as DeliveryChannel),
-            daysBeforeDueDate: firstReminder?.daysBeforeDueDate ?? 1,
-          },
+        setInitialFormValues({
+          ...DEFAULT_FORM_VALUES,
+          subjectId: task.subject?.id || (task as any).subjectId || "",
+          taskDefinitionId: (task as any).taskDefinitionId || "",
+          taskType: task.taskType || "",
+          priority: ((task as any).priority || "MEDIUM") as TaskPriority,
+          frequency: task.frequency || "one_time",
+          dueDate: task.dueDate || task.dates?.dueDate?.slice(0, 10) || "",
+          assignedStaffId:
+            task.assignee?.id || (task as any).assignedStaffId || "",
+          notes: task.notes || (task as any).description || "",
+          remindersEnabled: Boolean(firstReminder),
+          templateId:
+            firstReminder?.messageTemplateId || firstReminder?.templateId || "",
+          deliveryChannel: (
+            firstReminder?.channel ||
+            firstReminder?.deliveryChannel ||
+            "EMAIL"
+          ).toUpperCase() as DeliveryChannel,
+          daysBeforeDueDate: firstReminder?.daysBeforeDueDate || 1,
         });
 
         if (task.subject) {
           setSelectedClient({
             id: task.subject.id,
             displayName: task.subject.name,
-            businessName: (task.subject as any).businessName || task.subject.name,
+            businessName:
+              (task.subject as any).businessName || task.subject.name,
           } as SubjectListItem);
         }
         if (task.assignee) {
           setSelectedStaff({
             id: task.assignee.id,
-            firstName: task.assignee.name.split(' ')[0] ?? '',
-            lastName: task.assignee.name.split(' ').slice(1).join(' '),
+            firstName: task.assignee.name.split(" ")[0] ?? "",
+            lastName: task.assignee.name.split(" ").slice(1).join(" "),
           } as StaffMember);
         }
-      } catch (err: unknown) {
-        setLocalError(err instanceof Error ? err.message : 'Failed to load task details');
-      } finally {
-        setLoadingTask(false);
-      }
-    })();
+      },
+      {
+        errorMessage: "Failed to load task details",
+        showErrorToast: false,
+      },
+    );
   }, [open, mode, taskId, businessId]);
-
-  // Keep selectedTemplate in sync with form.templateId
-  useEffect(() => {
-    if (!form.templateId || templates.length === 0) return;
-    const found = templates.find((t) => t.id === form.templateId);
-    if (found) setSelectedTemplate(found);
-  }, [form.templateId, templates]);
 
   const handleClose = () => {
     if (saveAction.loading) return;
-    reset();
     setSelectedClient(null);
     setSelectedStaff(null);
     setSelectedTemplate(null);
-    setLocalError('');
-    setFetchError('');
+    fetchTaskAction.reset();
     saveAction.reset();
+    setFetchError("");
     onClose();
   };
 
-  const combinedError = localError || fetchError || saveAction.error;
+  const handleSubmit = async (data: TaskFormValues) => {
+    const title = computeTitle(data.taskType, data.dueDate);
 
-  const handleSubmit = async () => {
-    const validationError = validate();
-    if (validationError) {
-      setLocalError(validationError);
-      return;
-    }
+    const dto: CreateTaskDto & UpdateTaskDto = {
+      ...data,
+      title,
+      taskName: title,
+      category: "COMPLIANCE",
+      status: "OPEN" as const,
+      remindersScheduled:
+        data.remindersEnabled && data.templateId
+          ? [
+              {
+                deliveryChannel: data.deliveryChannel,
+                daysBeforeDueDate: Number(data.daysBeforeDueDate) || 1,
+                messageTemplateId: data.templateId,
+              },
+            ]
+          : [],
+    };
 
     await saveAction.run(
       async () => {
-        const dto = toDto();
-        if (mode === 'edit' && taskId) {
+        if (mode === "edit" && taskId) {
           await updateTask(businessId, taskId, dto);
         } else {
           await createTask(businessId, dto);
         }
       },
       {
-        successMessage: mode === 'edit' ? 'Task updated successfully' : 'Task created successfully',
-        errorMessage: mode === 'edit' ? 'Failed to update task' : 'Failed to create task',
+        successMessage:
+          mode === "edit"
+            ? "Task updated successfully"
+            : "Task created successfully",
+        errorMessage:
+          mode === "edit" ? "Failed to update task" : "Failed to create task",
         showSuccessToast: true,
         showErrorToast: true,
         onSuccess: () => {
           onSuccess?.();
           handleClose();
         },
-      }
+      },
     );
   };
 
-  const validDaysBeforeOptions = getValidDaysBeforeOptions(form.dueDate);
+  const currentDefaultValues =
+    mode === "edit" && initialFormValues
+      ? initialFormValues
+      : DEFAULT_FORM_VALUES;
 
-  // Reusable channel options
-  const channelList: {
-    id: DeliveryChannel;
-    label: string;
-    icon: React.ReactNode;
-  }[] = [
-    {
-      id: 'WHATSAPP',
-      label: 'WhatsApp',
-      icon: <WhatsAppIcon className="w-5 h-5" />,
-    },
-    {
-      id: 'EMAIL',
-      label: 'Email',
-      icon: <Mail className="w-5 h-5" />,
-    },
-    {
-      id: 'SMS',
-      label: 'SMS',
-      icon: <Smartphone className="w-5 h-5" />,
-    },
-  ];
+  const formKey =
+    mode === "edit"
+      ? `edit-${taskId}-${initialFormValues ? "loaded" : "pending"}`
+      : "create";
 
   return (
     <Drawer
       open={open}
       onClose={handleClose}
-      title={mode === 'edit' ? generatedTaskTitle || 'Edit Task' : 'Create Task'}
+      title={mode === "edit" ? headerTitle || "Edit Task" : "Create Task"}
       width="lg"
-      submitVariant="gold"
-      onSubmit={handleSubmit}
-      onCancel={handleClose}
-      cancelLabel="Cancel"
-      submitLabel={mode === 'edit' ? 'Save changes' : 'Create task'}
-      submitting={saveAction.loading}
       customHeader={
         <div className="bg-[#0F1E36] px-6 py-5 flex items-center justify-between text-white shrink-0 border-b border-white/10 select-none">
           <div className="flex items-center gap-3.5 min-w-0">
             <div className="w-10 h-10 rounded-2xl bg-[#F59E0B] flex items-center justify-center text-slate-950 font-bold shadow-sm shrink-0">
-              {mode === 'edit' ? (
+              {mode === "edit" ? (
                 <Pencil className="h-5 w-5 text-slate-950 stroke-[2.5]" />
               ) : (
                 <Plus className="h-5 w-5 text-slate-950 stroke-[2.5]" />
@@ -320,12 +324,12 @@ export default function TaskFormDialog({
             </div>
             <div className="min-w-0">
               <p className="text-xs font-bold text-[#F59E0B] uppercase tracking-wider mb-0.5">
-                {mode === 'edit' ? 'Update task' : 'New task'}
+                {mode === "edit" ? "Update task" : "New task"}
               </p>
               <h2 className="text-lg font-extrabold leading-tight text-white tracking-tight truncate">
-                {mode === 'edit'
-                  ? generatedTaskTitle || 'Update Task Details'
-                  : 'Create New Task'}
+                {mode === "edit"
+                  ? headerTitle || "Update Task Details"
+                  : "Create New Task"}
               </h2>
             </div>
           </div>
@@ -340,392 +344,69 @@ export default function TaskFormDialog({
           </button>
         </div>
       }
+      footer={
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={handleClose}
+            disabled={saveAction.loading}
+            className="flex-1 rounded-xl border border-[var(--border)] py-2.5 text-sm font-semibold text-txt-main bg-[var(--bg)] transition-all hover:bg-[var(--border)]/60 disabled:opacity-50 cursor-pointer"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            form={TASK_FORM_ID}
+            disabled={saveAction.loading || fetchTaskAction.loading}
+            className="flex flex-[2] items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold bg-[#F59E0B] hover:bg-[#D97706] text-slate-950 shadow-md transition-all hover:shadow-lg disabled:opacity-60 cursor-pointer"
+          >
+            {saveAction.loading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>{mode === "edit" ? "Saving..." : "Creating..."}</span>
+              </>
+            ) : (
+              <span>{mode === "edit" ? "Save changes" : "Create task"}</span>
+            )}
+          </button>
+        </div>
+      }
     >
-      <div className="space-y-4 py-1">
-        {/* Subtle Non-blocking Loading Indicator */}
-        {loadingTask && (
-          <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 text-xs">
+      <div className="py-1">
+        {/* Loading Indicator */}
+        {fetchTaskAction.loading && (
+          <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 text-xs mb-4">
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
             <span>Loading task details...</span>
           </div>
         )}
 
-        {/* ── Error banner ─────────────────────────────────────────────── */}
-        {combinedError && (
-          <div role="alert" className="alert alert-error rounded-xl py-3 px-4 text-xs flex gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-            <span className="flex-1 font-medium">{combinedError}</span>
-            <button
-              type="button"
-              onClick={() => {
-                setLocalError('');
-                setFetchError('');
-                saveAction.clearError();
-              }}
-              className="btn btn-ghost btn-xs btn-circle"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        )}
-
-        {/* ── Section 1: Client ────────────────────────────────────────── */}
-        <DrawerSection step={1} title="Client" required>
-          <FieldWrap label="Select Client" required>
-            <SearchableSelect
-              options={clients}
-              value={selectedClient}
-              onChange={(client) => {
-                setSelectedClient(client);
-                set('subjectId', client?.id ?? '');
-              }}
-              getOptionLabel={(c) => c.displayName || c.businessName || 'Unnamed'}
-              getOptionKey={(c) => c.id}
-              loading={clientsLoading}
-              placeholder="Search and select client"
-              emptyMessage={
-                clients.length === 0
-                  ? 'No clients found. Create a client first.'
-                  : 'No matching clients'
-              }
-            />
-          </FieldWrap>
-
-          {selectedClient && (
-            <div className="flex items-center justify-between px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-divider text-xs">
-              <div className="flex items-center gap-2 text-txt-sub">
-                <Building2 className="w-3.5 h-3.5 text-amber-500" />
-                <span>
-                  Selected:{' '}
-                  <strong className="text-txt-main">
-                    {selectedClient.displayName || selectedClient.businessName}
-                  </strong>
-                </span>
-              </div>
-              <span className="font-mono text-[11px] text-txt-sub">
-                {selectedClient.phone || selectedClient.email || ''}
-              </span>
-            </div>
-          )}
-        </DrawerSection>
-
-        {/* ── Section 2: Task Details ──────────────────────────────────── */}
-        <DrawerSection step={2} title="Task and compliance" required>
-          {/* Task Type & Frequency */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <FieldWrap label="Task Type" required>
-              <div className="relative">
-                <select
-                  value={form.taskType}
-                  onChange={(e) => set('taskType', e.target.value)}
-                  className={`${SELECT} pr-9`}
-                >
-                  <option value="" disabled>
-                    Select type
-                  </option>
-                  {TASK_TYPES.map((t) => (
-                    <option key={t.value} value={t.value} className="bg-surface">
-                      {t.label}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-txt-sub" />
-              </div>
-            </FieldWrap>
-
-            <FieldWrap label="Frequency" required>
-              <div className="relative">
-                <select
-                  value={form.frequency}
-                  onChange={(e) => set('frequency', e.target.value)}
-                  className={`${SELECT} pr-9`}
-                >
-                  {FREQUENCY_OPTIONS.map((f) => (
-                    <option key={f.value} value={f.value} className="bg-surface">
-                      {f.label}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-txt-sub" />
-              </div>
-            </FieldWrap>
-          </div>
-
-          {/* Due Date & Priority Dropdown */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <FieldWrap label="Due Date" required>
-              <input
-                type="date"
-                value={form.dueDate}
-                onChange={(e) => {
-                  const d = e.target.value;
-                  set('dueDate', d);
-                  const opts = getValidDaysBeforeOptions(d);
-                  if (
-                    !opts.some((o) => o.value === form.reminder.daysBeforeDueDate) &&
-                    opts.length > 0
-                  ) {
-                    setReminder('daysBeforeDueDate', opts[0].value);
-                  }
-                }}
-                className={INPUT}
-              />
-            </FieldWrap>
-
-            {/* Priority as a dropdown */}
-            <FieldWrap label="Priority">
-              <div className="relative">
-                <select
-                  value={form.taskPriority}
-                  onChange={(e) => set('taskPriority', e.target.value as TaskPriority)}
-                  className={`${SELECT} pr-9`}
-                >
-                  <option value="LOW" className="bg-surface">● Low</option>
-                  <option value="MEDIUM" className="bg-surface">● Medium</option>
-                  <option value="HIGH" className="bg-surface">● High</option>
-                  <option value="URGENT" className="bg-surface">● Urgent</option>
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-txt-sub" />
-              </div>
-            </FieldWrap>
-          </div>
-
-          {/* Task Title */}
-          <FieldWrap label="Task Title">
-            <input
-              readOnly
-              value={generatedTaskTitle}
-              placeholder="Auto-generated based on client & type"
-              className={`${INPUT} cursor-default bg-bg/70 ${
-                generatedTaskTitle ? 'text-txt-main' : 'text-txt-sub/50'
-              }`}
-            />
-          </FieldWrap>
-
-          {/* Assigned To */}
-          <FieldWrap label="Assigned To">
-            <SearchableSelect
-              options={staff}
-              value={selectedStaff}
-              onChange={(member) => {
-                setSelectedStaff(member);
-                set('assignedStaffId', member?.id ?? '');
-              }}
-              getOptionLabel={(m) =>
-                [m.firstName, m.lastName].filter(Boolean).join(' ') || m.email || m.id
-              }
-              getOptionKey={(m) => m.id}
-              loading={staffLoading}
-              placeholder="Search and select employee"
-              emptyMessage={
-                staff.length === 0
-                  ? 'No staff found. Add a staff member first.'
-                  : 'No matching staff'
-              }
-            />
-          </FieldWrap>
-
-          {/* Notes */}
-          <FieldWrap label="Notes">
-            <textarea
-              rows={3}
-              value={form.notes}
-              onChange={(e) => set('notes', e.target.value)}
-              placeholder="Add any relevant notes or instructions..."
-              className={TEXTAREA}
-            />
-          </FieldWrap>
-        </DrawerSection>
-
-        {/* ── Section 3: Reminders ─────────────────────────────────────── */}
-        <DrawerSection
-          step={3}
-          title="Automated Reminders"
-          action={
-            <div
-              className="flex items-center gap-2 cursor-pointer select-none"
-              onClick={() => set('remindersEnabled', !form.remindersEnabled)}
-            >
-              <div
-                className={`w-9 h-5 rounded-full p-0.5 flex items-center transition-colors relative ${
-                  form.remindersEnabled ? 'bg-[#0F1E36] dark:bg-navy' : 'bg-slate-300 dark:bg-slate-700'
-                }`}
-              >
-                <div
-                  className={`w-4 h-4 bg-white rounded-full shadow-xs transition-transform ${
-                    form.remindersEnabled ? 'translate-x-4' : 'translate-x-0'
-                  }`}
-                />
-              </div>
-              <span
-                className={`text-xs font-semibold ${
-                  form.remindersEnabled ? 'text-txt-main' : 'text-txt-sub'
-                }`}
-              >
-                {form.remindersEnabled ? 'On' : 'Off'}
-              </span>
-            </div>
-          }
+        <FormWrapper
+          key={formKey}
+          formId={TASK_FORM_ID}
+          schema={taskFormSchema}
+          defaultValues={currentDefaultValues}
+          onSubmit={handleSubmit}
+          className="space-y-4"
         >
-          {form.remindersEnabled ? (
-            <div className="space-y-4 pt-1">
-              {/* Delivery Channel 3 Cards Selection */}
-              <div>
-                <label className="block text-xs font-bold text-txt-main mb-2">
-                  Delivery Channel
-                </label>
-                <div className="grid grid-cols-3 gap-3">
-                  {channelList.map((ch) => {
-                    const isSelected = form.reminder.deliveryChannel === ch.id;
-                    return (
-                      <button
-                        type="button"
-                        key={ch.id}
-                        onClick={() => setReminder('deliveryChannel', ch.id)}
-                        className={`flex flex-col items-center justify-center gap-2 py-3.5 px-3 rounded-2xl border transition-all text-center cursor-pointer ${
-                          isSelected
-                            ? 'bg-[#0F1E36] text-white border-[#0F1E36] shadow-md ring-2 ring-[#0F1E36]/20'
-                            : 'bg-surface text-txt-main border-divider hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50'
-                        }`}
-                      >
-                        <div
-                          className={`transition-transform duration-150 ${
-                            isSelected ? 'scale-110 text-white' : 'text-txt-sub'
-                          }`}
-                        >
-                          {ch.icon}
-                        </div>
-                        <span
-                          className={`text-xs font-bold tracking-tight ${
-                            isSelected ? 'text-white' : 'text-txt-main'
-                          }`}
-                        >
-                          {ch.label}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Days Before Due */}
-              <FieldWrap
-                label="Days Before Due"
-                helper={form.dueDate ? 'Days ahead to send' : 'Pick a due date first'}
-              >
-                <div className="relative">
-                  <select
-                    value={form.reminder.daysBeforeDueDate}
-                    onChange={(e) =>
-                      setReminder('daysBeforeDueDate', Number(e.target.value))
-                    }
-                    disabled={!form.dueDate}
-                    className={`${SELECT} pr-9 disabled:opacity-50`}
-                  >
-                    {validDaysBeforeOptions.map((opt) => (
-                      <option key={opt.value} value={opt.value} className="bg-surface">
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-txt-sub" />
-                </div>
-              </FieldWrap>
-
-              {/* Template */}
-              <FieldWrap
-                label="Message Template"
-                required
-                helper="Matched to task type & channel"
-              >
-                <SearchableSelect
-                  options={templates}
-                  value={selectedTemplate}
-                  onChange={(template) => {
-                    setSelectedTemplate(template);
-                    set('templateId', template?.id ?? '');
-                  }}
-                  getOptionLabel={(t) => t.name}
-                  getOptionKey={(t) => t.id}
-                  loading={templatesLoading}
-                  placeholder="Search and select template"
-                  emptyMessage={
-                    templates.length === 0
-                      ? 'No templates found. Create a template first.'
-                      : 'No matching templates'
-                  }
-                  renderOption={(t) => (
-                    <div>
-                      <p className="font-semibold text-txt-main">{t.name}</p>
-                      <p className="text-xs text-txt-sub">
-                        {t.businessCategory}
-                        {t.channels?.length ? ` · ${t.channels.join(', ')}` : ''}
-                      </p>
-                    </div>
-                  )}
-                />
-
-                {/* Template preview card */}
-                {selectedTemplate && (
-                  <div className="mt-3 rounded-xl border border-divider bg-bg/50 p-4 space-y-2">
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="w-3.5 h-3.5 text-[#F59E0B]" />
-                      <p className="text-xs font-bold text-txt-main">
-                        Template Preview
-                      </p>
-                    </div>
-                    <div className="text-xs text-txt-sub leading-relaxed">
-                      {form.reminder.deliveryChannel === 'EMAIL' &&
-                      selectedTemplate.templates?.email ? (
-                        <div className="space-y-1">
-                          <p className="font-semibold text-txt-main">
-                            {replaceTemplatePlaceholders(
-                              selectedTemplate.templates.email.subject
-                            )}
-                          </p>
-                          <p className="whitespace-pre-line text-txt-sub">
-                            {replaceTemplatePlaceholders(
-                              selectedTemplate.templates.email.body
-                            )}
-                          </p>
-                        </div>
-                      ) : form.reminder.deliveryChannel === 'EMAIL' ? (
-                        <p className="italic text-txt-sub/60">
-                          No Email content in this template
-                        </p>
-                      ) : null}
-
-                      {form.reminder.deliveryChannel === 'WHATSAPP' &&
-                      selectedTemplate.templates?.whatsapp ? (
-                        <p className="whitespace-pre-line text-txt-sub">
-                          💬{' '}
-                          {replaceTemplatePlaceholders(
-                            selectedTemplate.templates.whatsapp.body
-                          )}
-                        </p>
-                      ) : form.reminder.deliveryChannel === 'WHATSAPP' ? (
-                        <p className="italic text-txt-sub/60">
-                          No WhatsApp content in this template
-                        </p>
-                      ) : null}
-
-                      {form.reminder.deliveryChannel !== 'EMAIL' &&
-                        form.reminder.deliveryChannel !== 'WHATSAPP' && (
-                          <p className="italic text-txt-sub/60">
-                            No preview for {form.reminder.deliveryChannel}
-                          </p>
-                        )}
-                    </div>
-                  </div>
-                )}
-              </FieldWrap>
-            </div>
-          ) : (
-            <p className="text-xs text-txt-sub py-1">
-              Automated reminders are turned off for this task. Turn on to configure notifications.
-            </p>
-          )}
-        </DrawerSection>
+          <TaskFormContent
+            clients={clients}
+            clientsLoading={clientsLoading}
+            selectedClient={selectedClient}
+            setSelectedClient={setSelectedClient}
+            staff={staff}
+            staffLoading={staffLoading}
+            selectedStaff={selectedStaff}
+            setSelectedStaff={setSelectedStaff}
+            templates={templates}
+            templatesLoading={templatesLoading}
+            selectedTemplate={selectedTemplate}
+            setSelectedTemplate={setSelectedTemplate}
+            taskDefinitions={taskDefinitions}
+            business={business}
+            onTitleCalculated={setHeaderTitle}
+          />
+        </FormWrapper>
       </div>
     </Drawer>
   );

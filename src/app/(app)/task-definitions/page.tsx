@@ -1,9 +1,7 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useMemo } from "react";
 import { AlertTriangle } from "lucide-react";
-import { TaskDefinitionListItem } from "@/types/taskDefinition.types";
-import { getTaskDefinitions, deleteTaskDefinition } from "@/services/taskDefinitionService";
 import TaskDefinitionsTable from "@/components/task-definitions/TaskDefinitionsTable";
 import TaskDefinitionsFilter from "@/components/task-definitions/TaskDefinitionsFilter";
 import TaskDefinitionDetailsDrawer from "@/components/task-definitions/TaskDefinitionDetailsDrawer";
@@ -12,66 +10,41 @@ import ConfirmDialog from "@/components/tasks/ConfirmDialog";
 import ResourcePageLayout from "@/components/common/ResourcePageLayout";
 import { useWorkspace } from "@/context/WorkspaceContext";
 import { useResourcePageState } from "@/hooks/useResourcePageState";
-import { useAsyncAction } from "@/hooks/useAnyAction";
 import { useTaskDefinitionFilters } from "@/hooks/task-definitions/useTaskDefinitions";
 import { getTaskDefinitionStats } from "@/lib/task-definitons/taskDefinitionStat";
 import StatCard from "@/components/task-definitions/StatCard";
 import PageSkeleton from "@/components/common/PageSkeleton";
-
+import { useTaskDefinitionList } from "@/hooks/task-definitions/useDefintion";
 
 export default function TaskDefinitionsPage() {
   const { businessId } = useWorkspace();
-
-  const [definitions, setDefinitions] = useState<TaskDefinitionListItem[]>([]);
-  const [drawerRefreshKey, setDrawerRefreshKey] = useState(0);
-
-  const fetchAction = useAsyncAction(true);
-  const deleteAction = useAsyncAction();
   const page = useResourcePageState();
+
+  const {
+    definitions,
+    loading,
+    error,
+    clearError,
+    refetch,
+    refreshKey,
+    removeDefinition,
+    deleteLoading,
+  } = useTaskDefinitionList(businessId);
+
   const filters = useTaskDefinitionFilters(definitions);
-  const stats = useMemo(() => getTaskDefinitionStats(definitions), [definitions]);
-
-  const { run: runFetch } = fetchAction;
-  const { run: runDelete } = deleteAction;
-
-  const fetchDefinitions = useCallback(async () => {
-    if (!businessId) return;
-    await runFetch(() => getTaskDefinitions(businessId), {
-      errorMessage: "Failed to load task definitions",
-      showErrorToast: false,
-      onSuccess: (data) => {
-        setDefinitions(data);
-        setDrawerRefreshKey((prev) => prev + 1);
-      },
-    });
-  }, [businessId, runFetch]);
-
-  // Which business we've already started loading. Refs survive Strict Mode's
-  // dev-only unmount/remount, so the second effect run is skipped.
-  const loadedFor = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (!businessId) return;
-    if (loadedFor.current === businessId) return;
-    loadedFor.current = businessId;
-    setDefinitions([]);
-    fetchDefinitions();
-  }, [businessId, fetchDefinitions]);
+  const stats = useMemo(
+    () => getTaskDefinitionStats(definitions),
+    [definitions],
+  );
 
   const handleDeleteConfirm = async () => {
     const target = page.deleteTarget;
-    if (!businessId || !target) return;
-    await runDelete(() => deleteTaskDefinition(businessId, target.id), {
-      successMessage: `"${target.label}" deleted`,
-      errorMessage: "Failed to delete task definition",
-      onSuccess: async () => {
-        page.cancelDelete();
-        await fetchDefinitions();
-      },
-    });
+    if (!target) return;
+    const ok = await removeDefinition(target.id, target.label);
+    if (ok) page.cancelDelete();
   };
 
-  if (!businessId || (fetchAction.loading && definitions.length === 0)) {
+  if (!businessId || (loading && definitions.length === 0)) {
     return <PageSkeleton hasStats={true} />;
   }
 
@@ -82,23 +55,24 @@ export default function TaskDefinitionsPage() {
       actionLabel="New rule"
       actionVariant="amber"
       onAction={page.openCreate}
-      error={fetchAction.error || deleteAction.error}
-      onDismissError={() => {
-        fetchAction.clearError();
-        deleteAction.clearError();
-      }}
+      error={error}
+      onDismissError={clearError}
       stats={
         <>
           <StatCard
             label="Total rules"
             value={stats.total}
-            hint={stats.allActive ? "All active" : `${stats.activeCount} active`}
+            hint={
+              stats.allActive ? "All active" : `${stats.activeCount} active`
+            }
           />
           <StatCard
             label="Past due"
             value={stats.pastDueCount}
             hint="Need your attention"
-            valueClassName={stats.pastDueCount > 0 ? "text-[#dc2626]" : "text-txt-main"}
+            valueClassName={
+              stats.pastDueCount > 0 ? "text-[#dc2626]" : "text-txt-main"
+            }
           />
           <StatCard
             label="Due this week"
@@ -147,7 +121,7 @@ export default function TaskDefinitionsPage() {
         />
       }
       summary={
-        !fetchAction.loading && (
+        !loading && (
           <p className="text-sm text-txt-sub">
             Showing {filters.filtered.length} of {definitions.length} rules
           </p>
@@ -161,8 +135,8 @@ export default function TaskDefinitionsPage() {
             definitionId={page.viewId}
             businessId={businessId}
             onEdit={page.openEdit}
-            onRefresh={fetchDefinitions}
-            refreshKey={drawerRefreshKey}
+            onRefresh={refetch}
+            refreshKey={refreshKey}
           />
           <TaskDefinitionFormDrawer
             open={page.formOpen}
@@ -170,7 +144,7 @@ export default function TaskDefinitionsPage() {
             definitionId={page.formId}
             businessId={businessId}
             onSuccess={() => {
-              fetchDefinitions();
+              refetch();
               page.close();
             }}
           />
@@ -179,13 +153,14 @@ export default function TaskDefinitionsPage() {
             title="Delete Task Definition"
             description={
               <>
-                Are you sure you want to delete <strong>{page.deleteTarget?.label}</strong>? This
-                action cannot be undone.
+                Are you sure you want to delete{" "}
+                <strong>{page.deleteTarget?.label}</strong>? This action cannot
+                be undone.
               </>
             }
             confirmLabel="Delete"
             variant="danger"
-            loading={deleteAction.loading}
+            loading={deleteLoading}
             onConfirm={handleDeleteConfirm}
             onCancel={page.cancelDelete}
           />
@@ -194,12 +169,12 @@ export default function TaskDefinitionsPage() {
     >
       <TaskDefinitionsTable
         definitions={filters.filtered}
-        loading={fetchAction.loading}
+        loading={loading}
         businessId={businessId}
         onView={page.openView}
         onEdit={page.openEdit}
         onDelete={page.requestDelete}
-        onRefresh={fetchDefinitions}
+        onRefresh={refetch}
       />
     </ResourcePageLayout>
   );

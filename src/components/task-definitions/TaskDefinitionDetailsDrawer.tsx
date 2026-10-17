@@ -261,11 +261,10 @@ export default function TaskDefinitionDetailsDrawer({
                   </p>
                   {definition && (
                     <span
-                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${
-                        definition.isActive
+                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${definition.isActive
                           ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
                           : 'bg-white/10 text-white/80 border-white/20'
-                      }`}
+                        }`}
                     >
                       {definition.isActive ? 'Active' : 'Inactive'}
                     </span>
@@ -314,11 +313,10 @@ export default function TaskDefinitionDetailsDrawer({
                 type="button"
                 onClick={handleToggleActive}
                 disabled={toggling}
-                className={`inline-flex items-center gap-2 rounded-xl py-2.5 px-6 text-sm font-semibold shadow-xs transition-colors cursor-pointer disabled:opacity-50 ${
-                  definition.isActive
+                className={`inline-flex items-center gap-2 rounded-xl py-2.5 px-6 text-sm font-semibold shadow-xs transition-colors cursor-pointer disabled:opacity-50 ${definition.isActive
                     ? 'border border-red-300 dark:border-rose-800 text-red-600 dark:text-rose-300 bg-red-50 dark:bg-rose-950/40 hover:bg-red-100'
                     : 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                }`}
+                  }`}
               >
                 {toggling && <Loader2 className="h-4 w-4 animate-spin" />}
                 <Power className="h-4 w-4" />
@@ -328,8 +326,8 @@ export default function TaskDefinitionDetailsDrawer({
                       ? 'Disabling…'
                       : 'Enabling…'
                     : definition.isActive
-                    ? 'Disable Rule'
-                    : 'Enable Rule'}
+                      ? 'Disable Rule'
+                      : 'Enable Rule'}
                 </span>
               </button>
             </div>
@@ -400,18 +398,16 @@ export default function TaskDefinitionDetailsDrawer({
                   label="Auto-create Tasks"
                   value={
                     <span
-                      className={`inline-flex items-center gap-1.5 font-semibold text-xs ${
-                        definition.autoCreateTasks
+                      className={`inline-flex items-center gap-1.5 font-semibold text-xs ${definition.autoCreateTasks
                           ? 'text-emerald-600 dark:text-emerald-400'
                           : 'text-txt-sub'
-                      }`}
+                        }`}
                     >
                       <CheckCircle2
-                        className={`h-3.5 w-3.5 ${
-                          definition.autoCreateTasks
+                        className={`h-3.5 w-3.5 ${definition.autoCreateTasks
                             ? 'text-emerald-500'
                             : 'text-slate-300 dark:text-slate-600'
-                        }`}
+                          }`}
                       />
                       {definition.autoCreateTasks ? 'Enabled' : 'Disabled'}
                     </span>
@@ -422,18 +418,16 @@ export default function TaskDefinitionDetailsDrawer({
                   label="Auto-create Reminders"
                   value={
                     <span
-                      className={`inline-flex items-center gap-1.5 font-semibold text-xs ${
-                        definition.autoCreateReminders
+                      className={`inline-flex items-center gap-1.5 font-semibold text-xs ${definition.autoCreateReminders
                           ? 'text-emerald-600 dark:text-emerald-400'
                           : 'text-txt-sub'
-                      }`}
+                        }`}
                     >
                       <Bell
-                        className={`h-3.5 w-3.5 ${
-                          definition.autoCreateReminders
+                        className={`h-3.5 w-3.5 ${definition.autoCreateReminders
                             ? 'text-emerald-500'
                             : 'text-slate-300 dark:text-slate-600'
-                        }`}
+                          }`}
                       />
                       {definition.autoCreateReminders ? 'Enabled' : 'Disabled'}
                     </span>
@@ -474,9 +468,8 @@ export default function TaskDefinitionDetailsDrawer({
               <p className="text-xs text-txt-sub">
                 {loadingReminders
                   ? 'Loading reminder rules...'
-                  : `${reminderRules.length} reminder rule${
-                      reminderRules.length !== 1 ? 's' : ''
-                    } configured for this task rule.`}
+                  : `${reminderRules.length} reminder rule${reminderRules.length !== 1 ? 's' : ''
+                  } configured for this task rule.`}
               </p>
               {!loadingReminders && reminderRules.length > 0 && (
                 <button

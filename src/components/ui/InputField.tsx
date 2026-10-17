@@ -19,10 +19,12 @@ export function InputField({
     disabled,
     required,
     className = "",
+    onChange,
     ...props
 }: InputFieldProps) {
     const { register, formState: { errors } } = useFormContext();
     const error = errors[name]?.message as string | undefined;
+    const { onChange: formOnChange, ...restRegister } = register(name);
 
     return (
         <div className="w-full">
@@ -42,8 +44,12 @@ export function InputField({
                     type={type}
                     placeholder={placeholder}
                     disabled={disabled}
-                    {...register(name)}
+                    {...restRegister}
                     {...props}
+                    onChange={(e) => {
+                        formOnChange(e);
+                        onChange?.(e);
+                    }}
                     className={`w-full h-11 rounded-xl border bg-[var(--surface)] text-sm font-medium text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/60 outline-none transition-all ${Icon ? "pl-10" : "pl-3.5"
                         } pr-3.5 ${error
                             ? "border-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-400/20"

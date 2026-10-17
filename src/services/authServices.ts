@@ -11,18 +11,15 @@ import { getBackendToken, clearToken } from './apiService';
 
 export const loginWithEmail = async (email: string, password: string) => {
   try {
-    // Step 1: Firebase verifies the user
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     console.log("User Credential:", userCredential);
     const user = userCredential.user;
 
-    // Step 2: Block unverified emails
     if (!user.emailVerified) {
       await signOut(auth);
       throw new Error("Please verify your email before logging in. Check your inbox.");
     }
 
-    // Step 3: Get your backend token (no duplication anymore)
     await getBackendToken(email, password);
 
     return { user };

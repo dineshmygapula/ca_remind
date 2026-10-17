@@ -1,27 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import {
-  Card,
-  CardContent,
-  CardActions,
-  Typography,
-  Box,
-  IconButton,
-  Chip,
-  Divider,
-  Stack,
-  Button,
-  Tooltip,
-} from '@mui/material';
-import {
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-  //ContentCopy as DuplicateIcon,
-  ExpandMore as ExpandMoreIcon,
-  Email as EmailIcon,
-  WhatsApp as WhatsAppIcon,
-} from '@mui/icons-material';
+import { Pencil, Trash2, ChevronDown, Mail, MessageSquare } from 'lucide-react';
 import { MessageTemplate } from '@/types/messageTemplate.types';
 
 interface TemplateCardProps {
@@ -39,163 +19,135 @@ export default function TemplateCard({ template, onEdit, onDelete }: TemplateCar
   };
 
   return (
-    <Card
-      sx={{
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        transition: 'all 0.3s ease',
-        '&:hover': {
-          boxShadow: 6,
-          transform: 'translateY(-4px)',
-        },
-        border: '1px solid',
-        borderColor: 'grey.200',
-      }}
-    >
+    <div className="h-full flex flex-col rounded-2xl border border-[var(--border)] bg-[var(--surface)] transition-all hover:shadow-md">
       {/* Header */}
-      <CardContent sx={{ flexGrow: 1, pb: 1 }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="flex-start" mb={2}>
-          <Box>
-            <Typography variant="h6" fontWeight={600} gutterBottom>
-              {template.name}
-            </Typography>
-            <Stack direction="row" spacing={1} mt={1}>
-              <Chip
-                label={template.reminder_type}
-                size="small"
-                color="primary"
-                variant="outlined"
-              />
-              <Chip
-                label={template.isActive ? 'Active' : 'Inactive'}
-                size="small"
-                color={template.isActive ? 'success' : 'default'}
-              />
-            </Stack>
-          </Box>
-          <Stack direction="row" spacing={0.5}>
+      <div className="flex-1 p-5 pb-3 space-y-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h4 className="text-base font-bold text-txt-main">{template.name}</h4>
+            <div className="flex items-center gap-2 mt-1.5">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                {template.reminder_type}
+              </span>
+              <span
+                className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold ${
+                  template.isActive
+                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
+                    : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                }`}
+              >
+                {template.isActive ? 'Active' : 'Inactive'}
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5 text-txt-sub">
             {template.channels.includes('email') && (
-              <Tooltip title="Email">
-                <EmailIcon fontSize="small" color="action" />
-              </Tooltip>
+              <Mail className="w-4 h-4 text-blue-600 dark:text-blue-400" />
             )}
             {template.channels.includes('whatsapp') && (
-              <Tooltip title="WhatsApp">
-                <WhatsAppIcon fontSize="small" sx={{ color: '#25D366' }} />
-              </Tooltip>
+              <MessageSquare className="w-4 h-4 text-[#25D366]" />
             )}
-          </Stack>
-        </Stack>
+          </div>
+        </div>
 
-        <Divider sx={{ my: 2 }} />
+        <div className="border-t border-[var(--border)] pt-3 space-y-3">
+          {/* Email Preview */}
+          {template.templates.email && (
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-txt-main">
+                <Mail className="w-3.5 h-3.5 text-blue-600" />
+                <span>Email Template</span>
+              </div>
+              <div className="bg-[var(--bg)] p-2.5 rounded-xl border border-[var(--border)] text-xs space-y-1">
+                <p className="font-semibold text-txt-sub">
+                  Subject: <span className="text-txt-main font-normal">{template.templates.email.subject}</span>
+                </p>
+                <p className="text-txt-sub whitespace-pre-line leading-relaxed font-mono">
+                  {expanded
+                    ? template.templates.email.body
+                    : truncateText(template.templates.email.body, 100)}
+                </p>
+              </div>
+            </div>
+          )}
 
-        {/* Email Preview */}
-        {template.templates.email && (
-          <Box mb={2}>
-            <Stack direction="row" alignItems="center" spacing={1} mb={1}>
-              <EmailIcon fontSize="small" color="primary" />
-              <Typography variant="subtitle2" fontWeight={600}>
-                Email Template
-              </Typography>
-            </Stack>
-            <Box sx={{ bgcolor: 'grey.50', p: 1.5, borderRadius: 1, border: '1px solid', borderColor: 'grey.200' }}>
-              <Typography variant="caption" color="text.secondary" fontWeight={600}>
-                Subject:
-              </Typography>
-              <Typography variant="body2" gutterBottom>
-                {template.templates.email.subject}
-              </Typography>
-              <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ mt: 1, display: 'block' }}>
-                Body:
-              </Typography>
-              <Typography variant="body2" sx={{ whiteSpace: 'pre-line' }}>
-                {expanded
-                  ? template.templates.email.body
-                  : truncateText(template.templates.email.body, 100)}
-              </Typography>
-            </Box>
-          </Box>
-        )}
+          {/* WhatsApp Preview */}
+          {template.templates.whatsapp && (
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-txt-main">
+                <MessageSquare className="w-3.5 h-3.5 text-[#25D366]" />
+                <span>WhatsApp Template</span>
+              </div>
+              <div className="bg-emerald-50/50 dark:bg-emerald-950/20 p-2.5 rounded-xl border border-emerald-200 dark:border-emerald-800 text-xs">
+                <p className="text-txt-sub whitespace-pre-line leading-relaxed font-mono">
+                  {expanded
+                    ? template.templates.whatsapp.body
+                    : truncateText(template.templates.whatsapp.body, 100)}
+                </p>
+              </div>
+            </div>
+          )}
 
-        {/* WhatsApp Preview */}
-        {template.templates.whatsapp && (
-          <Box mb={2}>
-            <Stack direction="row" alignItems="center" spacing={1} mb={1}>
-              <WhatsAppIcon fontSize="small" sx={{ color: '#25D366' }} />
-              <Typography variant="subtitle2" fontWeight={600}>
-                WhatsApp Template
-              </Typography>
-            </Stack>
-            <Box sx={{ bgcolor: '#E7F8ED', p: 1.5, borderRadius: 1, border: '1px solid #25D366' }}>
-              <Typography variant="body2" sx={{ whiteSpace: 'pre-line' }}>
-                {expanded
-                  ? template.templates.whatsapp.body
-                  : truncateText(template.templates.whatsapp.body, 100)}
-              </Typography>
-            </Box>
-          </Box>
-        )}
-
-        {/* Placeholders */}
-        {template.placeholders.length > 0 && (
-          <Box>
-            <Typography variant="caption" color="text.secondary" fontWeight={600} gutterBottom display="block">
-              Placeholders ({template.placeholders.length}):
-            </Typography>
-            <Stack direction="row" spacing={0.5} flexWrap="wrap" gap={0.5}>
-              {template.placeholders.slice(0, expanded ? undefined : 3).map((placeholder) => (
-                <Chip
-                  key={placeholder}
-                  label={`[${placeholder}]`}
-                  size="small"
-                  variant="outlined"
-                  sx={{ fontSize: '0.7rem', fontFamily: 'monospace' }}
-                />
-              ))}
-              {!expanded && template.placeholders.length > 3 && (
-                <Chip label={`+${template.placeholders.length - 3} more`} size="small" />
-              )}
-            </Stack>
-          </Box>
-        )}
-      </CardContent>
+          {/* Placeholders */}
+          {template.placeholders.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-[11px] font-semibold text-txt-sub">
+                Placeholders ({template.placeholders.length}):
+              </p>
+              <div className="flex flex-wrap gap-1">
+                {template.placeholders.slice(0, expanded ? undefined : 3).map((placeholder) => (
+                  <span
+                    key={placeholder}
+                    className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-medium bg-[var(--bg)] border border-[var(--border)] text-txt-main"
+                  >
+                    [{placeholder}]
+                  </span>
+                ))}
+                {!expanded && template.placeholders.length > 3 && (
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] text-txt-sub">
+                    +{template.placeholders.length - 3} more
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Actions */}
-      <Divider />
-      <CardActions sx={{ justifyContent: 'space-between', px: 2, py: 1.5 }}>
-        <Button
-          size="small"
+      <div className="border-t border-[var(--border)] flex items-center justify-between px-4 py-2.5 bg-[var(--bg)]/50 rounded-b-2xl">
+        <button
+          type="button"
           onClick={() => setExpanded(!expanded)}
-          endIcon={
-            <ExpandMoreIcon
-              sx={{
-                transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)',
-                transition: 'transform 0.3s',
-              }}
-            />
-          }
+          className="inline-flex items-center gap-1 text-xs font-semibold text-txt-sub hover:text-txt-main transition-colors cursor-pointer"
         >
-          {expanded ? 'Show Less' : 'Read More'}
-        </Button>
+          <span>{expanded ? 'Show Less' : 'Read More'}</span>
+          <ChevronDown
+            className={`w-3.5 h-3.5 transition-transform duration-200 ${
+              expanded ? 'rotate-180' : ''
+            }`}
+          />
+        </button>
 
-        <Stack direction="row" spacing={1}>
-          <Tooltip title="Edit Template">
-            <IconButton size="small" color="primary" onClick={() => onEdit(template.id)}>
-              <EditIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Delete Template">
-            <IconButton
-              size="small"
-              color="error"
-              onClick={() => onDelete(template.id, template.name)}
-            >
-              <DeleteIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-        </Stack>
-      </CardActions>
-    </Card>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => onEdit(template.id)}
+            title="Edit Template"
+            className="p-1.5 rounded-lg text-txt-sub hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-colors cursor-pointer"
+          >
+            <Pencil className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => onDelete(template.id, template.name)}
+            title="Delete Template"
+            className="p-1.5 rounded-lg text-txt-sub hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors cursor-pointer"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

@@ -3,6 +3,7 @@
 import { ReactNode } from "react";
 import { Search, RotateCcw, ChevronDown } from "lucide-react";
 import Dropdown from "./Dropdown";
+import { DatePicker } from "./DatePicker";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -171,20 +172,18 @@ export default function FilterBar({
         {/* Date Range Inputs */}
         {dateRange && (
           <div className="flex items-center gap-2 shrink-0">
-            <input
-              type="date"
+            <DatePicker
               value={dateRange.fromValue}
-              onChange={(e) => dateRange.onFromChange(e.target.value)}
-              className="h-10 rounded-xl border border-divider bg-bg/60 px-3 text-sm font-medium text-txt-main focus:border-blue-500 focus:bg-surface focus:outline-none focus:ring-2 focus:ring-blue-500/15 transition-all"
-              title={dateRange.fromLabel ?? "From Date"}
+              onChange={(v) => dateRange.onFromChange(v ?? "")}
+              placeholder={dateRange.fromLabel ?? "From date"}
+              className="w-40"
             />
             <span className="text-sm text-txt-sub font-medium">to</span>
-            <input
-              type="date"
+            <DatePicker
               value={dateRange.toValue}
-              onChange={(e) => dateRange.onToChange(e.target.value)}
-              className="h-10 rounded-xl border border-divider bg-bg/60 px-3 text-sm font-medium text-txt-main focus:border-blue-500 focus:bg-surface focus:outline-none focus:ring-2 focus:ring-blue-500/15 transition-all"
-              title={dateRange.toLabel ?? "To Date"}
+              onChange={(v) => dateRange.onToChange(v ?? "")}
+              placeholder={dateRange.toLabel ?? "To date"}
+              className="w-40"
             />
           </div>
         )}

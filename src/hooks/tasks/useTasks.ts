@@ -21,11 +21,9 @@ export function useTasks(businessId: string | null | undefined): UseTasksResult 
     const [error, setError] = useState('');
     const [deleteLoading, setDeleteLoading] = useState(false);
 
-    // Which business we've already started loading. Refs survive Strict Mode's
-    // dev-only unmount/remount, so the second effect run is skipped.
+
     const loadedFor = useRef<string | null>(null);
-    // True once we have data, so later refetches don't flip `loading` and
-    // flash the page skeleton.
+
     const hasData = useRef(false);
     // Ignore responses that arrive after a newer request started.
     const requestId = useRef(0);

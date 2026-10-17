@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { Eye, Pencil, Trash2, Loader2 } from "lucide-react";
 import CommonDataGrid, {
   GridAction,
@@ -11,7 +11,7 @@ import { TaskDefinitionListItem } from "@/types/taskDefinition.types";
 import { updateTaskDefinition } from "@/services/taskDefinitionService";
 import { useToast } from "@/context/ToastContext";
 import { DueDate } from "@/components/common/DueDate";
-
+import { useAsyncAction } from "@/hooks/useAnyAction";
 interface TaskDefinitionsTableProps {
   definitions: TaskDefinitionListItem[];
   loading: boolean;
@@ -130,32 +130,41 @@ export default function TaskDefinitionsTable({
     "autoCreateTasks" | "autoCreateReminders" | null
   >(null);
 
+  // remove: import { useToast } from "@/context/ToastContext";
+
+  // inside the component, replacing `const toast = useToast();`
+  const toggleAction = useAsyncAction();
+  const updateAction = useAsyncAction();
+  const { run } = useAsyncAction();
+  const togglingRef = useRef(false);
+
   const handleToggle = async (
     e: React.MouseEvent,
     def: TaskDefinitionListItem,
     field: "autoCreateTasks" | "autoCreateReminders",
   ) => {
     e.stopPropagation();
+    if (e.detail > 1 || togglingRef.current) return; // ignore double-click / in-flight
+
+    togglingRef.current = true;
     setTogglingId(def.id);
     setTogglingField(field);
 
     const nextVal = !def[field];
-    try {
-      await updateTaskDefinition(businessId, def.id, {
-        [field]: nextVal,
-      });
-      toast.success(
-        `${field === "autoCreateTasks" ? "Auto Tasks" : "Auto Reminders"} turned ${nextVal ? "ON" : "OFF"}`,
-      );
-      onRefresh();
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : `Failed to toggle ${field}`,
-      );
-    } finally {
-      setTogglingId(null);
-      setTogglingField(null);
-    }
+    const label = field === "autoCreateTasks" ? "Auto Tasks" : "Auto Reminders";
+
+    await run(
+      () => updateTaskDefinition(businessId, def.id, { [field]: nextVal }),
+      {
+        successMessage: `${label} turned ${nextVal ? "ON" : "OFF"}`,
+        errorMessage: `Failed to toggle ${label.toLowerCase()}`,
+        // onSuccess: () => onRefresh(),
+      },
+    );
+
+    togglingRef.current = false;
+    setTogglingId(null);
+    setTogglingField(null);
   };
 
   const columns: GridColumn<TaskDefinitionListItem>[] = useMemo(
@@ -292,21 +301,15 @@ export default function TaskDefinitionsTable({
       {
         headerName: "Status",
         field: "isActive",
+        cellDataType: false,
         minWidth: 110,
         flex: 0.9,
         editable: true,
         cellEditor: "agSelectCellEditor",
-        cellEditorParams: {
-          values: ["Active", "Inactive"],
-        },
-        valueFormatter: (p) =>
-          p.value === "Active" || p.value === true ? "Active" : "Inactive",
-        cellRenderer: (p) => {
-          const active =
-            p.value === "Active" ||
-            p.value === true ||
-            (p.value !== "Inactive" && Boolean(p.data?.isActive));
-          return active ? (
+        cellEditorParams: { values: [true, false] },
+        valueFormatter: (p) => (p.value ? "Active" : "Inactive"),
+        cellRenderer: (p) =>
+          p.value ? (
             <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#059669] dark:text-emerald-400">
               <span className="w-1.5 h-1.5 rounded-full bg-[#10b981]" />
               Active
@@ -316,8 +319,7 @@ export default function TaskDefinitionsTable({
               <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
               Inactive
             </span>
-          );
-        },
+          ),
       },
       {
         headerName: "Next due",
@@ -351,14 +353,14 @@ export default function TaskDefinitionsTable({
       rowHeight={64}
       onUpdateCell={async ({ row, field, newValue }) => {
         if (!businessId) return;
-        let valToSave: unknown = newValue;
-        if (field === "isActive") {
-          valToSave = newValue === "Active" || newValue === true;
-        }
-        await updateTaskDefinition(businessId, row.id, {
-          [field]: valToSave,
-        });
-        onRefresh();
+        await run(
+          () => updateTaskDefinition(businessId, row.id, { [field]: newValue }),
+          {
+            successMessage: "Rule updated successfully",
+            errorMessage: "Failed to update rule",
+            // onSuccess: () => onRefresh(),
+          },
+        );
       }}
       emptyMessage="No task definitions found"
     />

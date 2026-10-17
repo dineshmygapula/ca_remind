@@ -4,7 +4,6 @@ import React, { useState, useMemo } from 'react';
 import { Eye, Pencil, Trash2, Mail, Phone, Building2, X, ShieldCheck } from 'lucide-react';
 import CommonDataGrid, { GridAction, GridColumn, createTableActions } from '@/components/common/CommonTable';
 import { SubjectListItem } from '@/types/subject';
-import { updateSubject } from '@/services/subjectService';
 
 interface ClientsTableProps {
   clients: SubjectListItem[];
@@ -13,6 +12,12 @@ interface ClientsTableProps {
   onView: (clientId: string) => void;
   onEdit: (clientId: string) => void;
   onDelete: (clientId: string, clientName: string) => void;
+  onUpdateCell?: (params: {
+    row: SubjectListItem;
+    field: string;
+    newValue: unknown;
+    oldValue?: unknown;
+  }) => Promise<void>;
   onRefresh?: () => void;
 }
 
@@ -96,6 +101,7 @@ export default function ClientsTable({
   onView,
   onEdit,
   onDelete,
+  onUpdateCell,
   onRefresh,
 }: ClientsTableProps) {
   // Popover state for showing all compliances when user clicks "+N more"
@@ -274,14 +280,7 @@ export default function ClientsTable({
         actions={actions}
         isLoading={loading}
         rowHeight={64}
-        onUpdateCell={async ({ row, field, newValue }) => {
-          if (!businessId) return;
-          const valToSave = field === 'isActive' ? newValue === 'Active' : newValue;
-          await updateSubject(businessId, row.id, {
-            [field]: valToSave,
-          });
-          onRefresh?.();
-        }}
+        onUpdateCell={onUpdateCell}
         emptyMessage="No clients found"
       />
 

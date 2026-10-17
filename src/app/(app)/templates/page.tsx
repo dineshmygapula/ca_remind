@@ -1,80 +1,49 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { MessageTemplateListItem } from '@/types/messageTemplate.types';
-import {
-  getMessageTemplates,
-  deleteMessageTemplate,
-} from '@/services/messageTemplateService';
-import TemplatesTable from '@/components/templates/TemplatesTable';
-import TemplatesFilter from '@/components/templates/TemplatesFilter';
-import TemplateFormDrawer from '@/components/templates/TemplateFormDrawer';
-import TemplateDetailsDrawer from '@/components/templates/TemplateDetailsDrawer';
-import ConfirmDialog from '@/components/tasks/ConfirmDialog';
-import ResourcePageLayout from '@/components/common/ResourcePageLayout';
-import { useWorkspace } from '@/context/WorkspaceContext';
-import { useResourcePageState } from '@/hooks/useResourcePageState';
-import { useAsyncAction } from '@/hooks/useAnyAction';
-import StatCard from '@/components/task-definitions/StatCard';
-import PageSkeleton from '@/components/common/PageSkeleton';
+import { useState, useMemo } from "react";
+import TemplatesTable from "@/components/templates/TemplatesTable";
+import TemplatesFilter from "@/components/templates/TemplatesFilter";
+import TemplateFormDrawer from "@/components/templates/TemplateFormDrawer";
+import TemplateDetailsDrawer from "@/components/templates/TemplateDetailsDrawer";
+import ConfirmDialog from "@/components/tasks/ConfirmDialog";
+import ResourcePageLayout from "@/components/common/ResourcePageLayout";
+import { useWorkspace } from "@/context/WorkspaceContext";
+import { useResourcePageState } from "@/hooks/useResourcePageState";
+import StatCard from "@/components/task-definitions/StatCard";
+import PageSkeleton from "@/components/common/PageSkeleton";
 import {
   StatusFilter,
   ChannelFilter,
   ReminderTypeFilter,
-} from '@/constants/messageTemplateConstants';
+} from "@/constants/messageTemplateConstants";
+import { useTemplates } from "@/hooks/templates/useTemplate";
 
 export default function TemplatesPage() {
   const { businessId } = useWorkspace();
-
-  const [templates, setTemplates] = useState<MessageTemplateListItem[]>([]);
-
-  // Filter state
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
-  const [channelFilter, setChannelFilter] = useState<ChannelFilter>('ALL');
-  const [reminderTypeFilter, setReminderTypeFilter] = useState<ReminderTypeFilter>('ALL');
-
-  const fetchAction = useAsyncAction(true);
-  const deleteAction = useAsyncAction();
   const page = useResourcePageState();
 
-  const { run: runFetch } = fetchAction;
-  const { run: runDelete } = deleteAction;
+  const {
+    templates,
+    loading,
+    error,
+    clearError,
+    refetch,
+    removeTemplate,
+    deleteLoading,
+  } = useTemplates(businessId);
 
-  const fetchTemplates = useCallback(async () => {
-    if (!businessId) return;
-    await runFetch(() => getMessageTemplates(businessId), {
-      errorMessage: 'Failed to load message templates',
-      showErrorToast: false,
-      onSuccess: (data) => {
-        setTemplates(data);
-      },
-    });
-  }, [businessId, runFetch]);
-
-  // Which business we've already started loading. Refs survive Strict Mode's
-  // dev-only unmount/remount, so the second effect run is skipped.
-  const loadedFor = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (!businessId) return;
-    if (loadedFor.current === businessId) return;
-    loadedFor.current = businessId;
-    setTemplates([]);
-    fetchTemplates();
-  }, [businessId, fetchTemplates]);
+  // Filter state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
+  const [channelFilter, setChannelFilter] = useState<ChannelFilter>("ALL");
+  const [reminderTypeFilter, setReminderTypeFilter] =
+    useState<ReminderTypeFilter>("ALL");
 
   const handleDeleteConfirm = async () => {
     const target = page.deleteTarget;
-    if (!businessId || !target) return;
-    await runDelete(() => deleteMessageTemplate(businessId, target.id), {
-      successMessage: `"${target.label}" deleted`,
-      errorMessage: 'Failed to delete template',
-      onSuccess: async () => {
-        page.cancelDelete();
-        await fetchTemplates();
-      },
-    });
+    if (!target) return;
+    const ok = await removeTemplate(target.id, target.label);
+    if (ok) page.cancelDelete();
   };
 
   // Filter templates
@@ -87,21 +56,21 @@ export default function TemplatesPage() {
         (t) =>
           t.name.toLowerCase().includes(query) ||
           t.key?.toLowerCase().includes(query) ||
-          t.reminder_type?.toLowerCase().includes(query)
+          t.reminder_type?.toLowerCase().includes(query),
       );
     }
 
-    if (statusFilter === 'ACTIVE') {
+    if (statusFilter === "ACTIVE") {
       result = result.filter((t) => t.isActive === true);
-    } else if (statusFilter === 'INACTIVE') {
+    } else if (statusFilter === "INACTIVE") {
       result = result.filter((t) => t.isActive === false);
     }
 
-    if (channelFilter !== 'ALL') {
+    if (channelFilter !== "ALL") {
       result = result.filter((t) => t.channels?.includes(channelFilter));
     }
 
-    if (reminderTypeFilter !== 'ALL') {
+    if (reminderTypeFilter !== "ALL") {
       result = result.filter((t) => t.reminder_type === reminderTypeFilter);
     }
 
@@ -111,8 +80,12 @@ export default function TemplatesPage() {
   // Derived stats
   const stats = useMemo(() => {
     const activeCount = templates.filter((t) => t.isActive).length;
-    const whatsappCount = templates.filter((t) => t.channels?.includes('whatsapp')).length;
-    const emailCount = templates.filter((t) => t.channels?.includes('email')).length;
+    const whatsappCount = templates.filter((t) =>
+      t.channels?.includes("whatsapp"),
+    ).length;
+    const emailCount = templates.filter((t) =>
+      t.channels?.includes("email"),
+    ).length;
     return {
       total: templates.length,
       activeCount,
@@ -121,7 +94,7 @@ export default function TemplatesPage() {
     };
   }, [templates]);
 
-  if (!businessId || (fetchAction.loading && templates.length === 0)) {
+  if (!businessId || (loading && templates.length === 0)) {
     return <PageSkeleton hasStats={true} />;
   }
 
@@ -132,11 +105,8 @@ export default function TemplatesPage() {
       actionLabel="New template"
       actionVariant="amber"
       onAction={page.openCreate}
-      error={fetchAction.error || deleteAction.error}
-      onDismissError={() => {
-        fetchAction.clearError();
-        deleteAction.clearError();
-      }}
+      error={error}
+      onDismissError={clearError}
       stats={
         <>
           <StatCard
@@ -144,7 +114,7 @@ export default function TemplatesPage() {
             value={stats.total}
             hint={
               stats.total > 0 && stats.activeCount === stats.total
-                ? 'All active'
+                ? "All active"
                 : `${stats.activeCount} active`
             }
           />
@@ -179,15 +149,15 @@ export default function TemplatesPage() {
           reminderTypeFilter={reminderTypeFilter}
           onReminderTypeChange={setReminderTypeFilter}
           onReset={() => {
-            setSearchQuery('');
-            setStatusFilter('ALL');
-            setChannelFilter('ALL');
-            setReminderTypeFilter('ALL');
+            setSearchQuery("");
+            setStatusFilter("ALL");
+            setChannelFilter("ALL");
+            setReminderTypeFilter("ALL");
           }}
         />
       }
       summary={
-        !fetchAction.loading && (
+        !loading && (
           <p className="text-sm text-txt-sub">
             Showing {filteredTemplates.length} of {templates.length} templates
           </p>
@@ -208,7 +178,7 @@ export default function TemplatesPage() {
             templateId={page.formId}
             businessId={businessId}
             onSuccess={() => {
-              fetchTemplates();
+              refetch();
               page.close();
             }}
           />
@@ -217,13 +187,14 @@ export default function TemplatesPage() {
             title="Delete Template"
             description={
               <>
-                Are you sure you want to delete <strong>{page.deleteTarget?.label}</strong>? This
-                action cannot be undone.
+                Are you sure you want to delete{" "}
+                <strong>{page.deleteTarget?.label}</strong>? This action cannot
+                be undone.
               </>
             }
             confirmLabel="Delete"
             variant="danger"
-            loading={deleteAction.loading}
+            loading={deleteLoading}
             onConfirm={handleDeleteConfirm}
             onCancel={page.cancelDelete}
           />
@@ -232,12 +203,12 @@ export default function TemplatesPage() {
     >
       <TemplatesTable
         templates={filteredTemplates}
-        loading={fetchAction.loading}
+        loading={loading}
         businessId={businessId}
         onView={page.openView}
         onEdit={page.openEdit}
         onDelete={(id, name) => page.requestDelete(id, name)}
-        onRefresh={fetchTemplates}
+        onRefresh={refetch}
       />
     </ResourcePageLayout>
   );

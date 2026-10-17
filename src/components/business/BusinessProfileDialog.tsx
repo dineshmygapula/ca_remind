@@ -20,10 +20,11 @@ import { Business, BusinessType, UpdateBusinessDto } from "@/types/business";
 import { getOrganizations } from "@/services/organizationService";
 import { getBusinessById, getBusinesses, updateBusiness } from "@/services/businessService";
 import { BUSINESS_TYPE_OPTIONS } from "@/constants/businessConstants";
+import { Controller } from "react-hook-form";
 import { ModalWrapper } from "../wrappers/ModalWrapper";
 import { FormWrapper } from "../wrappers/FormWrapper";
 import { InputField } from "../ui/InputField";
-import { SelectField } from "../ui/SelectField";
+import Dropdown from "../common/Dropdown";
 import { TextareaField } from "../ui/TextareaField";
 
 interface BusinessProfileDialogProps {
@@ -393,11 +394,27 @@ export default function BusinessProfileDialog({ open, onClose }: BusinessProfile
                   <InputField name="phone" label="Phone" placeholder="10-digit mobile" icon={Phone} maxLength={10} inputMode="numeric" required />
                 </div>
 
-                <SelectField
+                <Controller
                   name="businessType"
-                  label="Business Category"
-                  options={BUSINESS_TYPE_OPTIONS}
-                  required
+                  render={({ field, fieldState: { error } }) => (
+                    <div className="flex flex-col gap-1.5 w-full">
+                      <label className="text-[13px] font-bold text-[var(--text-primary)]">
+                        Business Category <span className="text-red-500">*</span>
+                      </label>
+                      <Dropdown
+                        fullWidth
+                        value={field.value || ""}
+                        onChange={field.onChange}
+                        options={BUSINESS_TYPE_OPTIONS}
+                        placeholder="Select category"
+                      />
+                      {error && (
+                        <p className="mt-1 text-xs font-medium leading-4 text-red-500">
+                          {error.message}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 />
 
                 {/* Address Section */}

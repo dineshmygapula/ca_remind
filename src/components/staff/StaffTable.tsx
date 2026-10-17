@@ -11,7 +11,6 @@ interface StaffTableProps {
   loading: boolean;
   businessId?: string;
   onView: (membershipId: string) => void;
-  onEdit?: (membershipId: string) => void;
   onDelete: (membershipId: string, staffName: string) => void;
   onRefresh?: () => void;
 }
@@ -94,7 +93,6 @@ export default function StaffTable({
   loading,
   businessId,
   onView,
-  onEdit,
   onDelete,
   onRefresh,
 }: StaffTableProps) {

@@ -10,7 +10,6 @@ import {
   AlertTriangle,
   CheckCircle2,
   Clock,
-  Pencil,
   Loader2,
   AlertCircle,
   ExternalLink,
@@ -56,7 +55,6 @@ interface StaffDetailsDrawerProps {
   onClose: () => void;
   membershipId: string | null;
   businessId: string;
-  onEdit: (membershipId: string) => void;
 }
 
 export default function StaffDetailsDrawer({
@@ -64,7 +62,6 @@ export default function StaffDetailsDrawer({
   onClose,
   membershipId,
   businessId,
-  onEdit,
 }: StaffDetailsDrawerProps) {
   const [staff, setStaff] = useState<StaffDetails | null>(null);
   const [dashboard, setDashboard] = useState<StaffDashboardResponse | null>(null);
@@ -151,18 +148,6 @@ export default function StaffDetailsDrawer({
       }
       icon={<Users className="h-5 w-5 text-white" />}
       width="lg"
-      headerActions={
-        membershipId && (
-          <button
-            type="button"
-            onClick={() => onEdit(membershipId)}
-            className="flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-xs font-semibold text-[var(--text-primary)] transition-all hover:border-[var(--primary)] hover:bg-[var(--primary)]/5"
-          >
-            <Pencil className="h-3.5 w-3.5 text-[var(--primary)]" />
-            <span>Edit Staff</span>
-          </button>
-        )
-      }
     >
       {loading ? (
         <div className="flex h-72 flex-col items-center justify-center gap-3">

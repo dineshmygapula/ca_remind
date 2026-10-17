@@ -20,6 +20,8 @@ import Drawer from '@/components/common/Drawer';
 import DrawerSection from '@/components/common/DrawerSection';
 import WhatsAppIcon from '@/components/common/WhatsAppIcon';
 import SearchableSelect from '@/components/common/SearchableSelect';
+import ClientSelector from '@/components/common/ClientSelector';
+import DeliveryChannelSelector from '@/components/common/DeliveryChannelSelector';
 import { useAsyncAction } from '@/hooks/useAnyAction';
 import {
   CreateReminderPayload,
@@ -394,29 +396,6 @@ export default function ReminderFormDrawer({
     );
   };
 
-  // Reusable channel options
-  const channelList: {
-    id: ReminderChannel;
-    label: string;
-    icon: React.ReactNode;
-  }[] = [
-    {
-      id: 'WHATSAPP',
-      label: 'WhatsApp',
-      icon: <WhatsAppIcon className="w-5 h-5" />,
-    },
-    {
-      id: 'EMAIL',
-      label: 'Email',
-      icon: <Mail className="w-5 h-5" />,
-    },
-    {
-      id: 'SMS',
-      label: 'SMS',
-      icon: <Smartphone className="w-5 h-5" />,
-    },
-  ];
-
   return (
     <Drawer
       open={open}
@@ -527,44 +506,12 @@ export default function ReminderFormDrawer({
           <div className="space-y-4">
             {/* Step 1: Client Selection */}
             <DrawerSection step={1} title="Client" required>
-              <div className="space-y-2">
-                <SearchableSelect<SubjectListItem>
-                  options={clients}
-                  value={selectedClient}
-                  onChange={handleClientChange}
-                  getOptionLabel={(c) => c.displayName || c.businessName || 'Unnamed'}
-                  getOptionKey={(c) => c.id}
-                  placeholder="Search and select client"
-                  emptyMessage="No active clients found"
-                  renderOption={(c) => (
-                    <div className="flex flex-col py-0.5">
-                      <span className="font-semibold text-txt-main text-sm">
-                        {c.displayName || c.businessName}
-                      </span>
-                      {c.email && (
-                        <span className="text-xs text-txt-sub">{c.email}</span>
-                      )}
-                    </div>
-                  )}
-                />
-
-                {selectedClient && (
-                  <div className="flex items-center justify-between px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-divider text-xs">
-                    <div className="flex items-center gap-2 text-txt-sub">
-                      <Building2 className="w-3.5 h-3.5 text-amber-500" />
-                      <span>
-                        Selected:{' '}
-                        <strong className="text-txt-main">
-                          {selectedClient.displayName || selectedClient.businessName}
-                        </strong>
-                      </span>
-                    </div>
-                    <span className="font-mono text-[11px] text-txt-sub">
-                      {selectedClient.phone || selectedClient.email || ''}
-                    </span>
-                  </div>
-                )}
-              </div>
+              <ClientSelector
+                clients={clients}
+                value={selectedClient}
+                onChange={handleClientChange}
+                required
+              />
             </DrawerSection>
 
             {/* Step 2: Task Details */}
@@ -621,40 +568,13 @@ export default function ReminderFormDrawer({
               required
               subtitle="Pick one or more"
             >
-              <div className="grid grid-cols-3 gap-3">
-                {channelList.map((ch) => {
-                  const isSelected = form.channel === ch.id;
-                  return (
-                    <button
-                      type="button"
-                      key={ch.id}
-                      onClick={() =>
-                        setForm((p) => ({ ...p, channel: ch.id }))
-                      }
-                      className={`flex flex-col items-center justify-center gap-2 py-4 px-3 rounded-2xl border transition-all text-center cursor-pointer ${
-                        isSelected
-                          ? 'bg-[#0F1E36] text-white border-[#0F1E36] shadow-md ring-2 ring-[#0F1E36]/20'
-                          : 'bg-surface text-txt-main border-divider hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50'
-                      }`}
-                    >
-                      <div
-                        className={`transition-transform duration-150 ${
-                          isSelected ? 'scale-110 text-white' : 'text-txt-sub'
-                        }`}
-                      >
-                        {ch.icon}
-                      </div>
-                      <span
-                        className={`text-xs font-bold tracking-tight ${
-                          isSelected ? 'text-white' : 'text-txt-main'
-                        }`}
-                      >
-                        {ch.label}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
+              <DeliveryChannelSelector
+                label=""
+                value={form.channel}
+                onChange={(ch) =>
+                  setForm((p) => ({ ...p, channel: ch }))
+                }
+              />
             </DrawerSection>
 
             {/* Step 4: Message Template & Preview */}
