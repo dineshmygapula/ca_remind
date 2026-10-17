@@ -32,8 +32,6 @@ import "../globals.css";
 import Providers from "@/components/Providers";
 import NextTopLoader from "nextjs-toploader";
 import { Header } from "@/components/layout/Header";
-import { ModuleRegistry, AllCommunityModule } from "ag-grid-community";
-import { auth } from "@/config/firebase";
 
 const manrope = Manrope({
   subsets: ["latin"],
@@ -52,12 +50,13 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
- 
   return (
     <html lang="en" className={manrope.variable}>
-      <body className={`${manrope.className} min-h-screen bg-[var(--bg)] text-[var(--text-primary)] antialiased transition-colors duration-300`}>
+      <body
+        className={`${manrope.className} min-h-screen bg-[var(--bg)] text-[var(--text-primary)] antialiased transition-colors duration-300`}
+      >
         <NextTopLoader
-          color="#29d"
+          color="#c9a227"
           initialPosition={0.08}
           crawlSpeed={200}
           height={3}
@@ -65,7 +64,7 @@ export default async function RootLayout({
           showSpinner={false}
           easing="ease"
           speed={200}
-          shadow="0 0 10px #2299DD,0 0 5px #2299DD"
+          shadow="0 0 10px #c9a227,0 0 5px #c9a227"
           zIndex={1600}
           showAtBottom={false}
         />

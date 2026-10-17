@@ -2,7 +2,7 @@
 
 import React, { useMemo } from 'react';
 import { Eye, Pencil, Trash2, Mail, Phone, UserX } from 'lucide-react';
-import CommonDataGrid, { GridAction, GridColumn } from '@/components/common/CommonTable';
+import CommonDataGrid, { GridAction, GridColumn, createTableActions } from '@/components/common/CommonTable';
 import { StaffMember } from '@/types/staff.types';
 
 interface StaffTableProps {
@@ -189,26 +189,12 @@ export default function StaffTable({
   );
 
   const actions: GridAction<StaffMember>[] = useMemo(
-    () => [
-      {
-        label: 'View',
-        icon: <Eye className="h-4 w-4" />,
-        variant: 'primary',
-        onClick: (member) => onView(member.id),
-      },
-      {
-        label: 'Edit',
-        icon: <Pencil className="h-4 w-4" />,
-        variant: 'secondary',
-        onClick: (member) => onEdit(member.id),
-      },
-      {
-        label: 'Delete',
-        icon: <Trash2 className="h-4 w-4" />,
-        variant: 'danger',
-        onClick: (member) => onDelete(member.id, getFullName(member)),
-      },
-    ],
+    () =>
+      createTableActions<StaffMember>({
+        onView: (member) => onView(member.id),
+        onEdit: (member) => onEdit(member.id),
+        onDelete: (member) => onDelete(member.id, getFullName(member)),
+      }),
     [onView, onEdit, onDelete]
   );
 
@@ -218,10 +204,9 @@ export default function StaffTable({
       columns={columns}
       actions={actions}
       isLoading={loading}
-      onRowClick={(row) => onView(row.id)}
-      onRowDoubleClick={(row) => onEdit(row.id)}
       emptyMessage="No staff members found matching your search or filters."
       rowHeight={64}
     />
   );
 }
+

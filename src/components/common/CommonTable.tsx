@@ -6,6 +6,8 @@ import { Eye, Pencil, Trash2, Loader2 } from "lucide-react";
 import { useIsDarkMode } from "@/hooks/useIsDarkMode";
 import { agGridDefaultConfig } from "@/constants/agConfig";
 import { useToast } from "@/context/ToastContext";
+import TableActions, { createTableActions } from "@/components/common/TableActions";
+export { TableActions, createTableActions };
 
 
 import {
@@ -135,53 +137,24 @@ const DEFAULT_ICON: Record<NonNullable<GridAction["variant"]>, ReactNode> = {
 };
 
 function ActionCell<T = any>({ row, actions, actionStyle = 'tinted' }: ActionCellProps<T>) {
-    const visibleActions = actions.filter(
-        (action) => !action.visible || action.visible(row),
-    );
+    const actionItems = actions.map((action, idx) => ({
+        key: String(idx),
+        label: action.label,
+        icon: action.icon ?? DEFAULT_ICON[action.variant ?? 'primary'],
+        variant: action.variant,
+        disabled: action.disabled?.(row) ?? false,
+        loading: action.loading?.(row) ?? false,
+        showText: action.showText,
+        visible: !action.visible || action.visible(row),
+        onClick: (e: React.MouseEvent) => {
+            e.stopPropagation();
+            action.onClick(row);
+        },
+    }));
 
-    if (visibleActions.length === 0) {
-        return <span className="text-sm text-txt-sub/50">No actions</span>;
-    }
-
-    return (
-        <div className="flex h-full items-center gap-1.5">
-            {visibleActions.map((action, idx) => {
-                const isLoading = action.loading?.(row) ?? false;
-                const isDisabled = action.disabled?.(row) ?? false;
-                const variant = action.variant ?? "primary";
-                const btnClass = actionStyle === 'ghost' ? GHOST_VARIANT_CLASS[variant] : VARIANT_CLASS[variant];
-
-                return (
-                    <button
-                        key={idx}
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            if (!isLoading && !isDisabled) {
-                                action.onClick(row);
-                            }
-                        }}
-                        disabled={isLoading || isDisabled}
-                        className={btnClass}
-                        title={action.label}
-                    >
-                        {isLoading ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                            <>
-                                {action.icon ?? DEFAULT_ICON[variant]}
-                                {action.showText && (
-                                    <span className="ml-1.5 text-sm font-medium">
-                                        {action.label}
-                                    </span>
-                                )}
-                            </>
-                        )}
-                    </button>
-                );
-            })}
-        </div>
-    );
+    return <TableActions actions={actionItems} style={actionStyle} />;
 }
+
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 

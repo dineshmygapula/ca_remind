@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { Eye, Pencil, Trash2, Mail, MessageSquare, Bell, Phone, Loader2 } from 'lucide-react';
-import CommonDataGrid, { GridAction, GridColumn } from '@/components/common/CommonTable';
+import CommonDataGrid, { GridAction, GridColumn, createTableActions } from '@/components/common/CommonTable';
 import { MessageTemplateListItem, ChannelType } from '@/types/messageTemplate.types';
 import { updateMessageTemplate } from '@/services/messageTemplateService';
 import { useToast } from '@/context/ToastContext';
@@ -263,26 +263,15 @@ export default function TemplatesTable({
     [togglingId, businessId]
   );
 
-  const actions: GridAction<MessageTemplateListItem>[] = [
-    {
-      label: 'View',
-      icon: <Eye className="h-4 w-4" />,
-      variant: 'primary',
-      onClick: (row) => onView(row.id),
-    },
-    {
-      label: 'Edit',
-      icon: <Pencil className="h-4 w-4" />,
-      variant: 'secondary',
-      onClick: (row) => onEdit(row.id),
-    },
-    {
-      label: 'Delete',
-      icon: <Trash2 className="h-4 w-4" />,
-      variant: 'danger',
-      onClick: (row) => onDelete(row.id, row.name),
-    },
-  ];
+  const actions: GridAction<MessageTemplateListItem>[] = useMemo(
+    () =>
+      createTableActions<MessageTemplateListItem>({
+        onView: (row) => onView(row.id),
+        onEdit: (row) => onEdit(row.id),
+        onDelete: (row) => onDelete(row.id, row.name),
+      }),
+    [onView, onEdit, onDelete]
+  );
 
   return (
     <CommonDataGrid<MessageTemplateListItem>
@@ -292,9 +281,7 @@ export default function TemplatesTable({
       isLoading={loading}
       actionStyle="ghost"
       rowHeight={64}
-      onRowClick={(row) => onView(row.id)}
-      onRowDoubleClick={(row) => onEdit(row.id)}
       emptyMessage="No message templates found"
     />
   );
-}
+}

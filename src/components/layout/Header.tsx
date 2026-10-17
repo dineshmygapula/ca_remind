@@ -1,7 +1,8 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { usePathname } from "next/navigation";
+import { useRouter } from "nextjs-toploader/app";
 import {
   LayoutDashboard,
   CheckSquare,
@@ -78,15 +79,14 @@ function dropdownItemClass(active: boolean) {
 
 interface NavButtonProps {
   label: string;
-  href: string;
   icon: LucideIcon;
   active: boolean;
   onClick: () => void;
 }
 
-function NavButton({ label, href, icon: Icon, active, onClick }: NavButtonProps) {
+function NavButton({ label, icon: Icon, active, onClick }: NavButtonProps) {
   return (
-    <button key={href} type="button" onClick={onClick} className={navItemClass(active)}>
+    <button type="button" onClick={onClick} className={navItemClass(active)}>
       <Icon className="w-4 h-4" />
       <span>{label}</span>
     </button>
@@ -308,7 +308,6 @@ export function Header() {
             <NavButton
               key={href}
               label={label}
-              href={href}
               icon={icon}
               active={!!pathname?.startsWith(href)}
               onClick={() => goTo(href)}

@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { Eye, Pencil, Trash2, Calendar } from "lucide-react";
 import { useWorkspace } from "@/context/WorkspaceContext";
 import { TaskListItem } from "@/types/task.types";
-import CommonDataGrid, { GridAction, GridColumn } from "@/components/common/CommonTable";
+import CommonDataGrid, { GridAction, GridColumn, createTableActions } from "@/components/common/CommonTable";
 import PageFilterBar from "@/components/common/PageFilter";
 import ResourcePageLayout from "@/components/common/ResourcePageLayout";
 import TaskFormDialog from "@/components/tasks/TaskFormDialogue";
@@ -306,13 +306,15 @@ export default function TasksPage() {
   };
 
   const actions = useMemo<GridAction<TaskListItem>[]>(
-    () => [
-      { label: "View", icon: <Eye className="h-4 w-4" />, variant: "primary", onClick: (r) => page.openView(r.id) },
-      { label: "Edit", icon: <Pencil className="h-4 w-4" />, variant: "secondary", onClick: (r) => page.openEdit(r.id) },
-      { label: "Delete", icon: <Trash2 className="h-4 w-4" />, variant: "danger", onClick: (r) => page.requestDelete(r.id, r.title) },
-    ],
+    () =>
+      createTableActions<TaskListItem>({
+        onView: (r) => page.openView(r.id),
+        onEdit: (r) => page.openEdit(r.id),
+        onDelete: (r) => page.requestDelete(r.id, r.title),
+      }),
     [page.openView, page.openEdit, page.requestDelete]
   );
+
 
   if (!businessId || loading) {
     return <PageSkeleton />;
@@ -387,8 +389,6 @@ export default function TasksPage() {
         actions={actions}
         isLoading={loading}
         rowHeight={64}
-        onRowClick={(row) => page.openView(row.id)}
-        onRowDoubleClick={(row) => page.openEdit(row.id)}
         onUpdateCell={handleUpdateCell}
         emptyMessage="No tasks found"
       />

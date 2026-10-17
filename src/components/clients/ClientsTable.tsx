@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Eye, Pencil, Trash2, Mail, Phone, Building2, X, ShieldCheck } from 'lucide-react';
-import CommonDataGrid, { GridAction, GridColumn } from '@/components/common/CommonTable';
+import CommonDataGrid, { GridAction, GridColumn, createTableActions } from '@/components/common/CommonTable';
 import { SubjectListItem } from '@/types/subject';
 import { updateSubject } from '@/services/subjectService';
 
@@ -256,26 +256,15 @@ export default function ClientsTable({
     []
   );
 
-  const actions: GridAction<SubjectListItem>[] = [
-    {
-      label: 'View',
-      icon: <Eye className="h-4 w-4" />,
-      variant: 'primary',
-      onClick: (row) => onView(row.id),
-    },
-    {
-      label: 'Edit',
-      icon: <Pencil className="h-4 w-4" />,
-      variant: 'secondary',
-      onClick: (row) => onEdit(row.id),
-    },
-    {
-      label: 'Delete',
-      icon: <Trash2 className="h-4 w-4" />,
-      variant: 'danger',
-      onClick: (row) => onDelete(row.id, row.displayName || 'Client'),
-    },
-  ];
+  const actions = useMemo(
+    () =>
+      createTableActions<SubjectListItem>({
+        onView: (row) => onView(row.id),
+        onEdit: (row) => onEdit(row.id),
+        onDelete: (row) => onDelete(row.id, row.displayName || 'Client'),
+      }),
+    [onView, onEdit, onDelete]
+  );
 
   return (
     <>
@@ -285,8 +274,6 @@ export default function ClientsTable({
         actions={actions}
         isLoading={loading}
         rowHeight={64}
-        onRowClick={(row) => onView(row.id)}
-        onRowDoubleClick={(row) => onEdit(row.id)}
         onUpdateCell={async ({ row, field, newValue }) => {
           if (!businessId) return;
           const valToSave = field === 'isActive' ? newValue === 'Active' : newValue;

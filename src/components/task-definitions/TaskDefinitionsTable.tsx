@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { Eye, Pencil, Trash2, Loader2 } from 'lucide-react';
-import CommonDataGrid, { GridAction, GridColumn } from '@/components/common/CommonTable';
+import CommonDataGrid, { GridAction, GridColumn, createTableActions } from '@/components/common/CommonTable';
 import { TaskDefinitionListItem } from '@/types/taskDefinition.types';
 import { updateTaskDefinition } from '@/services/taskDefinitionService';
 import { useToast } from '@/context/ToastContext';
@@ -177,23 +177,25 @@ export default function TaskDefinitionsTable({
         field: 'name',
         minWidth: 260,
         flex: 2.5,
+        editable: true,
         cellRenderer: (p) => {
           if (!p.data) return null;
+          const ruleName = p.value || p.data.name || '—';
           return (
             <div className="flex items-center gap-3 py-1">
               <span
                 className={`w-11 h-9 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 ${getRuleBadgeClass(
-                  p.data.taskType || p.data.name
+                  p.data.taskType || ruleName
                 )}`}
               >
-                {getRuleTypePrefix(p.data.taskType || p.data.name)}
+                {getRuleTypePrefix(p.data.taskType || ruleName)}
               </span>
               <div className="flex flex-col min-w-0">
                 <span className="font-bold text-sm text-[var(--primary)] dark:text-slate-100 truncate">
-                  {p.data.name || '—'}
+                  {ruleName}
                 </span>
                 <span className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                  {getTaskTypeDescription(p.data.taskType, p.data.name)}
+                  {getTaskTypeDescription(p.data.taskType, ruleName)}
                 </span>
               </div>
             </div>
@@ -296,8 +298,18 @@ export default function TaskDefinitionsTable({
         field: 'isActive',
         minWidth: 110,
         flex: 0.9,
+        editable: true,
+        cellEditor: 'agSelectCellEditor',
+        cellEditorParams: {
+          values: ['Active', 'Inactive'],
+        },
+        valueFormatter: (p) =>
+          p.value === 'Active' || p.value === true ? 'Active' : 'Inactive',
         cellRenderer: (p) => {
-          const active = Boolean(p.data?.isActive);
+          const active =
+            p.value === 'Active' ||
+            p.value === true ||
+            (p.value !== 'Inactive' && Boolean(p.data?.isActive));
           return active ? (
             <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#059669] dark:text-emerald-400">
               <span className="w-1.5 h-1.5 rounded-full bg-[#10b981]" />
@@ -354,26 +366,15 @@ export default function TaskDefinitionsTable({
     [togglingId, togglingField]
   );
 
-  const actions: GridAction<TaskDefinitionListItem>[] = [
-    {
-      label: 'View',
-      icon: <Eye className="h-4 w-4" />,
-      variant: 'primary',
-      onClick: (row) => onView(row.id),
-    },
-    {
-      label: 'Edit',
-      icon: <Pencil className="h-4 w-4" />,
-      variant: 'secondary',
-      onClick: (row) => onEdit(row.id),
-    },
-    {
-      label: 'Delete',
-      icon: <Trash2 className="h-4 w-4" />,
-      variant: 'danger',
-      onClick: (row) => onDelete(row.id, row.name),
-    },
-  ];
+  const actions: GridAction<TaskDefinitionListItem>[] = useMemo(
+    () =>
+      createTableActions<TaskDefinitionListItem>({
+        onView: (row) => onView(row.id),
+        onEdit: (row) => onEdit(row.id),
+        onDelete: (row) => onDelete(row.id, row.name),
+      }),
+    [onView, onEdit, onDelete]
+  );
 
   return (
     <CommonDataGrid<TaskDefinitionListItem>
@@ -383,9 +384,19 @@ export default function TaskDefinitionsTable({
       isLoading={loading}
       actionStyle="ghost"
       rowHeight={64}
-      onRowClick={(row) => onView(row.id)}
-      onRowDoubleClick={(row) => onEdit(row.id)}
+      onUpdateCell={async ({ row, field, newValue }) => {
+        if (!businessId) return;
+        let valToSave: unknown = newValue;
+        if (field === 'isActive') {
+          valToSave = newValue === 'Active' || newValue === true;
+        }
+        await updateTaskDefinition(businessId, row.id, {
+          [field]: valToSave,
+        });
+        onRefresh();
+      }}
       emptyMessage="No task definitions found"
     />
   );
 }
+

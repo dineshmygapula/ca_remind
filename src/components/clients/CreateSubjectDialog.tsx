@@ -1,32 +1,36 @@
-"use client";
+'use client';
 
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-  X,
   UserRoundPlus,
-  ChevronDown,
-  ChevronUp,
-  LoaderCircle,
-  AlertCircle,
-  CheckCircle2,
   UserRound,
   Phone,
   Mail,
   Building2,
-  FileText,
-  MapPin,
-  Bell,
-  Users,
-  ClipboardList,
+  ChevronDown,
   Plus,
-} from "lucide-react";
+  AlertCircle,
+  CheckCircle2,
+  X,
+  FileText,
+  Landmark,
+  FileCheck,
+  Briefcase,
+  Factory,
+} from 'lucide-react';
 
-import { createSubject } from "@/services/subjectService";
-import { DEFAULT_FORM } from "@/constants/clientConstants";
-import type { CreateSubjectDto, AddressType } from "@/types/subject";
-import { getStaff } from "@/services/staffService";
-import type { StaffMember } from "@/types/staff.types";
-import AddStaffDialog from "../staff/AddStaffDialog";
+import Drawer from '@/components/common/Drawer';
+import DrawerSection from '@/components/common/DrawerSection';
+import WhatsAppIcon from '@/components/common/WhatsAppIcon';
+import AddStaffDialog from '../staff/AddStaffDialog';
+
+import { createSubject } from '@/services/subjectService';
+import { getStaff } from '@/services/staffService';
+import { DEFAULT_FORM } from '@/constants/clientConstants';
+import type { CreateSubjectDto, AddressType } from '@/types/subject';
+import type { StaffMember } from '@/types/staff.types';
+
+// ─── Props ────────────────────────────────────────────────────────────────────
 
 interface Props {
   businessId: string;
@@ -35,28 +39,87 @@ interface Props {
   onSuccess?: () => void;
 }
 
-type SectionKey = "identifiers" | "compliance" | "addresses" | "notifications" | "team" | "notes";
+// ─── Style Primitives (Aligned with Tasks & Reminders) ─────────────────────────
 
-function StaticLabel({
+const INPUT =
+  'w-full h-11 rounded-xl border border-divider bg-bg/50 px-3.5 ' +
+  'text-sm font-medium text-txt-main placeholder:text-txt-sub/60 ' +
+  'focus:bg-surface focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/15 transition-all';
+
+const SELECT =
+  'w-full h-11 rounded-xl border border-divider bg-bg/50 pl-3.5 pr-9 ' +
+  'text-sm font-medium text-txt-main appearance-none cursor-pointer ' +
+  'focus:bg-surface focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/15 transition-all';
+
+const TEXTAREA =
+  'w-full rounded-xl border border-divider bg-bg/50 p-3.5 ' +
+  'text-sm font-medium text-txt-main placeholder:text-txt-sub/60 resize-none ' +
+  'focus:bg-surface focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/15 transition-all';
+
+function FieldWrap({
+  label,
+  required,
+  error,
   children,
-  required = false,
 }: {
-  children: React.ReactNode;
+  label: string;
   required?: boolean;
+  error?: string;
+  children: React.ReactNode;
 }) {
   return (
-    <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center justify-between">
+        <label className="text-xs font-bold text-txt-main flex items-center gap-1">
+          <span>{label}</span>
+          {required && <span className="text-red-500">*</span>}
+        </label>
+      </div>
       {children}
-      {required && <span className="ml-1 text-error">*</span>}
-    </label>
+      {error && <p className="text-xs text-red-500 font-medium leading-none mt-0.5">{error}</p>}
+    </div>
   );
 }
 
-const inputClass =
-  "input input-bordered w-full rounded-xl bg-base-100 focus:outline-none focus:ring-2 focus:ring-primary/20";
-const selectClass =
-  "select select-bordered w-full rounded-xl bg-base-100 focus:outline-none focus:ring-2 focus:ring-primary/20";
-const sectionClass = "overflow-hidden rounded-2xl border border-base-300 bg-base-100";
+// ─── Compliance Services Meta ─────────────────────────────────────────────────
+
+const COMPLIANCE_ITEMS = [
+  {
+    key: 'complianceGst',
+    label: 'GST',
+    code: 'GST',
+    icon: <FileText className="h-4 w-4" />,
+    color: 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border-blue-100 dark:border-blue-900/40',
+  },
+  {
+    key: 'complianceTds',
+    label: 'TDS',
+    code: 'TDS',
+    icon: <Landmark className="h-4 w-4" />,
+    color: 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/40',
+  },
+  {
+    key: 'complianceItr',
+    label: 'ITR',
+    code: 'ITR',
+    icon: <FileCheck className="h-4 w-4" />,
+    color: 'bg-violet-50 dark:bg-violet-950/60 text-violet-600 dark:text-violet-400 border-violet-100 dark:border-violet-900/40',
+  },
+  {
+    key: 'complianceRoc',
+    label: 'ROC',
+    code: 'ROC',
+    icon: <Briefcase className="h-4 w-4" />,
+    color: 'bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 border-amber-100 dark:border-amber-900/40',
+  },
+  {
+    key: 'complianceMsme',
+    label: 'MSME',
+    code: 'MSME',
+    icon: <Factory className="h-4 w-4" />,
+    color: 'bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border-rose-100 dark:border-rose-900/40',
+  },
+] as const;
 
 export default function CreateSubjectDialog({
   businessId,
@@ -66,35 +129,28 @@ export default function CreateSubjectDialog({
 }: Props) {
   const [form, setForm] = useState(DEFAULT_FORM);
   const [loading, setLoading] = useState(false);
-  const [apiError, setApiError] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
+  const [apiError, setApiError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [errors, setErrors] = useState({
-    fullName: "",
-    phone: "",
-    email: "",
-    companyName: "",
+    fullName: '',
+    phone: '',
+    email: '',
+    companyName: '',
   });
 
   const [staffList, setStaffList] = useState<StaffMember[]>([]);
   const [loadingStaff, setLoadingStaff] = useState(false);
   const [openCreateStaff, setOpenCreateStaff] = useState(false);
-  const [notes, setNotes] = useState("");
-  const [expanded, setExpanded] = useState<Record<SectionKey, boolean>>({
-    identifiers: false,
-    compliance: true,
-    addresses: false,
-    notifications: false,
-    team: false,
-    notes: false,
-  });
+  const [notes, setNotes] = useState('');
 
+  // Fetch staff members
   const fetchStaff = useCallback(async () => {
     try {
       setLoadingStaff(true);
       const data = await getStaff(businessId);
       setStaffList(data);
     } catch (err) {
-      console.error("Failed to fetch staff", err);
+      console.error('Failed to fetch staff', err);
     } finally {
       setLoadingStaff(false);
     }
@@ -104,25 +160,15 @@ export default function CreateSubjectDialog({
     if (open) fetchStaff();
   }, [open, fetchStaff]);
 
-  useEffect(() => {
-    if (!open) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !loading) handleClose();
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-    // handleClose intentionally uses current render state for drawer dismissal.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, loading]);
-
+  // Set compliance service values
   function setCompliance(
     key: keyof typeof form,
-    field: "enabled" | "frequency",
+    field: 'enabled' | 'frequency',
     value: boolean | string,
   ) {
     setForm((prev) => {
       const current = prev[key];
-      if (typeof current !== "object") return prev;
+      if (typeof current !== 'object') return prev;
       return {
         ...prev,
         [key]: {
@@ -136,69 +182,60 @@ export default function CreateSubjectDialog({
   const handleClose = () => {
     if (!loading) {
       setForm(DEFAULT_FORM);
-      setNotes("");
-      setApiError("");
-      setSuccessMessage("");
-      setErrors({ fullName: "", phone: "", email: "", companyName: "" });
+      setNotes('');
+      setApiError('');
+      setSuccessMessage('');
+      setErrors({ fullName: '', phone: '', email: '', companyName: '' });
       onClose();
     }
   };
 
   const validateForm = () => {
     const newErrors = {
-      fullName: "",
-      phone: "",
-      email: "",
-      companyName: "",
+      fullName: '',
+      phone: '',
+      email: '',
+      companyName: '',
     };
 
-    if (!form.fullName.trim()) newErrors.fullName = "Please enter full name";
+    if (!form.fullName.trim()) newErrors.fullName = 'Please enter full name';
 
     if (!form.phone) {
-      newErrors.phone = "Phone number is required";
+      newErrors.phone = 'Phone number is required';
     } else if (!/^\d{10}$/.test(form.phone)) {
-      newErrors.phone = "Phone number must be exactly 10 digits";
+      newErrors.phone = 'Phone number must be exactly 10 digits';
     }
 
     if (!form.email.trim()) {
-      newErrors.email = "Please enter email address";
+      newErrors.email = 'Please enter email address';
     } else if (!/\S+@\S+\.\S+/.test(form.email)) {
-      newErrors.email = "Please enter a valid email address";
+      newErrors.email = 'Please enter a valid email address';
     }
 
     if (!form.companyName.trim()) {
-      newErrors.companyName = "Please enter business name";
+      newErrors.companyName = 'Please enter business name';
     }
 
     setErrors(newErrors);
     return Object.values(newErrors).every((error) => !error);
   };
 
-  const isFormValid = () =>
-    Boolean(
-      form.fullName.trim() &&
-        form.phone.trim() &&
-        form.email.trim() &&
-        /\S+@\S+\.\S+/.test(form.email) &&
-        form.companyName.trim(),
-    );
-
   const handleSubmit = async () => {
     if (!validateForm()) return;
 
     try {
       setLoading(true);
-      setApiError("");
+      setApiError('');
 
       const dto: CreateSubjectDto = {
-        subjectType: "CLIENT",
+        subjectType: 'CLIENT',
         profile: {
           displayName: form.fullName,
           businessName: form.companyName || form.fullName,
           legalName: form.companyName || form.fullName,
-          constitution: "INDIVIDUAL",
-          industry: "General",
-          businessNature: ["General"],
+          constitution: 'INDIVIDUAL',
+          industry: 'General',
+          businessNature: ['General'],
         },
         primaryContact: {
           name: form.fullName,
@@ -220,7 +257,7 @@ export default function CreateSubjectDialog({
       }
 
       const validGstins = form.gstins.filter(
-        (gstin) => gstin.gstin && gstin.gstin.trim() !== "",
+        (gstin) => gstin.gstin && gstin.gstin.trim() !== '',
       );
       if (validGstins.length > 0) {
         dto.gst = {
@@ -279,9 +316,9 @@ export default function CreateSubjectDialog({
       );
       if (selectedStaff) {
         const displayName =
-          `${selectedStaff.firstName ?? ""} ${selectedStaff.lastName ?? ""}`.trim() ||
+          `${selectedStaff.firstName ?? ''} ${selectedStaff.lastName ?? ''}`.trim() ||
           selectedStaff.userName ||
-          "";
+          '';
         dto.assignedTeam = {
           primaryAssignee: {
             userId: selectedStaff.id,
@@ -293,504 +330,595 @@ export default function CreateSubjectDialog({
       dto.notes = notes.trim() ? [{ text: notes.trim() }] : [];
 
       await createSubject(businessId, dto);
-      setSuccessMessage("Client created successfully!");
+      setSuccessMessage('Client created successfully!');
       setTimeout(() => {
         setForm(DEFAULT_FORM);
-        setNotes("");
+        setNotes('');
         onSuccess?.();
         handleClose();
-      }, 1000);
+      }, 700);
     } catch (err: unknown) {
-      setApiError(err instanceof Error ? err.message : "Something went wrong");
+      setApiError(err instanceof Error ? err.message : 'Something went wrong');
     } finally {
       setLoading(false);
     }
   };
 
-  const toggleSection = (section: SectionKey) =>
-    setExpanded((previous) => ({ ...previous, [section]: !previous[section] }));
-
-  const renderSectionHeader = (
-    section: SectionKey,
-    title: string,
-    icon: React.ReactNode,
-  ) => (
-    <button
-      type="button"
-      className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left transition hover:bg-base-200/60"
-      onClick={() => toggleSection(section)}
-      aria-expanded={expanded[section]}
-    >
-      <span className="flex items-center gap-3 text-sm font-bold text-base-content">
-        <span className="text-primary">{icon}</span>
-        {title}
-      </span>
-      {expanded[section] ? (
-        <ChevronUp className="h-4 w-4 shrink-0 text-base-content/60" />
-      ) : (
-        <ChevronDown className="h-4 w-4 shrink-0 text-base-content/60" />
-      )}
-    </button>
-  );
-
-  if (!open) return null;
-
   return (
     <>
-      <div className="fixed inset-0 z-[80]">
-        <button
-          type="button"
-          aria-label="Close create client drawer"
-          className="absolute inset-0 h-full w-full cursor-default bg-slate-950/45 backdrop-blur-[2px]"
-          onClick={handleClose}
-          disabled={loading}
-        />
-        <aside
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="create-client-title"
-          className="absolute right-0 top-0 flex h-full w-full max-w-2xl flex-col border-l border-base-300 bg-base-100 shadow-2xl animate-in slide-in-from-right duration-300"
-        >
-          {/* Header */}
-          <header className="flex shrink-0 items-center justify-between border-b border-base-300 bg-base-100 px-5 py-4 sm:px-7">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                <UserRoundPlus className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-xs font-bold uppercase tracking-[0.16em] text-primary">
-                  Client management
-                </p>
-                <h2 id="create-client-title" className="text-lg font-bold text-base-content">
-                  Add Client
-                </h2>
-              </div>
-            </div>
-            <button
-              type="button"
-              className="btn btn-ghost btn-square btn-sm"
-              aria-label="Close"
-              onClick={handleClose}
-              disabled={loading}
+      <Drawer
+        open={open}
+        onClose={handleClose}
+        eyebrow="CLIENT MANAGEMENT"
+        title="Add Client"
+        icon={<UserRoundPlus className="h-5 w-5 text-white" />}
+        width="lg"
+        onSubmit={handleSubmit}
+        onCancel={handleClose}
+        cancelLabel="Cancel"
+        submitLabel="Save Client"
+        submitting={loading}
+      >
+        <div className="space-y-5">
+          {/* Success Banner */}
+          {successMessage && (
+            <div
+              role="status"
+              className="flex items-center gap-3 p-4 rounded-xl border border-emerald-200 dark:border-emerald-900/40 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-800 dark:text-emerald-300 text-sm font-medium"
             >
-              <X className="h-5 w-5" />
-            </button>
-          </header>
+              <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+              <span>{successMessage}</span>
+            </div>
+          )}
 
-          {/* Scrollable form body */}
-          <div className="flex-1 overflow-y-auto px-5 py-5 sm:px-7">
-            <div className="space-y-4">
-              {successMessage && (
-                <div role="status" className="alert alert-success">
-                  <CheckCircle2 className="h-5 w-5" />
-                  <span>{successMessage}</span>
+          {/* API Error Banner */}
+          {apiError && (
+            <div
+              role="alert"
+              className="flex items-center justify-between gap-3 p-4 rounded-xl border border-red-200 dark:border-red-900/40 bg-red-50 dark:bg-red-950/20 text-red-800 dark:text-red-300 text-sm font-medium"
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 shrink-0" />
+                <span className="break-words">{apiError}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setApiError('')}
+                className="p-1 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/40 text-red-600 dark:text-red-400 transition-colors"
+                aria-label="Dismiss error"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+
+          {/* ── Section 1: Client Information (Required) ────────────────── */}
+          <DrawerSection step={1} title="Client Information" required>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <FieldWrap label="Full Name" required error={errors.fullName}>
+                <div className="relative">
+                  <UserRound className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-txt-sub" />
+                  <input
+                    className={`${INPUT} pl-10`}
+                    placeholder="e.g. Rama Rao"
+                    value={form.fullName}
+                    onChange={(e) => {
+                      setForm((prev) => ({ ...prev, fullName: e.target.value }));
+                      setErrors((prev) => ({ ...prev, fullName: '' }));
+                    }}
+                  />
                 </div>
-              )}
-              {apiError && (
-                <div role="alert" className="alert alert-error">
-                  <AlertCircle className="h-5 w-5" />
-                  <span>{apiError}</span>
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-xs"
-                    aria-label="Dismiss error"
-                    onClick={() => setApiError("")}
+              </FieldWrap>
+
+              <FieldWrap label="Phone" required error={errors.phone}>
+                <div className="relative">
+                  <Phone className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-txt-sub" />
+                  <input
+                    className={`${INPUT} pl-10`}
+                    placeholder="10-digit mobile number"
+                    inputMode="numeric"
+                    maxLength={10}
+                    value={form.phone}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/\D/g, '');
+                      if (value.length <= 10) {
+                        setForm((prev) => ({ ...prev, phone: value }));
+                        setErrors((prev) => ({ ...prev, phone: '' }));
+                      }
+                    }}
+                  />
+                </div>
+              </FieldWrap>
+
+              <FieldWrap label="Email" required error={errors.email}>
+                <div className="relative">
+                  <Mail className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-txt-sub" />
+                  <input
+                    type="email"
+                    className={`${INPUT} pl-10`}
+                    placeholder="name@example.com"
+                    value={form.email}
+                    onChange={(e) => {
+                      setForm((prev) => ({ ...prev, email: e.target.value }));
+                      setErrors((prev) => ({ ...prev, email: '' }));
+                    }}
+                  />
+                </div>
+              </FieldWrap>
+
+              <FieldWrap label="Business Name" required error={errors.companyName}>
+                <div className="relative">
+                  <Building2 className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-txt-sub" />
+                  <input
+                    className={`${INPUT} pl-10`}
+                    placeholder="e.g. Rama Traders"
+                    value={form.companyName}
+                    onChange={(e) => {
+                      setForm((prev) => ({ ...prev, companyName: e.target.value }));
+                      setErrors((prev) => ({ ...prev, companyName: '' }));
+                    }}
+                  />
+                </div>
+              </FieldWrap>
+            </div>
+          </DrawerSection>
+
+          {/* ── Section 2: Identifiers (Collapsible) ─────────────────────── */}
+          <DrawerSection
+            step={2}
+            title="Identifiers"
+            subtitle="PAN, GSTIN, TAN"
+            collapsible
+            defaultExpanded={false}
+          >
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <FieldWrap label="PAN">
+                <input
+                  className={INPUT}
+                  placeholder="e.g. ABCDE1234F"
+                  maxLength={10}
+                  value={form.pan}
+                  onChange={(e) =>
+                    setForm((prev) => ({ ...prev, pan: e.target.value.toUpperCase() }))
+                  }
+                />
+              </FieldWrap>
+
+              <FieldWrap label="GSTIN">
+                <input
+                  className={INPUT}
+                  placeholder="e.g. 22AAAAA0000A1Z5"
+                  maxLength={15}
+                  value={form.gstins[0]?.gstin || ''}
+                  onChange={(e) => {
+                    const value = e.target.value.toUpperCase();
+                    setForm((prev) => {
+                      const gstins = [...prev.gstins];
+                      if (gstins.length === 0) {
+                        gstins.push({
+                          gstin: value,
+                          state: '',
+                          registrationType: 'REGULAR',
+                          status: 'ACTIVE',
+                        });
+                      } else {
+                        gstins[0] = { ...gstins[0], gstin: value };
+                      }
+                      return { ...prev, gstins };
+                    });
+                  }}
+                />
+              </FieldWrap>
+
+              <FieldWrap label="TAN">
+                <input
+                  className={INPUT}
+                  placeholder="e.g. ABCD12345E"
+                  maxLength={10}
+                  value={form.tan}
+                  onChange={(e) =>
+                    setForm((prev) => ({ ...prev, tan: e.target.value.toUpperCase() }))
+                  }
+                />
+              </FieldWrap>
+            </div>
+          </DrawerSection>
+
+          {/* ── Section 3: Compliance Services (Collapsible, open by default) ── */}
+          <DrawerSection
+            step={3}
+            title="Compliance Services"
+            subtitle="Active schedules"
+            collapsible
+            defaultExpanded={true}
+          >
+            <div className="space-y-3">
+              {COMPLIANCE_ITEMS.map(({ key, label, code, icon, color }) => {
+                const item = form[key];
+                return (
+                  <div
+                    key={key}
+                    className="p-4 rounded-xl border border-divider bg-bg/40 hover:border-blue-500/30 transition-all"
                   >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-              )}
-
-              {/* Required client information */}
-              <section className={`${sectionClass} p-5`}>
-                <div className="mb-4 flex items-center gap-2 border-b border-base-200 pb-3">
-                  <UserRound className="h-4 w-4 text-primary" />
-                  <h3 className="text-sm font-bold uppercase tracking-wide text-base-content">
-                    Client information
-                  </h3>
-                </div>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div>
-                    <StaticLabel required>Full Name</StaticLabel>
-                    <input
-                      className={inputClass}
-                      placeholder="Enter full name (e.g., Rama Rao)"
-                      value={form.fullName}
-                      onChange={(event) => {
-                        setForm((previous) => ({ ...previous, fullName: event.target.value }));
-                        setErrors((previous) => ({ ...previous, fullName: "" }));
-                      }}
-                    />
-                    {errors.fullName && <p className="mt-1 text-xs text-error">{errors.fullName}</p>}
-                  </div>
-                  <div>
-                    <StaticLabel required>Phone</StaticLabel>
-                    <div className="relative">
-                      <Phone className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-base-content/40" />
-                      <input
-                        className={`${inputClass} pl-9`}
-                        placeholder="10-digit mobile number"
-                        inputMode="numeric"
-                        value={form.phone}
-                        onChange={(event) => {
-                          const value = event.target.value.replace(/\D/g, "");
-                          if (value.length <= 10) {
-                            setForm((previous) => ({ ...previous, phone: value }));
-                            setErrors((previous) => ({ ...previous, phone: "" }));
-                          }
-                        }}
-                      />
-                    </div>
-                    {errors.phone && <p className="mt-1 text-xs text-error">{errors.phone}</p>}
-                  </div>
-                  <div>
-                    <StaticLabel required>Email</StaticLabel>
-                    <div className="relative">
-                      <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-base-content/40" />
-                      <input
-                        className={`${inputClass} pl-9`}
-                        type="email"
-                        placeholder="name@example.com"
-                        value={form.email}
-                        onChange={(event) => {
-                          setForm((previous) => ({ ...previous, email: event.target.value }));
-                          setErrors((previous) => ({ ...previous, email: "" }));
-                        }}
-                      />
-                    </div>
-                    {errors.email && <p className="mt-1 text-xs text-error">{errors.email}</p>}
-                  </div>
-                  <div>
-                    <StaticLabel required>Business Name</StaticLabel>
-                    <div className="relative">
-                      <Building2 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-base-content/40" />
-                      <input
-                        className={`${inputClass} pl-9`}
-                        placeholder="e.g., Rama Traders"
-                        value={form.companyName}
-                        onChange={(event) => {
-                          setForm((previous) => ({ ...previous, companyName: event.target.value }));
-                          setErrors((previous) => ({ ...previous, companyName: "" }));
-                        }}
-                      />
-                    </div>
-                    {errors.companyName && <p className="mt-1 text-xs text-error">{errors.companyName}</p>}
-                  </div>
-                </div>
-              </section>
-
-              {/* Identifiers */}
-              <section className={sectionClass}>
-                {renderSectionHeader("identifiers", "Identifiers (Recommended)", <FileText className="h-4 w-4" />)}
-                {expanded.identifiers && (
-                  <div className="grid grid-cols-1 gap-4 border-t border-base-200 p-5 sm:grid-cols-2">
-                    <div>
-                      <StaticLabel>PAN</StaticLabel>
-                      <input
-                        className={inputClass}
-                        placeholder="e.g., ABCDE1234F"
-                        value={form.pan}
-                        onChange={(event) => setForm((previous) => ({ ...previous, pan: event.target.value.toUpperCase() }))}
-                      />
-                    </div>
-                    <div>
-                      <StaticLabel>GSTIN</StaticLabel>
-                      <input
-                        className={inputClass}
-                        placeholder="e.g., 22AAAAA0000A1Z5"
-                        value={form.gstins[0]?.gstin || ""}
-                        onChange={(event) => {
-                          const value = event.target.value.toUpperCase();
-                          setForm((previous) => {
-                            const gstins = [...previous.gstins];
-                            if (gstins.length === 0) {
-                              gstins.push({ gstin: value, state: "", registrationType: "REGULAR", status: "ACTIVE" });
-                            } else {
-                              gstins[0] = { ...gstins[0], gstin: value };
-                            }
-                            return { ...previous, gstins };
-                          });
-                        }}
-                      />
-                    </div>
-                    <div>
-                      <StaticLabel>TAN</StaticLabel>
-                      <input
-                        className={inputClass}
-                        placeholder="e.g., ABCD12345E"
-                        value={form.tan}
-                        onChange={(event) => setForm((previous) => ({ ...previous, tan: event.target.value.toUpperCase() }))}
-                      />
-                    </div>
-                  </div>
-                )}
-              </section>
-
-              {/* Compliance services */}
-              <section className={sectionClass}>
-                {renderSectionHeader("compliance", "Compliance Services", <ClipboardList className="h-4 w-4" />)}
-                {expanded.compliance && (
-                  <div className="space-y-3 border-t border-base-200 p-4">
-                    {(
-                      [
-                        { key: "complianceGst", label: "GST", icon: "📋" },
-                        { key: "complianceTds", label: "TDS", icon: "🏦" },
-                        { key: "complianceItr", label: "ITR", icon: "📄" },
-                        { key: "complianceRoc", label: "ROC", icon: "🏢" },
-                        { key: "complianceMsme", label: "MSME", icon: "🏭" },
-                      ] as const
-                    ).map(({ key, label, icon }) => (
-                      <div key={key} className="rounded-xl border border-base-300 p-4">
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                          <div className="flex items-center gap-3">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-lg">
-                              {icon}
-                            </div>
-                            <div>
-                              <p className="text-sm font-bold text-base-content">{label}</p>
-                              <p className="text-xs text-base-content/60">
-                                {form[key].enabled ? `${label} · Select Frequency` : `${label} · Inactive`}
-                              </p>
-                            </div>
-                          </div>
-                          <label className="flex cursor-pointer items-center gap-2">
-                            <span className={`text-xs font-semibold ${form[key].enabled ? "text-success" : "text-base-content/50"}`}>
-                              {form[key].enabled ? "Active" : "Inactive"}
-                            </span>
-                            <input
-                              type="checkbox"
-                              className="toggle toggle-success"
-                              checked={form[key].enabled}
-                              onChange={(event) => setCompliance(key as keyof typeof form, "enabled", event.target.checked)}
-                            />
-                          </label>
-                        </div>
-                        {form[key].enabled && (
-                          <div className="mt-4">
-                            <StaticLabel>Select Filing Frequency</StaticLabel>
-                            <select
-                              className={selectClass}
-                              value={form[key].frequency || ""}
-                              onChange={(event) =>
-                                setCompliance(
-                                  key as "complianceGst" | "complianceTds" | "complianceItr" | "complianceRoc" | "complianceMsme",
-                                  "frequency",
-                                  event.target.value,
-                                )
-                              }
-                            >
-                              <option value="" disabled>Select Filing Frequency</option>
-                              <option value="MONTHLY">Monthly</option>
-                              <option value="QUARTERLY">Quarterly</option>
-                              <option value="ANNUAL">Annual</option>
-                            </select>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </section>
-
-              {/* Address */}
-              <section className={sectionClass}>
-                {renderSectionHeader("addresses", "Addresses", <MapPin className="h-4 w-4" />)}
-                {expanded.addresses && (
-                  <div className="grid grid-cols-1 gap-4 border-t border-base-200 p-5 sm:grid-cols-2">
-                    <div>
-                      <StaticLabel>Address Type</StaticLabel>
-                      <select
-                        className={selectClass}
-                        value={form.addresses[0]?.type || "REGISTERED"}
-                        onChange={(event) => {
-                          const value = event.target.value as AddressType;
-                          setForm((previous) => {
-                            const addresses = [...previous.addresses];
-                            if (addresses.length === 0) {
-                              addresses.push({ type: value, line1: "", city: "", state: "", pincode: "" });
-                            } else {
-                              addresses[0] = { ...addresses[0], type: value };
-                            }
-                            return { ...previous, addresses };
-                          });
-                        }}
-                      >
-                        <option value="REGISTERED">Registered</option>
-                        <option value="COMMUNICATION">Communication</option>
-                        <option value="BRANCH">Branch</option>
-                      </select>
-                    </div>
-                    {(
-                      [
-                        { key: "line1", label: "Address Line", placeholder: "Door No, Street Name" },
-                        { key: "city", label: "City", placeholder: "e.g., Hyderabad" },
-                        { key: "state", label: "State", placeholder: "e.g., Telangana" },
-                        { key: "pincode", label: "Pincode", placeholder: "e.g., 500001" },
-                      ] as const
-                    ).map(({ key, label, placeholder }) => (
-                      <div key={key}>
-                        <StaticLabel>{label}</StaticLabel>
-                        <input
-                          className={inputClass}
-                          placeholder={placeholder}
-                          value={form.addresses[0]?.[key] || ""}
-                          onChange={(event) => {
-                            const value = event.target.value;
-                            setForm((previous) => {
-                              const addresses = [...previous.addresses];
-                              if (addresses.length === 0) {
-                                addresses.push({
-                                  type: "REGISTERED",
-                                  line1: key === "line1" ? value : "",
-                                  city: key === "city" ? value : "",
-                                  state: key === "state" ? value : "",
-                                  pincode: key === "pincode" ? value : "",
-                                });
-                              } else {
-                                addresses[0] = { ...addresses[0], [key]: value };
-                              }
-                              return { ...previous, addresses };
-                            });
-                          }}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </section>
-
-              {/* Notification preferences */}
-              <section className={sectionClass}>
-                {renderSectionHeader("notifications", "Notification Preferences", <Bell className="h-4 w-4" />)}
-                {expanded.notifications && (
-                  <div className="border-t border-base-200 p-5">
-                    <StaticLabel>Channels</StaticLabel>
-                    <div className="flex flex-wrap gap-3">
-                      {(["WHATSAPP", "EMAIL"] as const).map((channel) => (
-                        <label key={channel} className="flex cursor-pointer items-center gap-3 rounded-xl border border-base-300 px-4 py-3">
-                          <input
-                            type="checkbox"
-                            className="checkbox checkbox-primary checkbox-sm"
-                            checked={form.notifChannels.includes(channel)}
-                            onChange={(event) =>
-                              setForm((previous) => ({
-                                ...previous,
-                                notifChannels: event.target.checked
-                                  ? [...previous.notifChannels, channel]
-                                  : previous.notifChannels.filter((item) => item !== channel),
-                              }))
-                            }
-                          />
-                          <span className="text-sm font-semibold">{channel === "WHATSAPP" ? "WhatsApp" : "Email"}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </section>
-
-              {/* Assign team */}
-              <section className={sectionClass}>
-                {renderSectionHeader("team", "Assign Team", <Users className="h-4 w-4" />)}
-                {expanded.team && (
-                  <div className="border-t border-base-200 p-5">
-                    <StaticLabel>Select Staff</StaticLabel>
-                    {loadingStaff ? (
-                      <div className="flex items-center gap-2 py-2 text-sm text-base-content/60">
-                        <LoaderCircle className="h-4 w-4 animate-spin" /> Loading staff...
-                      </div>
-                    ) : (
-                      <>
-                        <select
-                          className={selectClass}
-                          value={form.assignedTeam?.primaryAssigneeId || ""}
-                          onChange={(event) => {
-                            const value = event.target.value;
-                            if (value === "__add_new__") {
-                              setOpenCreateStaff(true);
-                              return;
-                            }
-                            const selected = staffList.find((staff) => staff.id === value);
-                            setForm((previous) => ({
-                              ...previous,
-                              assignedTeam: {
-                                primaryAssigneeId: value,
-                                primaryAssigneeName: selected?.userName || "",
-                              },
-                            }));
-                          }}
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`w-9 h-9 rounded-xl border flex items-center justify-center font-bold text-xs shrink-0 ${color}`}
                         >
-                          <option value="">Select staff</option>
-                          {staffList.map((staff) => (
-                            <option key={staff.id} value={staff.id}>
-                              {staff.firstName && staff.lastName
-                                ? `${staff.firstName} ${staff.lastName}`
-                                : staff.userName ?? "Unnamed"}
-                            </option>
-                          ))}
-                          <option value="__add_new__">+ Add new staff</option>
-                        </select>
-                        {staffList.length === 0 && (
-                          <button
-                            type="button"
-                            className="btn btn-outline btn-sm mt-3 gap-2"
-                            onClick={() => setOpenCreateStaff(true)}
+                          {icon}
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-txt-main">{label}</p>
+                          <p className="text-xs text-txt-sub">
+                            {item.enabled
+                              ? `${code} · ${item.frequency || 'Select frequency'}`
+                              : `${code} · Inactive`}
+                          </p>
+                        </div>
+                      </div>
+
+                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <span
+                          className={`text-xs font-semibold ${
+                            item.enabled
+                              ? 'text-emerald-600 dark:text-emerald-400'
+                              : 'text-txt-sub'
+                          }`}
+                        >
+                          {item.enabled ? 'Active' : 'Inactive'}
+                        </span>
+                        <input
+                          type="checkbox"
+                          className="toggle toggle-success toggle-sm"
+                          checked={item.enabled}
+                          onChange={(e) =>
+                            setCompliance(
+                              key as keyof typeof form,
+                              'enabled',
+                              e.target.checked,
+                            )
+                          }
+                        />
+                      </label>
+                    </div>
+
+                    {item.enabled && (
+                      <div className="mt-3 pt-3 border-t border-divider/60">
+                        <label className="text-xs font-bold text-txt-main mb-1.5 block">
+                          Select Filing Frequency
+                        </label>
+                        <div className="relative">
+                          <select
+                            className={SELECT}
+                            value={item.frequency || ''}
+                            onChange={(e) =>
+                              setCompliance(
+                                key as keyof typeof form,
+                                'frequency',
+                                e.target.value,
+                              )
+                            }
                           >
-                            <Plus className="h-4 w-4" /> Add Staff
-                          </button>
-                        )}
-                      </>
+                            <option value="" disabled>
+                              Select Filing Frequency
+                            </option>
+                            <option value="MONTHLY" className="bg-surface">
+                              Monthly
+                            </option>
+                            <option value="QUARTERLY" className="bg-surface">
+                              Quarterly
+                            </option>
+                            <option value="ANNUAL" className="bg-surface">
+                              Annual
+                            </option>
+                          </select>
+                          <ChevronDown className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-txt-sub" />
+                        </div>
+                      </div>
                     )}
                   </div>
-                )}
-              </section>
-
-              {/* Internal notes */}
-              <section className={sectionClass}>
-                {renderSectionHeader("notes", "Add Internal Notes", <FileText className="h-4 w-4" />)}
-                {expanded.notes && (
-                  <div className="border-t border-base-200 p-5">
-                    <StaticLabel>Internal Notes</StaticLabel>
-                    <textarea
-                      className="textarea textarea-bordered min-h-28 w-full rounded-xl bg-base-100"
-                      placeholder="Add any internal notes about this client"
-                      value={notes}
-                      onChange={(event) => setNotes(event.target.value)}
-                    />
-                  </div>
-                )}
-              </section>
+                );
+              })}
             </div>
-          </div>
+          </DrawerSection>
 
-          {/* Sticky footer */}
-          <footer className="flex shrink-0 flex-col-reverse gap-3 border-t border-base-300 bg-base-100 px-5 py-4 sm:flex-row sm:justify-end sm:px-7">
-            <button
-              type="button"
-              className="btn btn-outline sm:min-w-32"
-              onClick={handleClose}
-              disabled={loading}
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              className="btn btn-primary gap-2 sm:min-w-44"
-              onClick={handleSubmit}
-              disabled={loading || !isFormValid()}
-            >
-              {loading ? (
-                <>
-                  <LoaderCircle className="h-4 w-4 animate-spin" /> Saving...
-                </>
-              ) : (
-                "Save Client"
-              )}
-            </button>
-          </footer>
-        </aside>
-      </div>
+          {/* ── Section 4: Addresses (Collapsible) ───────────────────────── */}
+          <DrawerSection
+            step={4}
+            title="Addresses"
+            subtitle="Registered / Communication"
+            collapsible
+            defaultExpanded={false}
+          >
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <FieldWrap label="Address Type">
+                <div className="relative">
+                  <select
+                    className={SELECT}
+                    value={form.addresses[0]?.type || 'REGISTERED'}
+                    onChange={(e) => {
+                      const value = e.target.value as AddressType;
+                      setForm((prev) => {
+                        const addresses = [...prev.addresses];
+                        if (addresses.length === 0) {
+                          addresses.push({
+                            type: value,
+                            line1: '',
+                            city: '',
+                            state: '',
+                            pincode: '',
+                          });
+                        } else {
+                          addresses[0] = { ...addresses[0], type: value };
+                        }
+                        return { ...prev, addresses };
+                      });
+                    }}
+                  >
+                    <option value="REGISTERED" className="bg-surface">
+                      Registered
+                    </option>
+                    <option value="COMMUNICATION" className="bg-surface">
+                      Communication
+                    </option>
+                    <option value="BRANCH" className="bg-surface">
+                      Branch
+                    </option>
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-txt-sub" />
+                </div>
+              </FieldWrap>
 
+              <FieldWrap label="Address Line">
+                <input
+                  className={INPUT}
+                  placeholder="Door No, Street Name"
+                  value={form.addresses[0]?.line1 || ''}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setForm((prev) => {
+                      const addresses = [...prev.addresses];
+                      if (addresses.length === 0) {
+                        addresses.push({
+                          type: 'REGISTERED',
+                          line1: value,
+                          city: '',
+                          state: '',
+                          pincode: '',
+                        });
+                      } else {
+                        addresses[0] = { ...addresses[0], line1: value };
+                      }
+                      return { ...prev, addresses };
+                    });
+                  }}
+                />
+              </FieldWrap>
+
+              <FieldWrap label="City">
+                <input
+                  className={INPUT}
+                  placeholder="e.g. Hyderabad"
+                  value={form.addresses[0]?.city || ''}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setForm((prev) => {
+                      const addresses = [...prev.addresses];
+                      if (addresses.length === 0) {
+                        addresses.push({
+                          type: 'REGISTERED',
+                          line1: '',
+                          city: value,
+                          state: '',
+                          pincode: '',
+                        });
+                      } else {
+                        addresses[0] = { ...addresses[0], city: value };
+                      }
+                      return { ...prev, addresses };
+                    });
+                  }}
+                />
+              </FieldWrap>
+
+              <FieldWrap label="State">
+                <input
+                  className={INPUT}
+                  placeholder="e.g. Telangana"
+                  value={form.addresses[0]?.state || ''}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setForm((prev) => {
+                      const addresses = [...prev.addresses];
+                      if (addresses.length === 0) {
+                        addresses.push({
+                          type: 'REGISTERED',
+                          line1: '',
+                          city: '',
+                          state: value,
+                          pincode: '',
+                        });
+                      } else {
+                        addresses[0] = { ...addresses[0], state: value };
+                      }
+                      return { ...prev, addresses };
+                    });
+                  }}
+                />
+              </FieldWrap>
+
+              <FieldWrap label="Pincode">
+                <input
+                  className={INPUT}
+                  placeholder="e.g. 500001"
+                  maxLength={6}
+                  value={form.addresses[0]?.pincode || ''}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setForm((prev) => {
+                      const addresses = [...prev.addresses];
+                      if (addresses.length === 0) {
+                        addresses.push({
+                          type: 'REGISTERED',
+                          line1: '',
+                          city: '',
+                          state: '',
+                          pincode: value,
+                        });
+                      } else {
+                        addresses[0] = { ...addresses[0], pincode: value };
+                      }
+                      return { ...prev, addresses };
+                    });
+                  }}
+                />
+              </FieldWrap>
+            </div>
+          </DrawerSection>
+
+          {/* ── Section 5: Notification Preferences (Collapsible) ───────── */}
+          <DrawerSection
+            step={5}
+            title="Notification Preferences"
+            subtitle="Channels"
+            collapsible
+            defaultExpanded={false}
+          >
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {[
+                {
+                  channel: 'WHATSAPP' as const,
+                  label: 'WhatsApp',
+                  desc: 'Automated due date alerts & reminders',
+                  icon: <WhatsAppIcon className="h-5 w-5 text-emerald-500 shrink-0" />,
+                },
+                {
+                  channel: 'EMAIL' as const,
+                  label: 'Email',
+                  desc: 'Filing summaries & official notifications',
+                  icon: <Mail className="h-5 w-5 text-blue-500 shrink-0" />,
+                },
+              ].map(({ channel, label, desc, icon }) => {
+                const isChecked = form.notifChannels.includes(channel);
+                return (
+                  <label
+                    key={channel}
+                    className={`flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer select-none transition-all ${
+                      isChecked
+                        ? 'border-blue-500/50 bg-blue-50/40 dark:bg-blue-950/20'
+                        : 'border-divider bg-bg/40 hover:bg-surface'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      className="checkbox checkbox-primary checkbox-sm mt-0.5 rounded-md"
+                      checked={isChecked}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          notifChannels: e.target.checked
+                            ? [...prev.notifChannels, channel]
+                            : prev.notifChannels.filter((item) => item !== channel),
+                        }))
+                      }
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        {icon}
+                        <span className="text-xs font-bold text-txt-main">{label}</span>
+                      </div>
+                      <p className="text-[11px] text-txt-sub mt-0.5">{desc}</p>
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+          </DrawerSection>
+
+          {/* ── Section 6: Assign Team (Collapsible) ─────────────────────── */}
+          <DrawerSection
+            step={6}
+            title="Assign Team"
+            subtitle="Primary staff member"
+            collapsible
+            defaultExpanded={false}
+          >
+            <FieldWrap label="Staff Member">
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <select
+                    className={SELECT}
+                    value={form.assignedTeam?.primaryAssigneeId || ''}
+                    disabled={loadingStaff}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === '__add_new__') {
+                        setOpenCreateStaff(true);
+                        return;
+                      }
+                      const selected = staffList.find((staff) => staff.id === val);
+                      setForm((prev) => ({
+                        ...prev,
+                        assignedTeam: {
+                          primaryAssigneeId: val,
+                          primaryAssigneeName: selected?.userName || '',
+                        },
+                      }));
+                    }}
+                  >
+                    <option value="">Select staff</option>
+                    {staffList.map((staff) => (
+                      <option key={staff.id} value={staff.id} className="bg-surface">
+                        {staff.firstName && staff.lastName
+                          ? `${staff.firstName} ${staff.lastName}`
+                          : staff.userName ?? 'Unnamed'}
+                      </option>
+                    ))}
+                    <option
+                      value="__add_new__"
+                      className="bg-surface font-semibold text-blue-600"
+                    >
+                      + Add new staff
+                    </option>
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-txt-sub" />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setOpenCreateStaff(true)}
+                  className="h-11 px-3.5 rounded-xl border border-divider bg-bg/50 hover:bg-surface text-txt-main text-xs font-semibold flex items-center gap-1.5 shrink-0 transition-all cursor-pointer shadow-xs hover:border-blue-500/40"
+                  title="Add new staff member"
+                >
+                  <Plus className="h-4 w-4 text-blue-500" />
+                  <span className="hidden sm:inline">Add Staff</span>
+                </button>
+              </div>
+            </FieldWrap>
+          </DrawerSection>
+
+          {/* ── Section 7: Internal Notes (Collapsible) ─────────────────── */}
+          <DrawerSection
+            step={7}
+            title="Internal Notes"
+            subtitle="Team comments"
+            collapsible
+            defaultExpanded={false}
+          >
+            <FieldWrap label="Notes">
+              <textarea
+                rows={3}
+                className={TEXTAREA}
+                placeholder="Add any internal team notes about this client..."
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+              />
+            </FieldWrap>
+          </DrawerSection>
+        </div>
+      </Drawer>
+
+      {/* Add Staff Modal Modal */}
       <AddStaffDialog
         open={openCreateStaff}
         onClose={() => setOpenCreateStaff(false)}
@@ -804,9 +932,9 @@ export default function CreateSubjectDialog({
               assignedTeam: {
                 primaryAssigneeId: newStaff.id,
                 primaryAssigneeName:
-                  `${newStaff.firstName ?? ""} ${newStaff.lastName ?? ""}`.trim() ||
+                  `${newStaff.firstName ?? ''} ${newStaff.lastName ?? ''}`.trim() ||
                   newStaff.userName ||
-                  "",
+                  '',
               },
             }));
           }

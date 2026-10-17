@@ -2,7 +2,7 @@
 
 import React, { useMemo } from 'react';
 import { Eye, Pencil, Trash2, Mail, Smartphone, Bell, Calendar } from 'lucide-react';
-import CommonDataGrid, { GridAction, GridColumn } from '@/components/common/CommonTable';
+import CommonDataGrid, { GridAction, GridColumn, createTableActions } from '@/components/common/CommonTable';
 import { ReminderDetail, ReminderStatus } from '@/types/reminders.types';
 import { updateReminder } from '@/services/reminderService';
 import WhatsAppIcon from '@/components/common/WhatsAppIcon';
@@ -224,23 +224,27 @@ export default function RemindersTable({
         cellEditorParams: {
           values: ['SCHEDULED', 'SENT', 'FAILED', 'CANCELLED'],
         },
-        cellRenderer: (p) => <StatusBadge status={p.data?.status} />,
+        cellRenderer: (p) => (
+          <StatusBadge status={(p.value ?? p.data?.status) as ReminderStatus} />
+        ),
       },
       {
         headerName: 'Scheduled At',
         field: 'scheduledAt',
         minWidth: 190,
         flex: 1.5,
+        editable: true,
         cellRenderer: (p) => {
-          if (!p.data?.scheduledAt) {
+          const dateVal = p.value || p.data?.scheduledAt;
+          if (!dateVal) {
             return <span className="text-xs text-slate-400">—</span>;
           }
 
-          const parsed = formatScheduledDate(p.data.scheduledAt);
-          const diffDays = getRelativeDateDiff(p.data.scheduledAt);
+          const parsed = formatScheduledDate(dateVal);
+          const diffDays = getRelativeDateDiff(dateVal);
 
           if (!parsed) {
-            return <span className="text-xs text-slate-400">{p.data.scheduledAt}</span>;
+            return <span className="text-xs text-slate-400">{dateVal}</span>;
           }
 
           return (
@@ -283,26 +287,15 @@ export default function RemindersTable({
     []
   );
 
-  const actions: GridAction<ReminderDetail>[] = [
-    {
-      label: 'View',
-      icon: <Eye className="h-4 w-4" />,
-      variant: 'primary',
-      onClick: (row) => onView(row.id),
-    },
-    {
-      label: 'Edit',
-      icon: <Pencil className="h-4 w-4" />,
-      variant: 'secondary',
-      onClick: (row) => onEdit(row.id),
-    },
-    {
-      label: 'Delete',
-      icon: <Trash2 className="h-4 w-4" />,
-      variant: 'danger',
-      onClick: (row) => onDelete(row.id, row.task?.title || 'Reminder'),
-    },
-  ];
+  const actions: GridAction<ReminderDetail>[] = useMemo(
+    () =>
+      createTableActions<ReminderDetail>({
+        onView: (row) => onView(row.id),
+        onEdit: (row) => onEdit(row.id),
+        onDelete: (row) => onDelete(row.id, row.task?.title || 'Reminder'),
+      }),
+    [onView, onEdit, onDelete]
+  );
 
   return (
     <CommonDataGrid<ReminderDetail>
@@ -311,12 +304,17 @@ export default function RemindersTable({
       actions={actions}
       isLoading={loading}
       rowHeight={64}
-      onRowClick={(row) => onView(row.id)}
-      onRowDoubleClick={(row) => onEdit(row.id)}
       onUpdateCell={async ({ row, field, newValue }) => {
         if (!businessId) return;
+        let valToSave: unknown = newValue;
+        if (field === 'scheduledAt' && typeof newValue === 'string' && newValue.trim()) {
+          const d = new Date(newValue);
+          if (!isNaN(d.getTime())) {
+            valToSave = d.toISOString();
+          }
+        }
         await updateReminder(businessId, row.id, {
-          [field]: newValue,
+          [field]: valToSave,
         });
         onRefresh?.();
       }}

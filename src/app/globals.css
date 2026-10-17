@@ -98,14 +98,14 @@ body {
 }
 
 #nprogress .bar {
-  background: #3b82f6 !important;
-  height: 5px !important;
+  background: var(--accent) !important;
+  height: 3px !important;
 }
 
 #nprogress .peg {
   box-shadow:
-    0 0 10px #3b82f6,
-    0 0 5px #3b82f6 !important;
+    0 0 10px var(--accent),
+    0 0 5px var(--accent) !important;
 }
 
 /* Keep your global hide as-is */
