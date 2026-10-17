@@ -4,7 +4,11 @@ import { useMemo } from "react";
 import { Eye, Pencil, Trash2, Calendar } from "lucide-react";
 import { useWorkspace } from "@/context/WorkspaceContext";
 import { TaskListItem } from "@/types/task.types";
-import CommonDataGrid, { GridAction, GridColumn, createTableActions } from "@/components/common/CommonTable";
+import CommonDataGrid, {
+  GridAction,
+  GridColumn,
+  createTableActions,
+} from "@/components/common/CommonTable";
 import PageFilterBar from "@/components/common/PageFilter";
 import ResourcePageLayout from "@/components/common/ResourcePageLayout";
 import TaskFormDialog from "@/components/tasks/TaskFormDialogue";
@@ -15,66 +19,79 @@ import { useTaskFilters } from "@/hooks/tasks/useTaskFilters";
 
 import { updateTask } from "@/services/taskService";
 import { TASK_TYPES } from "@/constants/taskConstants";
-import { compareDates, compareStrings, SortOption, useSortedItems } from "@/hooks/useSortedItems";
+import {
+  compareDates,
+  compareStrings,
+  SortOption,
+  useSortedItems,
+} from "@/hooks/useSortedItems";
 import { useResourcePageState } from "@/hooks/useResourcePageState";
 import { useAsyncAction } from "@/hooks/useAnyAction";
 import PageSkeleton from "@/components/common/PageSkeleton";
+// import { DateCellEditor } from "@/components/grid/DateCellEditor";
+import { DueDate } from "@/components/common/DueDate";
+import { DateCellEditor } from "@/components/grid/DateCellEditor";
 
-const STATUS_VALUES = ["OPEN", "PENDING", "IN_PROGRESS", "COMPLETED", "CLOSED", "CANCELLED"];
+const STATUS_VALUES = [
+  "OPEN",
+  "PENDING",
+  "IN_PROGRESS",
+  "COMPLETED",
+  "CLOSED",
+  "CANCELLED",
+];
 
 const SORT_OPTIONS: SortOption<TaskListItem>[] = [
-  { key: "due_asc", label: "Sort by due date", compare: compareDates((t) => t.dueDate, "asc") },
-  { key: "due_desc", label: "Sort by due date (Latest)", compare: compareDates((t) => t.dueDate, "desc") },
-  { key: "title_asc", label: "Sort by title (A-Z)", compare: compareStrings((t) => t.title) },
-  { key: "client_asc", label: "Sort by client (A-Z)", compare: compareStrings((t) => t.subject?.name) },
+  {
+    key: "due_asc",
+    label: "Sort by due date",
+    compare: compareDates((t) => t.dueDate, "asc"),
+  },
+  {
+    key: "due_desc",
+    label: "Sort by due date (Latest)",
+    compare: compareDates((t) => t.dueDate, "desc"),
+  },
+  {
+    key: "title_asc",
+    label: "Sort by title (A-Z)",
+    compare: compareStrings((t) => t.title),
+  },
+  {
+    key: "client_asc",
+    label: "Sort by client (A-Z)",
+    compare: compareStrings((t) => t.subject?.name),
+  },
 ];
 
 function getTaskTypePrefix(val?: string | null) {
-  if (!val) return 'TASK';
+  if (!val) return "TASK";
   const upper = val.toUpperCase();
-  if (upper.includes('GST')) return 'GST';
-  if (upper.includes('TDS')) return 'TDS';
-  if (upper.includes('ITR')) return 'ITR';
-  if (upper.includes('ROC')) return 'ROC';
-  if (upper.includes('MSME')) return 'MSME';
-  return val.split('_')[0] || 'TASK';
+  if (upper.includes("GST")) return "GST";
+  if (upper.includes("TDS")) return "TDS";
+  if (upper.includes("ITR")) return "ITR";
+  if (upper.includes("ROC")) return "ROC";
+  if (upper.includes("MSME")) return "MSME";
+  return val.split("_")[0] || "TASK";
 }
 
 function getTaskTypeBadgeClass(val?: string | null) {
   const prefix = getTaskTypePrefix(val);
-  if (prefix === 'TDS') return 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300';
-  if (prefix === 'ITR') return 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300';
-  if (prefix === 'GST') return 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300';
-  if (prefix === 'ROC') return 'bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300';
-  return 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300';
+  if (prefix === "TDS")
+    return "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300";
+  if (prefix === "ITR")
+    return "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300";
+  if (prefix === "GST")
+    return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300";
+  if (prefix === "ROC")
+    return "bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300";
+  return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300";
 }
 
-function formatTaskDueDate(dateStr?: string | null) {
-  if (!dateStr) return null;
-  try {
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return null;
-    const day = String(d.getDate()).padStart(2, '0');
-    const month = d.toLocaleDateString('en-US', { month: 'short' });
-    const year = d.getFullYear();
-    return `${day} ${month} ${year}`;
-  } catch {
-    return null;
-  }
-}
-
-function getTaskDueDiffDays(dateStr?: string | null) {
-  if (!dateStr) return null;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const due = new Date(dateStr);
-  due.setHours(0, 0, 0, 0);
-  return Math.ceil((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-}
 
 function StatusPill({ status }: { status?: string }) {
-  const s = (status || '').toUpperCase();
-  if (s === 'COMPLETED') {
+  const s = (status || "").toUpperCase();
+  if (s === "COMPLETED") {
     return (
       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#ecfdf5] text-[#047857] dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200/60">
         <span className="w-1.5 h-1.5 rounded-full bg-[#10b981]" />
@@ -82,7 +99,7 @@ function StatusPill({ status }: { status?: string }) {
       </span>
     );
   }
-  if (s === 'IN_PROGRESS') {
+  if (s === "IN_PROGRESS") {
     return (
       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#fffbeb] text-[#b45309] dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200/60">
         <span className="w-1.5 h-1.5 rounded-full bg-[#f59e0b]" />
@@ -90,7 +107,7 @@ function StatusPill({ status }: { status?: string }) {
       </span>
     );
   }
-  if (s === 'OPEN') {
+  if (s === "OPEN") {
     return (
       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#eff6ff] text-[#1d4ed8] dark:bg-blue-950/40 dark:text-blue-400 border border-blue-200/60">
         <span className="w-1.5 h-1.5 rounded-full bg-[#3b82f6]" />
@@ -98,7 +115,7 @@ function StatusPill({ status }: { status?: string }) {
       </span>
     );
   }
-  if (s === 'PENDING') {
+  if (s === "PENDING") {
     return (
       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#f5f3ff] text-[#6d28d9] dark:bg-purple-950/40 dark:text-purple-400 border border-purple-200/60">
         <span className="w-1.5 h-1.5 rounded-full bg-[#8b5cf6]" />
@@ -106,7 +123,7 @@ function StatusPill({ status }: { status?: string }) {
       </span>
     );
   }
-  if (s === 'CLOSED') {
+  if (s === "CLOSED") {
     return (
       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200/60">
         <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
@@ -114,7 +131,7 @@ function StatusPill({ status }: { status?: string }) {
       </span>
     );
   }
-  if (s === 'CANCELLED') {
+  if (s === "CANCELLED") {
     return (
       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#fef2f2] text-[#dc2626] dark:bg-rose-950/40 dark:text-rose-400 border border-rose-200/60">
         <span className="w-1.5 h-1.5 rounded-full bg-[#ef4444]" />
@@ -125,7 +142,7 @@ function StatusPill({ status }: { status?: string }) {
   return (
     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border border-slate-200/60">
       <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
-      <span>{status || '—'}</span>
+      <span>{status || "—"}</span>
     </span>
   );
 }
@@ -140,7 +157,7 @@ const columns: GridColumn<TaskListItem>[] = [
     cellRenderer: (p) => {
       const row = p.data;
       if (!row) return null;
-      const taskType = row.taskType || row.title || '';
+      const taskType = row.taskType || row.title || "";
       const prefix = getTaskTypePrefix(taskType);
       const badgeClass = getTaskTypeBadgeClass(taskType);
       const clientName = row.subject?.name;
@@ -154,10 +171,10 @@ const columns: GridColumn<TaskListItem>[] = [
           </span>
           <div className="flex flex-col min-w-0">
             <span className="font-bold text-sm text-[var(--primary)] dark:text-slate-100 truncate">
-              {row.title || '—'}
+              {row.title || "—"}
             </span>
             <span className="text-xs text-slate-500 dark:text-slate-400 truncate">
-              {clientName ? `Client: ${clientName}` : 'General task'}
+              {clientName ? `Client: ${clientName}` : "General task"}
             </span>
           </div>
         </div>
@@ -221,46 +238,17 @@ const columns: GridColumn<TaskListItem>[] = [
     minWidth: 180,
     flex: 1.4,
     editable: true,
-    cellRenderer: (p) => {
-      if (!p.value) {
-        return <span className="text-xs text-slate-400">—</span>;
-      }
-      const formatted = formatTaskDueDate(p.value);
-      const diffDays = getTaskDueDiffDays(p.value);
-      const isCompleted = p.data?.status === 'COMPLETED' || p.data?.status === 'CLOSED';
-
-      return (
-        <div className="flex flex-col justify-center py-1 leading-tight">
-          <div className="flex items-center gap-1.5">
-            <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-            <span className="font-bold text-xs sm:text-sm text-slate-900 dark:text-slate-100">
-              {formatted || p.value}
-            </span>
-          </div>
-          {diffDays !== null && !isCompleted && (
-            <div className="mt-0.5">
-              {diffDays < 0 ? (
-                <span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#fef2f2] text-[#dc2626] dark:bg-rose-950/40 dark:text-rose-400">
-                  {Math.abs(diffDays)}d overdue
-                </span>
-              ) : diffDays === 0 ? (
-                <span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#fffbeb] text-[#b45309] dark:bg-amber-950/40 dark:text-amber-400">
-                  Due today
-                </span>
-              ) : diffDays <= 7 ? (
-                <span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#fffbeb] text-[#b45309] dark:bg-amber-950/40 dark:text-amber-400">
-                  Due in {diffDays} days
-                </span>
-              ) : (
-                <span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#eef2ff] text-[#4f46e5] dark:bg-indigo-950/40 dark:text-indigo-400">
-                  In {diffDays} days
-                </span>
-              )}
-            </div>
-          )}
-        </div>
-      );
-    },
+    cellEditor: DateCellEditor,
+    cellEditorPopup: true,
+    cellEditorPopupPosition: "under",
+    cellRenderer: (p) => (
+      <DueDate
+        value={p.value}
+        completed={
+          p.data?.status === "COMPLETED" || p.data?.status === "CLOSED"
+        }
+      />
+    ),
   },
 ];
 
@@ -270,7 +258,10 @@ export default function TasksPage() {
 
   const { tasks, loading, error, setError, refetch, removeTask } = useTasks(id);
   const filters = useTaskFilters(tasks);
-  const { sorted, sortProps } = useSortedItems(filters.filteredTasks, SORT_OPTIONS);
+  const { sorted, sortProps } = useSortedItems(
+    filters.filteredTasks,
+    SORT_OPTIONS,
+  );
 
   const page = useResourcePageState();
   const deleteAction = useAsyncAction();
@@ -297,7 +288,10 @@ export default function TasksPage() {
     let value = newValue;
     if (field === "taskType") {
       const matched = TASK_TYPES.find(
-        (t) => t.label === newValue || t.value === newValue || t.apiValue === newValue
+        (t) =>
+          t.label === newValue ||
+          t.value === newValue ||
+          t.apiValue === newValue,
       );
       if (matched) value = matched.apiValue;
     }
@@ -312,9 +306,8 @@ export default function TasksPage() {
         onEdit: (r) => page.openEdit(r.id),
         onDelete: (r) => page.requestDelete(r.id, r.title),
       }),
-    [page.openView, page.openEdit, page.requestDelete]
+    [page.openView, page.openEdit, page.requestDelete],
   );
-
 
   if (!businessId || loading) {
     return <PageSkeleton />;
@@ -340,7 +333,9 @@ export default function TasksPage() {
       }
       summary={
         <div className="flex items-baseline gap-1.5">
-          <span className="text-xl font-bold text-txt-main">{sorted.length}</span>
+          <span className="text-xl font-bold text-txt-main">
+            {sorted.length}
+          </span>
           <span className="text-base font-normal text-txt-sub">tasks</span>
         </div>
       }
@@ -370,8 +365,9 @@ export default function TasksPage() {
             title="Delete Task"
             description={
               <>
-                Are you sure you want to delete <strong>{page.deleteTarget?.label}</strong>? This
-                action cannot be undone.
+                Are you sure you want to delete{" "}
+                <strong>{page.deleteTarget?.label}</strong>? This action cannot
+                be undone.
               </>
             }
             confirmLabel="Delete"

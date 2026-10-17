@@ -1,7 +1,11 @@
-'use client';
+"use client";
 
-import FilterBar from '@/components/common/Filter';
-import { STATUS_OPTIONS, StaffStatusFilter, STAFF_ROLES } from '../../constants/staffConstants';
+import FilterBar from "@/components/common/Filter";
+import {
+  STATUS_OPTIONS,
+  StaffStatusFilter,
+  STAFF_ROLES,
+} from "../../constants/staffConstants";
 
 interface StaffFilterProps {
   searchQuery: string;
@@ -29,26 +33,26 @@ export default function StaffFilter({
       searchPlaceholder="Search staff by name, email, or phone..."
       filters={[
         {
-          key: 'status',
-          label: 'Status',
+          key: "status",
+          label: "Status",
           value: statusFilter,
           options: STATUS_OPTIONS,
           onChange: (v) => onStatusChange(v as StaffStatusFilter),
         },
         {
-          key: 'role',
-          label: 'Role',
-          value: roleFilter || 'ALL',
-          options: [{ value: 'ALL', label: 'All Roles' }, ...STAFF_ROLES],
-          onChange: (v) => onRoleChange(v === 'ALL' ? '' : v),
+          key: "role",
+          label: "Role",
+          value: roleFilter || "ALL",
+          options: [{ value: "ALL", label: "all" }, ...STAFF_ROLES],
+          onChange: (v) => onRoleChange(v === "ALL" ? "" : v),
         },
       ]}
       onReset={
         onReset ||
         (() => {
-          onSearchChange('');
-          onStatusChange('ALL');
-          onRoleChange('');
+          onSearchChange("");
+          onStatusChange("ALL");
+          onRoleChange("");
         })
       }
     />

@@ -1,7 +1,8 @@
-'use client';
+"use client";
 
-import { ReactNode } from 'react';
-import { Search, RotateCcw, ChevronDown } from 'lucide-react';
+import { ReactNode } from "react";
+import { Search, RotateCcw, ChevronDown } from "lucide-react";
+import Dropdown from "./Dropdown";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -68,24 +69,24 @@ export interface FilterBarProps {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatOptionLabel(optLabel?: string): string {
-  if (!optLabel) return '';
+  if (!optLabel) return "";
 
   let label = optLabel.trim();
 
   // Strip any existing colon prefix like "Status: Scheduled" or "Status: all"
-  if (label.includes(':')) {
-    label = label.split(':').slice(1).join(':').trim();
+  if (label.includes(":")) {
+    label = label.split(":").slice(1).join(":").trim();
   }
 
   const lower = label.toLowerCase();
 
   // Simplify "All <Statuses/Channels/etc.>" and "all" / "any" to "All" (preserve "All Time")
   if (
-    lower === 'all' ||
-    lower === 'any' ||
-    (/^all\s+/i.test(label) && lower !== 'all time')
+    lower === "all" ||
+    lower === "any" ||
+    (/^all\s+/i.test(label) && lower !== "all time")
   ) {
-    return 'All';
+    return "All";
   }
 
   // Capitalize first letter if it starts with a lowercase letter (e.g. "active" -> "Active", "inactive" -> "Inactive")
@@ -101,14 +102,14 @@ function formatOptionLabel(optLabel?: string): string {
 export default function FilterBar({
   searchValue,
   onSearchChange,
-  searchPlaceholder = 'Search...',
+  searchPlaceholder = "Search...",
   showSearch = true,
   tabs,
   filters = [],
   dateRange,
   onReset,
   extra,
-  className = '',
+  className = "",
 }: FilterBarProps) {
   return (
     <div
@@ -134,8 +135,8 @@ export default function FilterBar({
           <div className="bg-bg p-1 rounded-xl border border-divider/50 flex items-center gap-0.5 shrink-0">
             {tabs.options.map((tab) => {
               const isSelected =
-                tab.value === ''
-                  ? !tabs.value || tabs.value === 'ALL'
+                tab.value === ""
+                  ? !tabs.value || tabs.value === "ALL"
                   : tabs.value.toLowerCase() === tab.value.toLowerCase();
 
               return (
@@ -145,8 +146,8 @@ export default function FilterBar({
                   onClick={() => tabs.onChange(tab.value)}
                   className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all cursor-pointer ${
                     isSelected
-                      ? 'bg-navy text-white shadow-xs font-semibold'
-                      : 'text-txt-sub hover:text-txt-main'
+                      ? "bg-navy text-white shadow-xs font-semibold"
+                      : "text-txt-sub hover:text-txt-main"
                   }`}
                 >
                   {tab.label}
@@ -157,31 +158,16 @@ export default function FilterBar({
         )}
 
         {/* Dynamic Select Filters */}
-        {filters.map((filter) => (
-          <div
-            key={filter.key}
-            className={`relative shrink-0 ${filter.widthClass ?? ''}`}
-          >
-            <select
-              value={filter.value}
-              onChange={(e) => filter.onChange(e.target.value)}
-              title={filter.label}
-              className="h-10 w-full appearance-none rounded-xl border border-divider bg-bg/60 pl-3.5 pr-8 text-sm font-medium text-txt-main focus:border-blue-500 focus:bg-surface focus:outline-none focus:ring-2 focus:ring-blue-500/15 transition-all cursor-pointer"
-            >
-              {filter.options.map((opt) => (
-                <option
-                  key={opt.value}
-                  value={opt.value}
-                  className="bg-surface text-txt-main text-sm"
-                >
-                  {formatOptionLabel(opt.label)}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-txt-sub" />
-          </div>
+        {filters.map((f) => (
+          <Dropdown
+            key={f.key}
+            label={f.label}
+            value={f.value}
+            options={f.options}
+            onChange={f.onChange}
+            className={`shrink-0 ${f.widthClass ?? "w-44"}`}
+          />
         ))}
-
         {/* Date Range Inputs */}
         {dateRange && (
           <div className="flex items-center gap-2 shrink-0">
@@ -190,7 +176,7 @@ export default function FilterBar({
               value={dateRange.fromValue}
               onChange={(e) => dateRange.onFromChange(e.target.value)}
               className="h-10 rounded-xl border border-divider bg-bg/60 px-3 text-sm font-medium text-txt-main focus:border-blue-500 focus:bg-surface focus:outline-none focus:ring-2 focus:ring-blue-500/15 transition-all"
-              title={dateRange.fromLabel ?? 'From Date'}
+              title={dateRange.fromLabel ?? "From Date"}
             />
             <span className="text-sm text-txt-sub font-medium">to</span>
             <input
@@ -198,7 +184,7 @@ export default function FilterBar({
               value={dateRange.toValue}
               onChange={(e) => dateRange.onToChange(e.target.value)}
               className="h-10 rounded-xl border border-divider bg-bg/60 px-3 text-sm font-medium text-txt-main focus:border-blue-500 focus:bg-surface focus:outline-none focus:ring-2 focus:ring-blue-500/15 transition-all"
-              title={dateRange.toLabel ?? 'To Date'}
+              title={dateRange.toLabel ?? "To Date"}
             />
           </div>
         )}

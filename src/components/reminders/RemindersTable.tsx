@@ -121,30 +121,8 @@ function StatusBadge({ status }: { status?: ReminderStatus }) {
   }
 }
 
-// ─── Date Difference Helper ─────────────────────────────────
-function getRelativeDateDiff(scheduledAt?: string) {
-  if (!scheduledAt) return null;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const target = new Date(scheduledAt);
-  target.setHours(0, 0, 0, 0);
-  return Math.ceil((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-}
-
-function formatScheduledDate(dateStr?: string) {
-  if (!dateStr) return null;
-  try {
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return null;
-    const day = String(d.getDate()).padStart(2, '0');
-    const month = d.toLocaleDateString('en-US', { month: 'short' });
-    const year = d.getFullYear();
-    const time = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-    return { formattedDate: `${day} ${month} ${year}`, time };
-  } catch {
-    return null;
-  }
-}
+import { DueDate } from '@/components/common/DueDate';
+import { DateCellEditor } from '@/components/grid/DateCellEditor';
 
 // ─── Reminders Table Component ──────────────────────────────
 export default function RemindersTable({
@@ -234,54 +212,19 @@ export default function RemindersTable({
         minWidth: 190,
         flex: 1.5,
         editable: true,
-        cellRenderer: (p) => {
-          const dateVal = p.value || p.data?.scheduledAt;
-          if (!dateVal) {
-            return <span className="text-xs text-slate-400">—</span>;
-          }
-
-          const parsed = formatScheduledDate(dateVal);
-          const diffDays = getRelativeDateDiff(dateVal);
-
-          if (!parsed) {
-            return <span className="text-xs text-slate-400">{dateVal}</span>;
-          }
-
-          return (
-            <div className="flex flex-col justify-center py-1 leading-tight">
-              <div className="flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                <span className="font-bold text-xs sm:text-sm text-slate-900 dark:text-slate-100">
-                  {parsed.formattedDate}
-                </span>
-                <span className="text-[11px] text-slate-400">
-                  {parsed.time}
-                </span>
-              </div>
-              {diffDays !== null && (
-                <div className="mt-0.5">
-                  {diffDays < 0 ? (
-                    <span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#fef2f2] text-[#dc2626] dark:bg-rose-950/40 dark:text-rose-400">
-                      {Math.abs(diffDays)}d overdue
-                    </span>
-                  ) : diffDays === 0 ? (
-                    <span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#fffbeb] text-[#b45309] dark:bg-amber-950/40 dark:text-amber-400">
-                      Scheduled today
-                    </span>
-                  ) : diffDays === 1 ? (
-                    <span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#eef2ff] text-[#4f46e5] dark:bg-indigo-950/40 dark:text-indigo-400">
-                      Tomorrow
-                    </span>
-                  ) : (
-                    <span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#eef2ff] text-[#4f46e5] dark:bg-indigo-950/40 dark:text-indigo-400">
-                      In {diffDays} days
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        },
+        cellEditor: DateCellEditor,
+        cellEditorPopup: true,
+        cellEditorPopupPosition: 'under',
+        cellRenderer: (p) => (
+          <DueDate
+            value={p.value || p.data?.scheduledAt}
+            showTime={true}
+            badgeMode="scheduled"
+            completed={
+              p.data?.status === 'SENT' || p.data?.status === 'CANCELLED'
+            }
+          />
+        ),
       },
     ],
     []

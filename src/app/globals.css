@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "react-day-picker/style.css";
 @plugin "daisyui";
 
 @theme {
@@ -319,4 +320,34 @@ body {
 
 .dark .rc-action-btn--danger:hover:not(:disabled) {
   background-color: rgba(239, 68, 68, 0.25);
+}
+
+/* ─── AG Grid Popup Editor & DatePicker Floating Layer ─────────── */
+.ag-popup-editor {
+  z-index: 9999 !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.ag-popup {
+  z-index: 9999 !important;
+}
+
+/* ─── DayPicker Theme Customization ────────────────────────────── */
+.rdp-root {
+  --rdp-accent-color: var(--primary) !important;
+  --rdp-accent-background-color: color-mix(in srgb, var(--primary) 12%, transparent) !important;
+  --rdp-day-height: 38px !important;
+  --rdp-day-width: 38px !important;
+  --rdp-day_button-height: 36px !important;
+  --rdp-day_button-width: 36px !important;
+  font-family: inherit !important;
+  margin: 0 !important;
+}
+
+.dark .rdp-root {
+  --rdp-accent-color: var(--accent) !important;
+  --rdp-accent-background-color: color-mix(in srgb, var(--accent) 15%, transparent) !important;
+  color: var(--text-primary) !important;
 }

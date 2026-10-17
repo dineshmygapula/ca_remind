@@ -233,9 +233,10 @@ export default function StaffPage() {
       <StaffTable
         staff={filters.filtered}
         loading={fetchAction.loading}
+        businessId={businessId}
         onView={page.openView}
-        onEdit={handleEdit}
         onDelete={(id, name) => page.requestDelete(id, name)}
+        onRefresh={fetchStaff}
       />
     </ResourcePageLayout>
   );

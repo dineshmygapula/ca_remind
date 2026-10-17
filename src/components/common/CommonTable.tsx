@@ -40,9 +40,11 @@ export interface GridColumn<T = any> {
 
     editable?: boolean;
 
-    // Add these
-    cellEditor?: string;
+    // Cell editing configuration
+    cellEditor?: any;
     cellEditorParams?: Record<string, any>;
+    cellEditorPopup?: boolean;
+    cellEditorPopupPosition?: 'over' | 'under';
 
     valueGetter?: (params: ValueGetterParams<T>) => any;
     valueFormatter?: (params: ValueFormatterParams<T>) => string;
@@ -219,6 +221,18 @@ export default function CommonDataGrid<T extends Record<string, any>>({
 
             if (col.cellEditorParams) {
                 baseDef.cellEditorParams = col.cellEditorParams;
+            }
+
+            if (col.cellEditorPopup !== undefined) {
+                baseDef.cellEditorPopup = col.cellEditorPopup;
+            } else if (typeof col.cellEditor !== 'string' && col.cellEditor !== undefined) {
+                baseDef.cellEditorPopup = true;
+            }
+
+            if (col.cellEditorPopupPosition !== undefined) {
+                baseDef.cellEditorPopupPosition = col.cellEditorPopupPosition;
+            } else if (baseDef.cellEditorPopup) {
+                baseDef.cellEditorPopupPosition = 'under';
             }
             if (col.valueGetter) {
                 baseDef.valueGetter = col.valueGetter;

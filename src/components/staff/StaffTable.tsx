@@ -1,16 +1,19 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import { Eye, Pencil, Trash2, Mail, Phone, UserX } from 'lucide-react';
+import { Eye, Trash2, Mail, Phone, UserX } from 'lucide-react';
 import CommonDataGrid, { GridAction, GridColumn, createTableActions } from '@/components/common/CommonTable';
-import { StaffMember } from '@/types/staff.types';
+import { StaffMember, UpdateStaffDto } from '@/types/staff.types';
+import { updateStaff } from '@/services/staffService';
 
 interface StaffTableProps {
   staff: StaffMember[];
   loading: boolean;
+  businessId?: string;
   onView: (membershipId: string) => void;
-  onEdit: (membershipId: string) => void;
+  onEdit?: (membershipId: string) => void;
   onDelete: (membershipId: string, staffName: string) => void;
+  onRefresh?: () => void;
 }
 
 // ── Helpers ──
@@ -89,9 +92,11 @@ function StaffStatusBadge({ status }: { status: 'ACTIVE' | 'INACTIVE' }) {
 export default function StaffTable({
   staff,
   loading,
+  businessId,
   onView,
   onEdit,
   onDelete,
+  onRefresh,
 }: StaffTableProps) {
   const columns: GridColumn<StaffMember>[] = useMemo(
     () => [
@@ -100,12 +105,18 @@ export default function StaffTable({
         field: 'userName',
         minWidth: 260,
         flex: 2.2,
+        editable: true,
         cellRenderer: (params) => {
           const member = params.data;
           if (!member) return null;
-          const fullName = getFullName(member);
+          const displayUserName = params.value || member.userName;
+          const fullName =
+            displayUserName ||
+            `${member.firstName ?? ''} ${member.lastName ?? ''}`.trim() ||
+            member.email ||
+            'Unknown User';
           const initials = getInitials(fullName);
-          const isActive = member.status === 'ACTIVE';
+          const isActive = (member.status || 'ACTIVE') === 'ACTIVE';
 
           return (
             <div className="flex items-center gap-3 py-1">
@@ -123,8 +134,8 @@ export default function StaffTable({
                   {fullName}
                 </span>
                 <span className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                  {member.userName && member.userName !== fullName
-                    ? `@${member.userName}`
+                  {displayUserName && displayUserName !== fullName
+                    ? `@${displayUserName}`
                     : member.email || 'Team member'}
                 </span>
               </div>
@@ -153,8 +164,9 @@ export default function StaffTable({
         field: 'phone',
         minWidth: 160,
         flex: 1.1,
+        editable: true,
         cellRenderer: (params) => {
-          const phone = params.data?.phone || params.data?.phoneMasked;
+          const phone = params.value || params.data?.phone || params.data?.phoneMasked;
           if (!phone) return <span className="text-slate-400 text-xs">—</span>;
           return (
             <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-700 dark:text-slate-300">
@@ -169,8 +181,13 @@ export default function StaffTable({
         field: 'role',
         minWidth: 140,
         flex: 1,
+        editable: true,
+        cellEditor: 'agSelectCellEditor',
+        cellEditorParams: {
+          values: ['Accountant', 'Manager', 'Admin'],
+        },
         cellRenderer: (params) => {
-          const role = params.data?.roles?.[0] || params.data?.role;
+          const role = params.value || params.data?.roles?.[0] || params.data?.role;
           return <StaffRoleBadge role={role} />;
         },
       },
@@ -179,8 +196,17 @@ export default function StaffTable({
         field: 'status',
         minWidth: 120,
         flex: 0.9,
+        editable: true,
+        cellEditor: 'agSelectCellEditor',
+        cellEditorParams: {
+          values: ['ACTIVE', 'INACTIVE'],
+        },
+        valueFormatter: (p) =>
+          p.value === 'ACTIVE' || p.value === true ? 'ACTIVE' : 'INACTIVE',
         cellRenderer: (params) => {
-          const status = params.data?.status || 'ACTIVE';
+          const status = (params.value || params.data?.status || 'ACTIVE') as
+            | 'ACTIVE'
+            | 'INACTIVE';
           return <StaffStatusBadge status={status} />;
         },
       },
@@ -192,10 +218,9 @@ export default function StaffTable({
     () =>
       createTableActions<StaffMember>({
         onView: (member) => onView(member.id),
-        onEdit: (member) => onEdit(member.id),
         onDelete: (member) => onDelete(member.id, getFullName(member)),
       }),
-    [onView, onEdit, onDelete]
+    [onView, onDelete]
   );
 
   return (
@@ -206,6 +231,21 @@ export default function StaffTable({
       isLoading={loading}
       emptyMessage="No staff members found matching your search or filters."
       rowHeight={64}
+      onUpdateCell={async ({ row, field, newValue }) => {
+        if (!businessId) return;
+        const dto: UpdateStaffDto = {};
+        if (field === 'role') {
+          dto.membership = { roles: [String(newValue)] };
+        } else if (field === 'status') {
+          dto.membership = { isActive: newValue === 'ACTIVE' || newValue === true };
+        } else if (field === 'phone') {
+          dto.user = { phone: String(newValue).trim() };
+        } else if (field === 'userName') {
+          dto.user = { userName: String(newValue).trim() };
+        }
+        await updateStaff(businessId, row.id, dto);
+        onRefresh?.();
+      }}
     />
   );
 }

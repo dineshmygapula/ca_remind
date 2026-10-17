@@ -54,7 +54,7 @@ export const COMMON_PLACEHOLDERS = [
 // Filter Options
 // ─────────────────────────────────────────────
 export const STATUS_FILTER_OPTIONS = [
-  { value: 'ALL', label: 'All Status' },
+  { value: 'ALL', label: 'All' },
   { value: 'ACTIVE', label: 'Active' },
   { value: 'INACTIVE', label: 'Inactive' },
 ] as const;
@@ -62,7 +62,7 @@ export const STATUS_FILTER_OPTIONS = [
 export type ChannelFilter = 'ALL' | 'email' | 'whatsapp';
 
 export const CHANNEL_FILTER_OPTIONS = [
-  { value: 'ALL',      label: 'All Channels' },
+  { value: 'ALL',      label: 'All' },
   { value: 'email',    label: 'Email' },
   { value: 'whatsapp', label: 'WhatsApp' },
 ];
@@ -70,7 +70,7 @@ export const CHANNEL_FILTER_OPTIONS = [
 export type ReminderTypeFilter = 'ALL' | 'GST' | 'TDS' | 'ITR' | 'ROC' | 'MSME';
 
 export const REMINDER_TYPE_FILTER_OPTIONS = [
-  { value: 'ALL',  label: 'All Types' },
+  { value: 'ALL',  label: 'All' },
   { value: 'GST',  label: 'GST' },
   { value: 'TDS',  label: 'TDS' },
   { value: 'ITR',  label: 'ITR' },

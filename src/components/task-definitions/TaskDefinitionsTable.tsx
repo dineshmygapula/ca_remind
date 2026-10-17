@@ -6,6 +6,7 @@ import CommonDataGrid, { GridAction, GridColumn, createTableActions } from '@/co
 import { TaskDefinitionListItem } from '@/types/taskDefinition.types';
 import { updateTaskDefinition } from '@/services/taskDefinitionService';
 import { useToast } from '@/context/ToastContext';
+import { DueDate } from '@/components/common/DueDate';
 
 interface TaskDefinitionsTableProps {
   definitions: TaskDefinitionListItem[];
@@ -105,28 +106,6 @@ function ScheduleBadge({ pattern }: { pattern?: string }) {
   );
 }
 
-function formatNextDueDate(dateStr?: string) {
-  if (!dateStr) return null;
-  try {
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return null;
-    const day = String(d.getDate()).padStart(2, '0');
-    const month = d.toLocaleDateString('en-US', { month: 'short' });
-    const year = d.getFullYear();
-    return `${day} ${month} ${year}`;
-  } catch {
-    return dateStr;
-  }
-}
-
-function getDueDifferenceDays(dueDate?: string) {
-  if (!dueDate) return null;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const due = new Date(dueDate);
-  due.setHours(0, 0, 0, 0);
-  return Math.ceil((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-}
 
 export default function TaskDefinitionsTable({
   definitions,
@@ -328,38 +307,7 @@ export default function TaskDefinitionsTable({
         field: 'dueDate',
         minWidth: 160,
         flex: 1.3,
-        cellRenderer: (p) => {
-          if (!p.data?.dueDate) {
-            return <span className="text-xs text-slate-400">—</span>;
-          }
-          const formatted = formatNextDueDate(p.data.dueDate);
-          const diffDays = getDueDifferenceDays(p.data.dueDate);
-
-          return (
-            <div className="flex flex-col justify-center py-1 leading-tight">
-              <span className="font-bold text-xs sm:text-sm text-slate-900 dark:text-slate-100">
-                {formatted}
-              </span>
-              {diffDays !== null && (
-                <div>
-                  {diffDays < 0 ? (
-                    <span className="inline-block mt-0.5 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#fef2f2] text-[#dc2626] dark:bg-rose-950/40 dark:text-rose-400">
-                      {Math.abs(diffDays)} days overdue
-                    </span>
-                  ) : diffDays <= 7 ? (
-                    <span className="inline-block mt-0.5 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#fffbeb] text-[#b45309] dark:bg-amber-950/40 dark:text-amber-400">
-                      {diffDays === 0 ? 'Due today' : `Due in ${diffDays} days`}
-                    </span>
-                  ) : (
-                    <span className="inline-block mt-0.5 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#eef2ff] text-[#4f46e5] dark:bg-indigo-950/40 dark:text-indigo-400">
-                      In {diffDays} days
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        },
+        cellRenderer: (p) => <DueDate value={p.value || p.data?.dueDate} />,
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -41,7 +41,7 @@ export function useTasks(businessId: string | null | undefined): UseTasksResult 
 
     useEffect(() => {
         if (businessId) refetch();
-    }, [businessId, refetch]);
+    }, [businessId]);
 
     const removeTask = useCallback(
         async (taskId: string) => {
@@ -58,7 +58,10 @@ export function useTasks(businessId: string | null | undefined): UseTasksResult 
                 setDeleteLoading(false);
             }
         },
-        [businessId, refetch],
+        [businessId],
+
+
+
     );
 
     return { tasks, loading, error, setError, refetch, removeTask, deleteLoading };
