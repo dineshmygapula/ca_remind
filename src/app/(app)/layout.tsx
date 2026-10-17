@@ -1,31 +1,3 @@
-// import { AuthProvider } from "@/context/AuthContext";
-// import { SubscriptionProvider } from "@/context/SubscriptionContext";
-// import { Box } from "@mui/material";
-// import TopbarAfter from "@/components/common/topbar/TopbarAfter";
-
-// export default function AppLayout({
-//   children,
-// }: {
-//   children: React.ReactNode;
-// }) {
-//   return (
-//     <AuthProvider>
-//       <SubscriptionProvider>
-//         <TopbarAfter />
-//         <Box
-//           sx={{
-//             minHeight: "100vh",
-//             bgcolor: "background.default",
-//             py: 3,
-//           }}
-//         >
-//           {children}
-//         </Box>
-//       </SubscriptionProvider>
-//     </AuthProvider>
-//   );
-// }
-
 import type { Metadata } from "next";
 import { Manrope } from "next/font/google";
 import "../globals.css";

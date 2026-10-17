@@ -24,7 +24,7 @@ import {
 } from '@/services/taskDefinitionService';
 import { MONTHS } from '@/constants/taskDefinition.constants';
 import { TaskDefinition } from '@/types/taskDefinition.types';
-import ReminderRulesListDrawer from '../reminderdefinitions/ReminderRulesListDrawer';
+import ReminderRulesListDrawer from './ReminderRulesListDrawer';
 import { getV2ReminderDefinitions } from '@/services/reminderDefinitionService';
 import { V2ReminderDefinition } from '@/types/v2ReminderDefinition.types';
 

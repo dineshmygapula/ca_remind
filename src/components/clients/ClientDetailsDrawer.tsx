@@ -319,12 +319,12 @@ export default function ClientDetailsDrawer({
             <div className="divide-y divide-[var(--border)]/40">
               <InfoRow
                 label="Primary Phone"
-                value={client.primaryContact?.phone || client.phone}
+                value={client.primaryContact?.phone || (client as any).phone}
                 icon={Phone}
               />
               <InfoRow
                 label="Primary Email"
-                value={client.primaryContact?.email || client.email}
+                value={client.primaryContact?.email || (client as any).email}
                 icon={Mail}
               />
               {client.addresses && client.addresses.length > 0 && (
@@ -394,13 +394,13 @@ export default function ClientDetailsDrawer({
                 </h3>
               </div>
               <span className="badge badge-sm badge-ghost text-txt-sub">
-                {client.activeCompliances?.length || 0} active
+                {(client as any).activeCompliances?.length || 0} active
               </span>
             </div>
 
             <div className="space-y-2">
               {COMPLIANCE_KEYS.map(({ key, label, icon }) => {
-                const isEnabled = client.activeCompliances?.includes(key.toLowerCase());
+                const isEnabled = (client as any).activeCompliances?.includes(key.toLowerCase());
                 const profile = (client.metadata?.complianceProfile as any)?.[key];
                 const isOpen = openComplianceKey === key;
 

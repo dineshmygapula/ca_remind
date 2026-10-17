@@ -121,7 +121,7 @@ export default function ClientsTable({
           const row = p.data;
           if (!row) return null;
 
-          const displayName = row.displayName || row.name || 'Unnamed Client';
+          const displayName = row.displayName || (row as any).name || 'Unnamed Client';
           const businessName = row.businessName;
           const initials = getInitials(displayName);
 
@@ -232,7 +232,7 @@ export default function ClientsTable({
                   onClick={(e) => {
                     e.stopPropagation();
                     setCompliancesModal({
-                      clientName: p.data?.displayName || p.data?.name || 'Client',
+                      clientName: p.data?.displayName || (p.data as any)?.name || 'Client',
                       compliances: list,
                     });
                   }}

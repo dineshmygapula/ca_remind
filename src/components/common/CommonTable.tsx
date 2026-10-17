@@ -322,9 +322,6 @@ export default function CommonDataGrid<T extends Record<string, any>>({
               paginationPageSize={paginationPageSize}
               paginationPageSizeSelector={paginationPageSizeSelector}
               loading={isLoading}
-              onCellValueChanged={(e) =>
-                console.log("changed", e.oldValue, "->", e.newValue)
-              }
               onCellEditingStopped={(e) =>
                 console.log("stopped", e.valueChanged)
               }
@@ -350,15 +347,15 @@ export default function CommonDataGrid<T extends Record<string, any>>({
                 ...defaultColDef,
               }}
               onRowClicked={(event) => {
-                if (event.column?.getColId() === "actions") return;
+                if ((event as any).column?.getColId() === "actions") return;
                 if (event.data) {
                   onRowClick?.(event.data as T);
                 }
               }}
               onRowDoubleClicked={(event) => {
-                if (event.column?.getColId() === "actions") return;
+                if ((event as any).column?.getColId() === "actions") return;
                 // If user double-clicks an editable cell, let AG Grid inline editing take place without firing row double-click
-                if (event.colDef?.editable) return;
+                if ((event as any).colDef?.editable) return;
                 if (event.data) {
                   onRowDoubleClick?.(event.data as T);
                 }
