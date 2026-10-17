@@ -296,7 +296,7 @@ export default function TasksPage() {
       if (matched) value = matched.apiValue;
     }
     await updateTask(id, row.id, { [field]: value });
-    refetch();
+    (row as any)[field] = value;
   };
 
   const actions = useMemo<GridAction<TaskListItem>[]>(

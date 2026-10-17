@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { AlertTriangle } from "lucide-react";
 import { TaskDefinitionListItem } from "@/types/taskDefinition.types";
 import { getTaskDefinitions, deleteTaskDefinition } from "@/services/taskDefinitionService";
@@ -46,9 +46,17 @@ export default function TaskDefinitionsPage() {
     });
   }, [businessId, runFetch]);
 
+  // Which business we've already started loading. Refs survive Strict Mode's
+  // dev-only unmount/remount, so the second effect run is skipped.
+  const loadedFor = useRef<string | null>(null);
+
   useEffect(() => {
+    if (!businessId) return;
+    if (loadedFor.current === businessId) return;
+    loadedFor.current = businessId;
+    setDefinitions([]);
     fetchDefinitions();
-  }, []);
+  }, [businessId, fetchDefinitions]);
 
   const handleDeleteConfirm = async () => {
     const target = page.deleteTarget;

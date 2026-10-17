@@ -183,6 +183,7 @@ export default function CommonDataGrid<T extends Record<string, any>>({
 }: CommonDataGridProps<T>) {
     const isDark = useIsDarkMode();
     const toast = useToast();
+    const isRevertingRef = React.useRef(false);
 
     // Map selection mode to AG Grid format
     const rowSelection =
@@ -356,6 +357,11 @@ export default function CommonDataGrid<T extends Record<string, any>>({
                             }}
 
                             onCellValueChanged={async (event) => {
+                                // If the change came from an internal revert, ignore it
+                                if (isRevertingRef.current || event.source === 'api' || event.source === 'revert') {
+                                    return;
+                                }
+
                                 const field = event.colDef.field;
                                 const oldValue = event.oldValue;
                                 const newValue = event.newValue;
@@ -373,15 +379,30 @@ export default function CommonDataGrid<T extends Record<string, any>>({
                                             newValue,
                                             oldValue,
                                         });
+
+                                        // Ensure in-memory row data and all dependent cells in the row are refreshed
+                                        (row as any)[field] = newValue;
+                                        event.api.refreshCells({ rowNodes: [event.node], force: true });
+
                                         const successMsg = getUpdateSuccessMessage
                                             ? getUpdateSuccessMessage(field, newValue, row)
                                             : `${headerName} updated successfully`;
                                         toast.success(successMsg);
                                     } catch (err: unknown) {
-                                        // Revert cell in AG Grid on failure
-                                        if (field) {
-                                            event.node.setDataValue(field, oldValue);
+                                        // Revert cell in AG Grid and in memory on failure
+                                        try {
+                                            isRevertingRef.current = true;
+                                            (row as any)[field] = oldValue;
+                                            if (field) {
+                                                event.node.setDataValue(field, oldValue, 'revert');
+                                            }
+                                            event.api.refreshCells({ rowNodes: [event.node], force: true });
+                                        } finally {
+                                            setTimeout(() => {
+                                                isRevertingRef.current = false;
+                                            }, 50);
                                         }
+
                                         const errorMsg =
                                             err instanceof Error ? err.message : `Failed to update ${headerName}`;
                                         toast.error(errorMsg);

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useWorkspace } from '@/context/WorkspaceContext';
 import ResourcePageLayout from '@/components/common/ResourcePageLayout';
 import StatCard from '@/components/task-definitions/StatCard';
@@ -44,9 +44,17 @@ export default function StaffPage() {
     });
   }, [businessId, runFetch]);
 
+  // Which business we've already started loading. Refs survive Strict Mode's
+  // dev-only unmount/remount, so the second effect run is skipped.
+  const loadedFor = useRef<string | null>(null);
+
   useEffect(() => {
+    if (!businessId) return;
+    if (loadedFor.current === businessId) return;
+    loadedFor.current = businessId;
+    setStaff([]);
     fetchStaff();
-  }, [fetchStaff]);
+  }, [businessId, fetchStaff]);
 
   const handleEdit = (membershipId: string) => {
     const member = staff.find((item) => item.id === membershipId);

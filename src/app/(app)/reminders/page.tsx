@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Plus, X } from 'lucide-react';
 import { useWorkspace } from '@/context/WorkspaceContext';
 import { ReminderDetail } from '@/types/reminders.types';
@@ -16,14 +16,18 @@ import {
   ReminderTimeFilter,
 } from '@/constants/reminderConstants';
 import PageSkeleton from '@/components/common/PageSkeleton';
+import { useAsyncAction } from '@/hooks/useAnyAction';
 
 export default function RemindersPage() {
   const { businessId, orgId } = useWorkspace();
 
   // Data state
   const [reminders, setReminders] = useState<ReminderDetail[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const fetchAction = useAsyncAction(true);
+  const deleteAction = useAsyncAction();
+
+  const { run: runFetch } = fetchAction;
+  const { run: runDelete } = deleteAction;
 
   // Dialog / drawer state
   const [formDrawerOpen, setFormDrawerOpen] = useState(false);
@@ -35,7 +39,6 @@ export default function RemindersPage() {
     id: string;
     title: string;
   } | null>(null);
-  const [deleteLoading, setDeleteLoading] = useState(false);
 
   // Filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -49,29 +52,39 @@ export default function RemindersPage() {
   const fetchReminders = useCallback(async () => {
     if (!businessId) return;
 
-    try {
-      setLoading(true);
-      setError('');
+    await runFetch(
+      async () => {
+        let allItems: ReminderDetail[] = [];
+        let cursor: string | null = null;
 
-      let allItems: ReminderDetail[] = [];
-      let cursor: string | null = null;
+        do {
+          const data = await getReminders(businessId, cursor ?? undefined);
+          allItems = [...allItems, ...(data.items || [])];
+          cursor = data.next_cursor;
+        } while (cursor);
 
-      do {
-        const data = await getReminders(businessId, cursor ?? undefined);
-        allItems = [...allItems, ...(data.items || [])];
-        cursor = data.next_cursor;
-      } while (cursor);
+        return allItems;
+      },
+      {
+        errorMessage: 'Failed to fetch reminders',
+        showErrorToast: false,
+        onSuccess: (allItems) => {
+          setReminders(allItems);
+        },
+      }
+    );
+  }, [businessId, runFetch]);
 
-      setReminders(allItems);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch reminders');
-    } finally {
-      setLoading(false);
-    }
-  }, [businessId]);
+  // Which business we've already started loading. Refs survive Strict Mode's
+  // dev-only unmount/remount, so the second effect run is skipped.
+  const loadedFor = useRef<string | null>(null);
 
   useEffect(() => {
-    if (businessId) fetchReminders();
+    if (!businessId) return;
+    if (loadedFor.current === businessId) return;
+    loadedFor.current = businessId;
+    setReminders([]);
+    fetchReminders();
   }, [businessId, fetchReminders]);
 
   // Client-side filtering
@@ -176,17 +189,14 @@ export default function RemindersPage() {
   const handleDeleteConfirm = async () => {
     if (!businessId || !deleteTarget) return;
 
-    try {
-      setDeleteLoading(true);
-      setError('');
-      await deleteReminder(businessId, deleteTarget.id);
-      setDeleteTarget(null);
-      await fetchReminders();
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to delete reminder');
-    } finally {
-      setDeleteLoading(false);
-    }
+    await runDelete(() => deleteReminder(businessId, deleteTarget.id), {
+      successMessage: 'Reminder deleted',
+      errorMessage: 'Failed to delete reminder',
+      onSuccess: async () => {
+        setDeleteTarget(null);
+        await fetchReminders();
+      },
+    });
   };
 
   const handleResetFilters = () => {
@@ -198,8 +208,10 @@ export default function RemindersPage() {
     setDateTo('');
   };
 
+  const pageError = fetchAction.error || deleteAction.error;
+
   // Loading guard
-  if (!businessId || (loading && reminders.length === 0)) {
+  if (!businessId || (fetchAction.loading && reminders.length === 0)) {
     return <PageSkeleton filterCount={4} />;
   }
 
@@ -226,14 +238,17 @@ export default function RemindersPage() {
         </div>
 
         {/* Error Alert */}
-        {error && (
+        {pageError && (
           <div role="alert" className="alert alert-error flex items-center justify-between text-sm">
-            <span>{error}</span>
+            <span>{pageError}</span>
             <button
               type="button"
               className="btn btn-ghost btn-xs btn-circle"
               aria-label="Dismiss error"
-              onClick={() => setError('')}
+              onClick={() => {
+                fetchAction.clearError();
+                deleteAction.clearError();
+              }}
             >
               <X className="h-4 w-4" />
             </button>
@@ -263,7 +278,7 @@ export default function RemindersPage() {
         />
 
         {/* Results count */}
-        {!loading && (
+        {!fetchAction.loading && (
           <p className="text-sm text-txt-sub">
             Showing {filteredReminders.length} of {reminders.length} reminders
           </p>
@@ -272,7 +287,7 @@ export default function RemindersPage() {
         {/* Table using CommonDataGrid */}
         <RemindersTable
           reminders={filteredReminders}
-          loading={loading}
+          loading={fetchAction.loading}
           businessId={businessId}
           onView={handleView}
           onEdit={handleEdit}
@@ -318,7 +333,7 @@ export default function RemindersPage() {
           }
           confirmLabel="Delete"
           variant="danger"
-          loading={deleteLoading}
+          loading={deleteAction.loading}
           onConfirm={handleDeleteConfirm}
           onCancel={() => setDeleteTarget(null)}
         />

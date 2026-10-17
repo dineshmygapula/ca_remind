@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { MessageTemplateListItem } from '@/types/messageTemplate.types';
 import {
   getMessageTemplates,
@@ -52,9 +52,17 @@ export default function TemplatesPage() {
     });
   }, [businessId, runFetch]);
 
+  // Which business we've already started loading. Refs survive Strict Mode's
+  // dev-only unmount/remount, so the second effect run is skipped.
+  const loadedFor = useRef<string | null>(null);
+
   useEffect(() => {
+    if (!businessId) return;
+    if (loadedFor.current === businessId) return;
+    loadedFor.current = businessId;
+    setTemplates([]);
     fetchTemplates();
-  }, [fetchTemplates]);
+  }, [businessId, fetchTemplates]);
 
   const handleDeleteConfirm = async () => {
     const target = page.deleteTarget;

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Plus, X } from 'lucide-react';
 import { useWorkspace } from '@/context/WorkspaceContext';
 import ClientsTable from '@/components/clients/ClientsTable';
@@ -11,17 +11,19 @@ import ClientDetailsDrawer from '@/components/clients/ClientDetailsDrawer';
 import EditClientDialog from '@/components/clients/EditClientDialog';
 import CreateSubjectDialog from '@/components/clients/CreateSubjectDialog';
 import ConfirmDialog from '@/components/tasks/ConfirmDialog';
-import { useToast } from '@/context/ToastContext';
 import PageSkeleton from '@/components/common/PageSkeleton';
+import { useAsyncAction } from '@/hooks/useAnyAction';
 
 export default function ClientsPage() {
   const { businessId } = useWorkspace();
-  const toast = useToast();
 
   // Data state
   const [clients, setClients] = useState<SubjectListItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const fetchAction = useAsyncAction(true);
+  const deleteAction = useAsyncAction();
+
+  const { run: runFetch } = fetchAction;
+  const { run: runDelete } = deleteAction;
 
   // Dialog / drawer state
   const [openCreateDialog, setOpenCreateDialog] = useState(false);
@@ -41,25 +43,29 @@ export default function ClientsPage() {
     id: string;
     name: string;
   } | null>(null);
-  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const fetchClients = useCallback(async () => {
     if (!businessId) return;
 
-    try {
-      setLoading(true);
-      setError('');
-      const data = await getSubjects(businessId);
-      setClients(data.filter((subject) => subject.subjectType === 'CLIENT'));
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to load clients');
-    } finally {
-      setLoading(false);
-    }
-  }, [businessId]);
+    await runFetch(() => getSubjects(businessId), {
+      errorMessage: 'Failed to load clients',
+      showErrorToast: false,
+      onSuccess: (data) => {
+        setClients(data.filter((subject) => subject.subjectType === 'CLIENT'));
+      },
+    });
+  }, [businessId, runFetch]);
+
+  // Which business we've already started loading. Refs survive Strict Mode's
+  // dev-only unmount/remount, so the second effect run is skipped.
+  const loadedFor = useRef<string | null>(null);
 
   useEffect(() => {
-    if (businessId) fetchClients();
+    if (!businessId) return;
+    if (loadedFor.current === businessId) return;
+    loadedFor.current = businessId;
+    setClients([]);
+    fetchClients();
   }, [businessId, fetchClients]);
 
   const filteredClients = useMemo(() => {
@@ -136,18 +142,14 @@ export default function ClientsPage() {
   const handleDeleteConfirm = async () => {
     if (!businessId || !deleteTarget) return;
 
-    try {
-      setDeleteLoading(true);
-      setError('');
-      await deleteSubject(businessId, deleteTarget.id);
-      toast.success(`Client "${deleteTarget.name}" deleted successfully`);
-      setDeleteTarget(null);
-      await fetchClients();
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Failed to delete client');
-    } finally {
-      setDeleteLoading(false);
-    }
+    await runDelete(() => deleteSubject(businessId, deleteTarget.id), {
+      successMessage: `Client "${deleteTarget.name}" deleted successfully`,
+      errorMessage: 'Failed to delete client',
+      onSuccess: async () => {
+        setDeleteTarget(null);
+        await fetchClients();
+      },
+    });
   };
 
   const handleResetFilters = () => {
@@ -157,7 +159,9 @@ export default function ClientsPage() {
     setComplianceFilter('ALL');
   };
 
-  if (!businessId || (loading && clients.length === 0)) {
+  const pageError = fetchAction.error || deleteAction.error;
+
+  if (!businessId || (fetchAction.loading && clients.length === 0)) {
     return <PageSkeleton filterCount={4} />;
   }
 
@@ -184,14 +188,17 @@ export default function ClientsPage() {
         </div>
 
         {/* Error Alert */}
-        {error && (
+        {pageError && (
           <div role="alert" className="alert alert-error flex items-center justify-between text-sm">
-            <span>{error}</span>
+            <span>{pageError}</span>
             <button
               type="button"
               className="btn btn-ghost btn-xs btn-circle"
               aria-label="Dismiss error"
-              onClick={() => setError('')}
+              onClick={() => {
+                fetchAction.clearError();
+                deleteAction.clearError();
+              }}
             >
               <X className="h-4 w-4" />
             </button>
@@ -212,7 +219,7 @@ export default function ClientsPage() {
         />
 
         {/* Results count */}
-        {!loading && (
+        {!fetchAction.loading && (
           <p className="text-sm text-txt-sub">
             Showing {filteredClients.length} of {clients.length} clients
           </p>
@@ -221,7 +228,7 @@ export default function ClientsPage() {
         {/* Table using CommonDataGrid */}
         <ClientsTable
           clients={filteredClients}
-          loading={loading}
+          loading={fetchAction.loading}
           businessId={businessId}
           onView={handleView}
           onEdit={handleEdit}
@@ -277,7 +284,7 @@ export default function ClientsPage() {
           }
           confirmLabel="Delete"
           variant="danger"
-          loading={deleteLoading}
+          loading={deleteAction.loading}
           onConfirm={handleDeleteConfirm}
           onCancel={() => setDeleteTarget(null)}
         />
