@@ -140,18 +140,19 @@ export interface ComplianceService {
   internalTargetOffsetDays?: number;
   customDueDay?: number;
   customDueMonth?: string;
+  quarterlyDates?: Record<string, unknown>;
 }
 
-// ✅ Single declaration — includes msme
+// ✅ Single declaration — includes msme (optional)
 export interface SubjectMetadata {
   complianceProfile: {
     gst:  ComplianceService;
     tds:  ComplianceService;
     itr:  ComplianceService;
     roc:  ComplianceService;
-    msme: ComplianceService;
+    msme?: ComplianceService;
   };
-  dueDateOverrides: (null | unknown)[];
+  dueDateOverrides: unknown[];
   tags: string[];
 }
 
@@ -232,7 +233,7 @@ export interface Subject {
 // 3️⃣ Create Subject Request ✅ Single declaration
 // ─────────────────────────────────────────────
 export interface CreateSubjectDto {
-  subjectType: SubjectType;
+  subjectType?: SubjectType;
   profile: {
     displayName: string;
     legalName: string;

@@ -176,6 +176,29 @@ export default function TaskDefinitionFormDrawer({
 
         setHeaderTitle(def.name ?? "");
 
+        // Support both camelCase and snake_case backend response fields
+        const rawDef = def as unknown as Record<string, unknown>;
+        const resolvedIsActive =
+          rawDef.isActive !== undefined
+            ? Boolean(rawDef.isActive)
+            : rawDef.is_active !== undefined
+            ? Boolean(rawDef.is_active)
+            : true;
+
+        const resolvedAutoCreateTasks =
+          rawDef.autoCreateTasks !== undefined
+            ? Boolean(rawDef.autoCreateTasks)
+            : rawDef.auto_create_tasks !== undefined
+            ? Boolean(rawDef.auto_create_tasks)
+            : false;
+
+        const resolvedAutoCreateReminders =
+          rawDef.autoCreateReminders !== undefined
+            ? Boolean(rawDef.autoCreateReminders)
+            : rawDef.auto_create_reminders !== undefined
+            ? Boolean(rawDef.auto_create_reminders)
+            : false;
+
         setInitialFormValues({
           name: def.name ?? "",
           taskType: def.taskType ?? "",
@@ -209,9 +232,9 @@ export default function TaskDefinitionFormDrawer({
             : "",
 
           targetOffsetDays: def.targetOffsetDays ?? 0,
-          isActive: def.isActive ?? true,
-          autoCreateTasks: def.autoCreateTasks ?? false,
-          autoCreateReminders: def.autoCreateReminders ?? false,
+          isActive: resolvedIsActive,
+          autoCreateTasks: resolvedAutoCreateTasks,
+          autoCreateReminders: resolvedAutoCreateReminders,
         });
       },
       {
@@ -355,14 +378,6 @@ export default function TaskDefinitionFormDrawer({
       }
     >
       <div className="py-1 space-y-4">
-        {/* Loading Indicator */}
-        {fetchAction.loading && (
-          <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 text-xs">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            <span>Loading rule details...</span>
-          </div>
-        )}
-
         {/* Error Banner */}
         {(saveAction.error || fetchAction.error) && (
           <div
@@ -386,16 +401,23 @@ export default function TaskDefinitionFormDrawer({
           </div>
         )}
 
-        <FormWrapper
-          key={formKey}
-          formId={TASK_DEFINITION_FORM_ID}
-          schema={taskDefinitionSchema}
-          defaultValues={currentDefaultValues}
-          onSubmit={handleSubmit}
-          className="space-y-4"
-        >
-          <TaskDefinitionFormContent onTitleCalculated={setHeaderTitle} />
-        </FormWrapper>
+        {mode === "edit" && fetchAction.loading && !initialFormValues ? (
+          <div className="flex flex-col items-center justify-center py-20 text-txt-sub">
+            <Loader2 className="h-8 w-8 animate-spin text-[#F59E0B] mb-2" />
+            <span className="text-sm font-medium">Loading rule details...</span>
+          </div>
+        ) : (
+          <FormWrapper
+            key={formKey}
+            formId={TASK_DEFINITION_FORM_ID}
+            schema={taskDefinitionSchema}
+            defaultValues={currentDefaultValues}
+            onSubmit={handleSubmit}
+            className="space-y-4"
+          >
+            <TaskDefinitionFormContent onTitleCalculated={setHeaderTitle} />
+          </FormWrapper>
+        )}
       </div>
     </Drawer>
   );

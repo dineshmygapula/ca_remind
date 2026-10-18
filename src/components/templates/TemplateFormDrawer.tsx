@@ -49,7 +49,12 @@ const DEFAULT_FORM_VALUES: TemplateFormValues = {
   whatsappBody: DEFAULT_WHATSAPP_TEMPLATE.body,
   smsBody: DEFAULT_SMS_TEMPLATE.body,
   inAppBody: DEFAULT_INAPP_TEMPLATE.body,
-  selectedPlaceholders: ["CLIENTNAME", "BUSINESSNAME", "DUEDATE", "SERVICETYPE"],
+  selectedPlaceholders: [
+    "CLIENTNAME",
+    "BUSINESSNAME",
+    "DUEDATE",
+    "SERVICETYPE",
+  ],
 };
 
 export default function TemplateFormDrawer({
@@ -101,8 +106,7 @@ export default function TemplateFormDrawer({
           isActive: data.isActive ?? true,
           emailSubject:
             data.templates?.email?.subject ?? DEFAULT_EMAIL_TEMPLATE.subject,
-          emailBody:
-            data.templates?.email?.body ?? DEFAULT_EMAIL_TEMPLATE.body,
+          emailBody: data.templates?.email?.body ?? DEFAULT_EMAIL_TEMPLATE.body,
           whatsappBody:
             data.templates?.whatsapp?.body ?? DEFAULT_WHATSAPP_TEMPLATE.body,
           smsBody: data.templates?.sms?.body ?? DEFAULT_SMS_TEMPLATE.body,
@@ -114,7 +118,7 @@ export default function TemplateFormDrawer({
       {
         errorMessage: "Failed to load template details",
         showErrorToast: false,
-      }
+      },
     );
   }, [open, mode, templateId, businessId]);
 
@@ -158,7 +162,8 @@ export default function TemplateFormDrawer({
             templates,
             placeholders: data.selectedPlaceholders,
             channels: data.channels,
-            reminder_type: data.reminderType as UpdateMessageTemplateDto["reminder_type"],
+            reminder_type:
+              data.reminderType as UpdateMessageTemplateDto["reminder_type"],
             businessCategory: data.businessCategory,
             isActive: data.isActive,
           };
@@ -169,8 +174,10 @@ export default function TemplateFormDrawer({
             templates,
             placeholders: data.selectedPlaceholders,
             channels: data.channels,
-            reminder_type: data.reminderType as CreateMessageTemplateDto["reminder_type"],
-            businessCategory: data.businessCategory as CreateMessageTemplateDto["businessCategory"],
+            reminder_type:
+              data.reminderType as CreateMessageTemplateDto["reminder_type"],
+            businessCategory:
+              data.businessCategory as CreateMessageTemplateDto["businessCategory"],
             isActive: data.isActive,
           };
           await createMessageTemplate(businessId, dto);
@@ -191,7 +198,7 @@ export default function TemplateFormDrawer({
           onSuccess?.();
           handleClose();
         },
-      }
+      },
     );
   };
 
@@ -283,29 +290,6 @@ export default function TemplateFormDrawer({
           <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 text-xs">
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
             <span>Loading template details...</span>
-          </div>
-        )}
-
-        {/* Error Banner */}
-        {(saveAction.error || fetchAction.error) && (
-          <div
-            role="alert"
-            className="alert alert-error rounded-xl py-3 px-4 text-xs flex gap-2"
-          >
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-            <span className="flex-1 font-medium">
-              {saveAction.error || fetchAction.error}
-            </span>
-            <button
-              type="button"
-              onClick={() => {
-                saveAction.clearError();
-                fetchAction.clearError();
-              }}
-              className="btn btn-ghost btn-xs btn-circle"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
           </div>
         )}
 

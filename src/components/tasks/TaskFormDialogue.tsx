@@ -261,22 +261,24 @@ export default function TaskFormDialog({
   const handleSubmit = async (data: TaskFormValues) => {
     const title = computeTitle(data.taskType, data.dueDate);
 
-    // Compute period dates from dueDate
+    // Compute period dates from dueDate in YYYY-MM-DD format
     let periodLabel = "";
     let periodStart = "";
     let periodEnd = "";
 
     if (data.dueDate) {
-      const d = new Date(data.dueDate);
-      if (!isNaN(d.getTime())) {
-        const year = d.getFullYear();
-        const month = d.getMonth();
+      const datePart = data.dueDate.split("T")[0];
+      const [y, m] = datePart.split("-").map(Number);
+      if (y && m) {
+        const d = new Date(y, m - 1, 1);
         periodLabel = d.toLocaleDateString("en-IN", {
           month: "short",
           year: "numeric",
         });
-        periodStart = new Date(year, month, 1).toISOString();
-        periodEnd = new Date(year, month + 1, 0, 23, 59, 59, 999).toISOString();
+        const monthStr = String(m).padStart(2, "0");
+        const lastDay = String(new Date(y, m, 0).getDate()).padStart(2, "0");
+        periodStart = `${y}-${monthStr}-01`;
+        periodEnd = `${y}-${monthStr}-${lastDay}`;
       }
     }
 
@@ -305,7 +307,7 @@ export default function TaskFormDialog({
             title,
             taskName: title,
             subjectId: data.subjectId,
-            dueDate: data.dueDate,
+            dueDate: data.dueDate.split("T")[0],
             description: data.notes?.trim() || "",
             notes: data.notes?.trim() || "",
             taskType: data.taskType,

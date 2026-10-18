@@ -1,17 +1,30 @@
 "use client";
 
 import React from "react";
-import { useFormContext } from "react-hook-form";
+import { useFormContext, useWatch } from "react-hook-form";
 import { Settings, Zap, Bell } from "lucide-react";
 import DrawerSection from "@/components/common/DrawerSection";
 import { TaskDefinitionFormValues } from "@/utils/schema";
 
 export default function TaskDefinitionAutomationSection() {
-  const { watch, setValue } = useFormContext<TaskDefinitionFormValues>();
+  const { setValue, control } = useFormContext<TaskDefinitionFormValues>();
 
-  const watchedIsActive = watch("isActive");
-  const watchedAutoCreateTasks = watch("autoCreateTasks");
-  const watchedAutoCreateReminders = watch("autoCreateReminders");
+  const watchedIsActive = useWatch({ control, name: "isActive" }) ?? true;
+  const watchedAutoCreateTasks =
+    useWatch({ control, name: "autoCreateTasks" }) ?? false;
+  const watchedAutoCreateReminders =
+    useWatch({ control, name: "autoCreateReminders" }) ?? false;
+
+  const handleToggle = (
+    field: "isActive" | "autoCreateTasks" | "autoCreateReminders",
+    currentVal: boolean
+  ) => {
+    setValue(field, !currentVal, {
+      shouldValidate: true,
+      shouldDirty: true,
+      shouldTouch: true,
+    });
+  };
 
   return (
     <DrawerSection step={3} title="Automation & Status">
@@ -35,20 +48,12 @@ export default function TaskDefinitionAutomationSection() {
               </p>
             </div>
           </div>
-          <div
+          <button
+            type="button"
             role="switch"
-            aria-checked={watchedIsActive}
-            tabIndex={0}
-            className="flex items-center gap-2 cursor-pointer select-none"
-            onClick={() =>
-              setValue("isActive", !watchedIsActive, { shouldDirty: true })
-            }
-            onKeyDown={(e) => {
-              if (e.key === " " || e.key === "Enter") {
-                e.preventDefault();
-                setValue("isActive", !watchedIsActive, { shouldDirty: true });
-              }
-            }}
+            aria-checked={Boolean(watchedIsActive)}
+            className="flex items-center gap-2 cursor-pointer select-none bg-transparent border-0 p-0"
+            onClick={() => handleToggle("isActive", Boolean(watchedIsActive))}
           >
             <div
               className={`w-9 h-5 rounded-full p-0.5 flex items-center transition-colors relative ${
@@ -70,7 +75,7 @@ export default function TaskDefinitionAutomationSection() {
             >
               {watchedIsActive ? "Active" : "Inactive"}
             </span>
-          </div>
+          </button>
         </div>
 
         {/* Auto Tasks */}
@@ -92,24 +97,14 @@ export default function TaskDefinitionAutomationSection() {
               </p>
             </div>
           </div>
-          <div
+          <button
+            type="button"
             role="switch"
-            aria-checked={watchedAutoCreateTasks}
-            tabIndex={0}
-            className="flex items-center gap-2 cursor-pointer select-none"
+            aria-checked={Boolean(watchedAutoCreateTasks)}
+            className="flex items-center gap-2 cursor-pointer select-none bg-transparent border-0 p-0"
             onClick={() =>
-              setValue("autoCreateTasks", !watchedAutoCreateTasks, {
-                shouldDirty: true,
-              })
+              handleToggle("autoCreateTasks", Boolean(watchedAutoCreateTasks))
             }
-            onKeyDown={(e) => {
-              if (e.key === " " || e.key === "Enter") {
-                e.preventDefault();
-                setValue("autoCreateTasks", !watchedAutoCreateTasks, {
-                  shouldDirty: true,
-                });
-              }
-            }}
           >
             <div
               className={`w-9 h-5 rounded-full p-0.5 flex items-center transition-colors relative ${
@@ -131,7 +126,7 @@ export default function TaskDefinitionAutomationSection() {
             >
               {watchedAutoCreateTasks ? "On" : "Off"}
             </span>
-          </div>
+          </button>
         </div>
 
         {/* Auto Reminders */}
@@ -155,24 +150,17 @@ export default function TaskDefinitionAutomationSection() {
               </p>
             </div>
           </div>
-          <div
+          <button
+            type="button"
             role="switch"
-            aria-checked={watchedAutoCreateReminders}
-            tabIndex={0}
-            className="flex items-center gap-2 cursor-pointer select-none"
+            aria-checked={Boolean(watchedAutoCreateReminders)}
+            className="flex items-center gap-2 cursor-pointer select-none bg-transparent border-0 p-0"
             onClick={() =>
-              setValue("autoCreateReminders", !watchedAutoCreateReminders, {
-                shouldDirty: true,
-              })
+              handleToggle(
+                "autoCreateReminders",
+                Boolean(watchedAutoCreateReminders)
+              )
             }
-            onKeyDown={(e) => {
-              if (e.key === " " || e.key === "Enter") {
-                e.preventDefault();
-                setValue("autoCreateReminders", !watchedAutoCreateReminders, {
-                  shouldDirty: true,
-                });
-              }
-            }}
           >
             <div
               className={`w-9 h-5 rounded-full p-0.5 flex items-center transition-colors relative ${
@@ -194,7 +182,7 @@ export default function TaskDefinitionAutomationSection() {
             >
               {watchedAutoCreateReminders ? "On" : "Off"}
             </span>
-          </div>
+          </button>
         </div>
       </div>
     </DrawerSection>

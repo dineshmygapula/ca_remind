@@ -206,7 +206,7 @@ export default function TaskDetailsSection({
       {/* Assigned Staff */}
       <div className="flex flex-col gap-1.5">
         <label className="text-xs font-semibold text-txt-main">
-          Assigned To
+          Assigned To <span className="text-red-500">*</span>
         </label>
         <SearchableSelect
           options={staff}
@@ -231,6 +231,11 @@ export default function TaskDetailsSection({
               : "No matching staff"
           }
         />
+        {errors.assignedStaffId && (
+          <p className="mt-1 text-xs font-medium leading-4 text-red-500">
+            {errors.assignedStaffId.message}
+          </p>
+        )}
       </div>
 
       {/* Notes */}

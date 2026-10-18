@@ -158,7 +158,7 @@ export default function TaskDefinitionsTable({
       {
         successMessage: `${label} turned ${nextVal ? "ON" : "OFF"}`,
         errorMessage: `Failed to toggle ${label.toLowerCase()}`,
-        // onSuccess: () => onRefresh(),
+        onSuccess: () => onRefresh?.(),
       },
     );
 
@@ -358,7 +358,7 @@ export default function TaskDefinitionsTable({
           {
             successMessage: "Rule updated successfully",
             errorMessage: "Failed to update rule",
-            // onSuccess: () => onRefresh(),
+            onSuccess: () => onRefresh?.(),
           },
         );
       }}

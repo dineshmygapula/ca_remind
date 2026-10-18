@@ -47,7 +47,7 @@ export const taskFormSchema = z
         priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]).default("MEDIUM"),
         frequency: z.string().min(1, "Please select a frequency").default("one_time"),
         dueDate: z.string().min(1, "Please select a due date"),
-        assignedStaffId: z.string().optional().default(""),
+assignedStaffId: z.string().min(1, "Please select an assigned staff member"),
         notes: z.string().optional().default(""),
         remindersEnabled: z.boolean().default(true),
         templateId: z.string().optional().default(""),
@@ -214,4 +214,4 @@ export const clientFormSchema = z.object({
 
 export type ClientFormValues = z.infer<typeof clientFormSchema>;
 
-
+

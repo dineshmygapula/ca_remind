@@ -2,12 +2,9 @@
 
 import { NextRequest, NextResponse } from "next/server";
 
-// ── Constants ────────────────────────────────────────────────────────────────
 
-/** Cookie written by the client after every Firebase sign-in / token refresh. */
 const SESSION_COOKIE = "__session";
 
-/** Routes that unauthenticated users are allowed to visit. */
 const PUBLIC_PATHS = ["/login", "/signup"] as const;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -22,15 +19,17 @@ function isAuthenticated(req: NextRequest): boolean {
   return !!req.cookies.get(SESSION_COOKIE)?.value;
 }
 
-// ── Proxy (formerly Middleware) ──────────────────────────────────────────────
 
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const authed = isAuthenticated(req);
 
-
-  if (authed && isPublicPath(pathname)) {
+  if (authed && (pathname === "/" || isPublicPath(pathname))) {
     return NextResponse.redirect(new URL("/dashboard", req.url));
+  }
+
+  if (pathname === "/") {
+    return NextResponse.next();
   }
 
   if (!authed && !isPublicPath(pathname)) {
@@ -45,6 +44,7 @@ export function proxy(req: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|public/).*)",
+   
+    "/((?!_next/static|_next/image|favicon.ico|favicon/|manifest.json|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };

@@ -12,7 +12,12 @@ import {
   getSubjectById,
 } from "@/services/subjectService";
 import { StaffMember } from "@/types/staff.types";
-import { Subject, CreateSubjectDto, UpdateSubjectDto } from "@/types/subject";
+import {
+  Subject,
+  CreateSubjectDto,
+  UpdateSubjectDto,
+  ComplianceService,
+} from "@/types/subject";
 import { clientFormSchema, ClientFormValues } from "@/utils/schema";
 
 import ClientInfoSection from "./client-form/ClientInfoSection";
@@ -102,6 +107,7 @@ export default function CreateClientDialog({
   const [initialFormValues, setInitialFormValues] = useState<
     ClientFormValues | undefined
   >(undefined);
+  const [existingClient, setExistingClient] = useState<Subject | null>(null);
   const [headerTitle, setHeaderTitle] = useState("");
 
   const saveAction = useAsyncAction();
@@ -120,6 +126,7 @@ export default function CreateClientDialog({
     if (!open) return;
     if (mode === "create") {
       setInitialFormValues(undefined);
+      setExistingClient(null);
       setHeaderTitle("");
       return;
     }
@@ -128,17 +135,22 @@ export default function CreateClientDialog({
     fetchClientAction.run(
       async () => {
         const client = await getSubjectById(businessId, clientId);
-        setHeaderTitle(client.profile?.displayName || client.profile?.businessName || "");
+        setExistingClient(client);
+        setHeaderTitle(
+          client.profile?.displayName || client.profile?.businessName || "",
+        );
 
         const compliance = client.metadata?.complianceProfile;
         const firstAddress = client.addresses?.[0];
         const primaryGstin = client.gst?.gstins?.[0]?.gstin || "";
 
         setInitialFormValues({
-          fullName: client.profile?.displayName || client.primaryContact?.name || "",
+          fullName:
+            client.profile?.displayName || client.primaryContact?.name || "",
           phone: client.primaryContact?.phone || "",
           email: client.primaryContact?.email || "",
-          companyName: client.profile?.businessName || client.profile?.legalName || "",
+          companyName:
+            client.profile?.businessName || client.profile?.legalName || "",
           pan: client.identifiers?.pan || "",
           gstin: primaryGstin,
           tan: client.identifiers?.tan || "",
@@ -168,7 +180,7 @@ export default function CreateClientDialog({
       {
         errorMessage: "Failed to load client details",
         showErrorToast: false,
-      }
+      },
     );
   }, [open, mode, clientId, businessId]);
 
@@ -177,6 +189,7 @@ export default function CreateClientDialog({
     fetchClientAction.reset();
     saveAction.reset();
     setFetchError("");
+    setExistingClient(null);
     onClose();
   };
 
@@ -195,9 +208,299 @@ export default function CreateClientDialog({
         ""
       : "";
 
+    if (mode === "edit" && clientId) {
+      const existingAddress = existingClient?.addresses?.[0];
+      const validAddresses = data.line1?.trim()
+        ? [
+            {
+              addressId: existingAddress?.addressId || "addr-1",
+              type:
+                (data.addressType as
+                  | "REGISTERED"
+                  | "COMMUNICATION"
+                  | "BRANCH") ||
+                existingAddress?.type ||
+                "REGISTERED",
+              line1: data.line1.trim(),
+              city: data.city?.trim() || "",
+              state: data.state?.trim() || "",
+              pincode: data.pincode?.trim() || "",
+            },
+          ]
+        : existingClient?.addresses && existingClient.addresses.length > 0
+          ? existingClient.addresses.map((a, idx) => ({
+              addressId: a.addressId || `addr-${idx + 1}`,
+              type:
+                (a.type as "REGISTERED" | "COMMUNICATION" | "BRANCH") ||
+                "REGISTERED",
+              line1: a.line1 || "",
+              city: a.city || "",
+              state: a.state || "",
+              pincode: a.pincode || "",
+            }))
+          : [];
+
+      const existingGstEntry = existingClient?.gst?.gstins?.[0];
+      const validGstins = data.gstin?.trim()
+        ? [
+            {
+              gstin: data.gstin.trim().toUpperCase(),
+              state: data.state?.trim() || existingGstEntry?.state || "Delhi",
+              registrationType:
+                (existingGstEntry?.registrationType as
+                  | "REGULAR"
+                  | "COMPOSITION"
+                  | "EXEMPTED") || "REGULAR",
+              status:
+                (existingGstEntry?.status as "ACTIVE" | "INACTIVE") || "ACTIVE",
+            },
+          ]
+        : existingClient?.gst?.gstins && existingClient.gst.gstins.length > 0
+          ? existingClient.gst.gstins.map((g) => ({
+              gstin: g.gstin,
+              state: g.state || "Delhi",
+              registrationType:
+                (g.registrationType as
+                  | "REGULAR"
+                  | "COMPOSITION"
+                  | "EXEMPTED") || "REGULAR",
+              status: (g.status as "ACTIVE" | "INACTIVE") || "ACTIVE",
+            }))
+          : [];
+
+      const existingContacts = existingClient?.contacts || [];
+      const updatedContacts =
+        existingContacts.length > 0
+          ? existingContacts.map((c, idx) => ({
+              contactId: c.contactId || `contact-${idx + 1}`,
+              name: idx === 0 || c.isPrimary ? primaryName : c.name,
+              role: (c.role || "OWNER") as "OWNER" | "ACCOUNTANT" | "MANAGER",
+              phone: idx === 0 || c.isPrimary ? data.phone.trim() : c.phone,
+              email: idx === 0 || c.isPrimary ? data.email.trim() : c.email,
+              isPrimary: idx === 0 || Boolean(c.isPrimary),
+            }))
+          : [
+              {
+                contactId: "contact-1",
+                name: primaryName,
+                role: "OWNER" as const,
+                phone: data.phone.trim(),
+                email: data.email.trim(),
+                isPrimary: true,
+              },
+            ];
+
+      const existingNotes = existingClient?.notes || [];
+      const updatedNotes = data.notes?.trim()
+        ? existingNotes.length > 0
+          ? existingNotes.map((n, idx) =>
+              idx === 0
+                ? {
+                    noteId: n.noteId || "note-1",
+                    text: data.notes.trim(),
+                    createdBy: {
+                      userId:
+                        n.createdBy?.userId || selectedStaff?.id || "",
+                      name:
+                        n.createdBy?.name || staffDisplayName || "",
+                    },
+                    createdAt: n.createdAt || new Date().toISOString(),
+                  }
+                : {
+                    noteId: n.noteId || `note-${idx + 1}`,
+                    text: n.text,
+                    createdBy: {
+                      userId: n.createdBy?.userId || "",
+                      name: n.createdBy?.name || "",
+                    },
+                    createdAt: n.createdAt || new Date().toISOString(),
+                  },
+            )
+          : [
+              {
+                noteId: "note-1",
+                text: data.notes.trim(),
+                createdBy: {
+                  userId: selectedStaff?.id || "",
+                  name: staffDisplayName || "",
+                },
+                createdAt: new Date().toISOString(),
+              },
+            ]
+        : existingNotes.map((n, idx) => ({
+            noteId: n.noteId || `note-${idx + 1}`,
+            text: n.text,
+            createdBy: {
+              userId: n.createdBy?.userId || "",
+              name: n.createdBy?.name || "",
+            },
+            createdAt: n.createdAt || new Date().toISOString(),
+          }));
+
+      const buildComplianceService = (
+        enabled: boolean,
+        frequency: string,
+        existing?: ComplianceService
+      ) => {
+        const svc: Record<string, unknown> = {
+          enabled: Boolean(enabled),
+          frequency: frequency || existing?.frequency || "QUARTERLY",
+        };
+
+        if (
+          existing?.internalTargetOffsetDays !== undefined &&
+          existing.internalTargetOffsetDays > 0
+        ) {
+          svc.internalTargetOffsetDays = existing.internalTargetOffsetDays;
+        }
+        if (
+          existing?.customDueDay !== undefined &&
+          existing.customDueDay >= 1 &&
+          existing.customDueDay <= 31
+        ) {
+          svc.customDueDay = existing.customDueDay;
+        }
+        if (existing?.customDueMonth && existing.customDueMonth.trim()) {
+          svc.customDueMonth = existing.customDueMonth.trim();
+        }
+        if (
+          existing?.quarterlyDates &&
+          Object.keys(existing.quarterlyDates).length > 0
+        ) {
+          svc.quarterlyDates = existing.quarterlyDates;
+        }
+
+        return svc as unknown as ComplianceService;
+      };
+
+      const updatePayload: UpdateSubjectDto = {
+        profile: {
+          displayName: primaryName,
+          legalName: existingClient?.profile?.legalName || businessName,
+          businessName: businessName,
+          constitution: existingClient?.profile?.constitution || "INDIVIDUAL",
+          industry: existingClient?.profile?.industry || "General",
+          businessNature:
+            existingClient?.profile?.businessNature &&
+            existingClient.profile.businessNature.length > 0
+              ? existingClient.profile.businessNature
+              : ["General"],
+        },
+        identifiers: {
+          pan:
+            data.pan?.trim().toUpperCase() ||
+            existingClient?.identifiers?.pan ||
+            "",
+          tan:
+            data.tan?.trim().toUpperCase() ||
+            existingClient?.identifiers?.tan ||
+            "",
+          cin: existingClient?.identifiers?.cin || "",
+          udyam: existingClient?.identifiers?.udyam || "",
+          iec: existingClient?.identifiers?.iec ?? null,
+        },
+        gst: {
+          gstins: validGstins,
+        },
+        primaryContact: {
+          name: primaryName,
+          phone: data.phone.trim(),
+          email: data.email.trim(),
+        },
+        contacts: updatedContacts,
+        addresses: validAddresses,
+        notificationPreferences: {
+          defaultChannels: data.notifChannels,
+          language: existingClient?.notificationPreferences?.language || "en",
+          timezone:
+            existingClient?.notificationPreferences?.timezone || "Asia/Kolkata",
+          quietHours: {
+            enabled:
+              existingClient?.notificationPreferences?.quietHours?.enabled ??
+              false,
+            start:
+              existingClient?.notificationPreferences?.quietHours?.start ||
+              "22:00",
+            end:
+              existingClient?.notificationPreferences?.quietHours?.end ||
+              "08:00",
+          },
+        },
+        assignedTeam: {
+          primaryAssignee: selectedStaff
+            ? {
+                userId: selectedStaff.id,
+                name: staffDisplayName,
+              }
+            : existingClient?.assignedTeam?.primaryAssignee?.userId
+              ? {
+                  userId: existingClient.assignedTeam.primaryAssignee.userId,
+                  name: existingClient.assignedTeam.primaryAssignee.name || "",
+                }
+              : {
+                  userId: "",
+                  name: "",
+                },
+        },
+        notes: updatedNotes,
+        metadata: {
+          complianceProfile: {
+            gst: buildComplianceService(
+              data.complianceGstEnabled,
+              data.complianceGstFrequency,
+              existingClient?.metadata?.complianceProfile?.gst
+            ),
+            tds: buildComplianceService(
+              data.complianceTdsEnabled,
+              data.complianceTdsFrequency,
+              existingClient?.metadata?.complianceProfile?.tds
+            ),
+            itr: buildComplianceService(
+              data.complianceItrEnabled,
+              data.complianceItrFrequency,
+              existingClient?.metadata?.complianceProfile?.itr
+            ),
+            roc: buildComplianceService(
+              data.complianceRocEnabled,
+              data.complianceRocFrequency,
+              existingClient?.metadata?.complianceProfile?.roc
+            ),
+          },
+          dueDateOverrides: Array.isArray(
+            existingClient?.metadata?.dueDateOverrides
+          )
+            ? existingClient.metadata.dueDateOverrides.filter(
+                (x) => x !== null && typeof x === "object"
+              )
+            : [],
+          tags: existingClient?.metadata?.tags || [],
+        },
+        isActive: existingClient?.isActive ?? true,
+      };
+
+      await saveAction.run(
+        async () => {
+          return await updateSubject(businessId, clientId, updatePayload);
+        },
+        {
+          successMessage: "Client updated successfully",
+          errorMessage: "Failed to update client",
+          showSuccessToast: true,
+          showErrorToast: true,
+          onSuccess: (saved) => {
+            onSuccess?.(saved);
+            handleClose();
+          },
+        },
+      );
+      return;
+    }
+
+    // ── Create Mode ─────────────────────────────────────────────────────────
     const validAddresses = data.line1?.trim()
       ? [
           {
+            addressId: "addr-1",
             type: data.addressType,
             line1: data.line1.trim(),
             city: data.city?.trim() || "",
@@ -211,14 +514,14 @@ export default function CreateClientDialog({
       ? [
           {
             gstin: data.gstin.trim().toUpperCase(),
-            state: data.state?.trim() || "",
+            state: data.state?.trim() || "Delhi",
             registrationType: "REGULAR" as const,
             status: "ACTIVE" as const,
           },
         ]
       : [];
 
-    const dto: CreateSubjectDto & UpdateSubjectDto = {
+    const createPayload: CreateSubjectDto = {
       subjectType: "CLIENT",
       profile: {
         displayName: primaryName,
@@ -233,35 +536,43 @@ export default function CreateClientDialog({
         phone: data.phone.trim(),
         email: data.email.trim(),
       },
-      contacts: [],
+      contacts: [
+        {
+          contactId: "contact-1",
+          name: primaryName,
+          role: "OWNER",
+          phone: data.phone.trim(),
+          email: data.email.trim(),
+          isPrimary: true,
+        },
+      ],
       isActive: true,
       identifiers: {
-        pan: data.pan?.trim().toUpperCase() || undefined,
-        tan: data.tan?.trim().toUpperCase() || undefined,
+        pan: data.pan?.trim().toUpperCase() || "",
+        tan: data.tan?.trim().toUpperCase() || "",
+        cin: "",
+        udyam: "",
+        iec: null,
       },
-      gst: validGstins.length > 0 ? { gstins: validGstins } : undefined,
-      addresses: validAddresses.length > 0 ? validAddresses : undefined,
+      gst: { gstins: validGstins },
+      addresses: validAddresses,
       metadata: {
         complianceProfile: {
           gst: {
-            enabled: data.complianceGstEnabled,
-            frequency: data.complianceGstFrequency,
+            enabled: Boolean(data.complianceGstEnabled),
+            frequency: data.complianceGstFrequency || "QUARTERLY",
           },
           tds: {
-            enabled: data.complianceTdsEnabled,
-            frequency: data.complianceTdsFrequency,
+            enabled: Boolean(data.complianceTdsEnabled),
+            frequency: data.complianceTdsFrequency || "QUARTERLY",
           },
           itr: {
-            enabled: data.complianceItrEnabled,
-            frequency: data.complianceItrFrequency,
+            enabled: Boolean(data.complianceItrEnabled),
+            frequency: data.complianceItrFrequency || "ANNUAL",
           },
           roc: {
-            enabled: data.complianceRocEnabled,
-            frequency: data.complianceRocFrequency,
-          },
-          msme: {
-            enabled: data.complianceMsmeEnabled,
-            frequency: data.complianceMsmeFrequency,
+            enabled: Boolean(data.complianceRocEnabled),
+            frequency: data.complianceRocFrequency || "ANNUAL",
           },
         },
         dueDateOverrides: [],
@@ -277,39 +588,46 @@ export default function CreateClientDialog({
           end: "08:00",
         },
       },
-      assignedTeam: selectedStaff
-        ? {
-            primaryAssignee: {
+      assignedTeam: {
+        primaryAssignee: selectedStaff
+          ? {
               userId: selectedStaff.id,
               name: staffDisplayName,
+            }
+          : {
+              userId: "",
+              name: "",
             },
-          }
-        : undefined,
-      notes: data.notes?.trim() ? [{ text: data.notes.trim() }] : [],
+      },
+      notes: data.notes?.trim()
+        ? [
+            {
+              noteId: "note-1",
+              text: data.notes.trim(),
+              createdBy: {
+                userId: selectedStaff?.id || "",
+                name: staffDisplayName || "",
+              },
+              createdAt: new Date().toISOString(),
+            },
+          ]
+        : [],
     };
 
     await saveAction.run(
       async () => {
-        if (mode === "edit" && clientId) {
-          return await updateSubject(businessId, clientId, dto);
-        } else {
-          return await createSubject(businessId, dto);
-        }
+        return await createSubject(businessId, createPayload);
       },
       {
-        successMessage:
-          mode === "edit"
-            ? "Client updated successfully"
-            : "Client created successfully",
-        errorMessage:
-          mode === "edit" ? "Failed to update client" : "Failed to create client",
+        successMessage: "Client created successfully",
+        errorMessage: "Failed to create client",
         showSuccessToast: true,
         showErrorToast: true,
         onSuccess: (saved) => {
           onSuccess?.(saved);
           handleClose();
         },
-      }
+      },
     );
   };
 
@@ -390,14 +708,6 @@ export default function CreateClientDialog({
       }
     >
       <div className="py-1">
-        {/* Loading Indicator for edit mode */}
-        {fetchClientAction.loading && (
-          <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 text-xs mb-4">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            <span>Loading client details...</span>
-          </div>
-        )}
-
         {/* Global error alert */}
         {fetchError && (
           <div className="flex items-center justify-between p-3 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-xs mb-4">
@@ -412,21 +722,30 @@ export default function CreateClientDialog({
           </div>
         )}
 
-        <FormWrapper
-          key={formKey}
-          formId={CLIENT_FORM_ID}
-          schema={clientFormSchema}
-          defaultValues={currentDefaultValues}
-          onSubmit={handleSubmit}
-          className="space-y-4"
-        >
-          <ClientFormContent
-            staff={staff}
-            staffLoading={staffLoading}
-            onAddStaffSuccess={handleStaffCreated}
-            businessId={businessId}
-          />
-        </FormWrapper>
+        {mode === "edit" && fetchClientAction.loading && !initialFormValues ? (
+          <div className="flex flex-col items-center justify-center py-20 text-txt-sub">
+            <Loader2 className="h-8 w-8 animate-spin text-[#F59E0B] mb-2" />
+            <span className="text-sm font-medium">
+              Loading client details...
+            </span>
+          </div>
+        ) : (
+          <FormWrapper
+            key={formKey}
+            formId={CLIENT_FORM_ID}
+            schema={clientFormSchema}
+            defaultValues={currentDefaultValues}
+            onSubmit={handleSubmit}
+            className="space-y-4"
+          >
+            <ClientFormContent
+              staff={staff}
+              staffLoading={staffLoading}
+              onAddStaffSuccess={handleStaffCreated}
+              businessId={businessId}
+            />
+          </FormWrapper>
+        )}
       </div>
     </Drawer>
   );
