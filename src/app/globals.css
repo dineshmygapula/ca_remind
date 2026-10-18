@@ -5,6 +5,7 @@
 @theme {
   --color-bg: var(--bg);
   --color-surface: var(--surface);
+  --color-surface-subtle: var(--surface-subtle);
   --color-navy: var(--primary);
   --color-navy-hover: var(--primary-hover);
   --color-gold: var(--accent);
@@ -19,6 +20,7 @@
 :root {
   --bg: #f8f6f1;
   --surface: #ffffff;
+  --surface-subtle: #f2efe9;
   --primary: #14224d;
   --primary-hover: #0f2440;
   --accent: #c9a227;
@@ -35,6 +37,7 @@
 .dark {
   --bg: #0b1220;
   --surface: #141f35;
+  --surface-subtle: #0f182b;
   --primary: #1b2a4a;
   --primary-hover: #2a3d63;
   --accent: #e0b93a;
@@ -337,7 +340,11 @@ body {
 /* ─── DayPicker Theme Customization ────────────────────────────── */
 .rdp-root {
   --rdp-accent-color: var(--primary) !important;
-  --rdp-accent-background-color: color-mix(in srgb, var(--primary) 12%, transparent) !important;
+  --rdp-accent-background-color: color-mix(
+    in srgb,
+    var(--primary) 12%,
+    transparent
+  ) !important;
   --rdp-day-height: 38px !important;
   --rdp-day-width: 38px !important;
   --rdp-day_button-height: 36px !important;
@@ -348,6 +355,150 @@ body {
 
 .dark .rdp-root {
   --rdp-accent-color: var(--accent) !important;
-  --rdp-accent-background-color: color-mix(in srgb, var(--accent) 15%, transparent) !important;
+  --rdp-accent-background-color: color-mix(
+    in srgb,
+    var(--accent) 15%,
+    transparent
+  ) !important;
   color: var(--text-primary) !important;
+}
+/* ---------- Toast ---------- */
+.app-toast {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: min(92vw, 400px);
+  padding: 14px 14px 16px 14px;
+  overflow: hidden;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  box-shadow:
+    0 18px 40px -14px rgba(20, 34, 77, 0.35),
+    0 2px 6px rgba(20, 34, 77, 0.08);
+  pointer-events: auto;
+}
+
+.app-toast-icon {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  color: var(--toast-color);
+  background: color-mix(in srgb, var(--toast-color) 16%, transparent);
+}
+
+.app-toast-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.app-toast-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--heading);
+}
+
+.app-toast-message {
+  margin: 2px 0 0;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.app-toast-close {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 0;
+  cursor: pointer;
+  color: var(--text-secondary);
+  background: transparent;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
+}
+.app-toast-close:hover {
+  background: color-mix(in srgb, var(--text-secondary) 14%, transparent);
+  color: var(--text-primary);
+}
+
+/* countdown bar */
+.app-toast-bar {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  width: 100%;
+  background: var(--toast-color);
+  transform-origin: left;
+  animation-name: toast-countdown;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+.app-toast:hover .app-toast-bar {
+  animation-play-state: paused;
+}
+
+.app-toast-enter {
+  animation: toast-in 0.4s cubic-bezier(0.21, 1.02, 0.73, 1) forwards;
+}
+.app-toast-leave {
+  animation: toast-out 0.25s ease-in forwards;
+}
+.app-toast-spin {
+  animation: toast-spin 0.8s linear infinite;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-24px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes toast-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-16px) scale(0.95);
+  }
+}
+@keyframes toast-countdown {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+@keyframes toast-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-toast-enter,
+  .app-toast-leave {
+    animation-duration: 0.01ms;
+  }
 }

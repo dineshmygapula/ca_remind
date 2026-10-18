@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useWorkspace } from '@/context/WorkspaceContext';
 import ResourcePageLayout from '@/components/common/ResourcePageLayout';
 import StatCard from '@/components/task-definitions/StatCard';
@@ -8,13 +8,12 @@ import PageSkeleton from '@/components/common/PageSkeleton';
 import ConfirmDialog from '@/components/tasks/ConfirmDialog';
 
 import AddStaffDialog from '@/components/staff/AddStaffDialog';
-import EditStaffDialog from '@/components/staff/EditStaffDialog';
 import StaffDetailsDrawer from '@/components/staff/StaffDetailsDrawer';
 import StaffFilter from '@/components/staff/StaffFilter';
 import StaffTable from '@/components/staff/StaffTable';
 
 import { getStaff, deleteStaff } from '@/services/staffService';
-import { StaffMember, StaffDetails } from '@/types/staff.types';
+import { StaffMember } from '@/types/staff.types';
 import { useResourcePageState } from '@/hooks/useResourcePageState';
 import { useAsyncAction } from '@/hooks/useAnyAction';
 import { useStaffFilters } from '@/hooks/staff/useStaffFilters';
@@ -23,7 +22,6 @@ export default function StaffPage() {
   const { businessId } = useWorkspace();
 
   const [staff, setStaff] = useState<StaffMember[]>([]);
-  const [editStaffData, setEditStaffData] = useState<StaffDetails | null>(null);
 
   const fetchAction = useAsyncAction(true);
   const deleteAction = useAsyncAction();
@@ -44,37 +42,18 @@ export default function StaffPage() {
     });
   }, [businessId, runFetch]);
 
+  // Which business we've already started loading. Refs survive Strict Mode's
+  // dev-only unmount/remount, so the second effect run is skipped.
+  const loadedFor = useRef<string | null>(null);
+
   useEffect(() => {
+    if (!businessId) return;
+    if (loadedFor.current === businessId) return;
+    loadedFor.current = businessId;
+    setStaff([]);
     fetchStaff();
-  }, [fetchStaff]);
+  }, [businessId, fetchStaff]);
 
-  const handleEdit = (membershipId: string) => {
-    const member = staff.find((item) => item.id === membershipId);
-
-    if (member) {
-      const details: StaffDetails = {
-        id: member.id,
-        userId: member.userId,
-        userName: member.userName,
-        status: member.status,
-        role: member.roles?.[0] || member.role || '',
-        roles: member.roles || (member.role ? [member.role] : []),
-        avatarUrl: null,
-        lastActiveAt: member.updatedAt || null,
-        contact: {
-          email: member.email,
-          phone: member.phone,
-          phoneMasked: member.phoneMasked,
-          firstName: member.firstName ?? '',
-          lastName: member.lastName ?? '',
-        },
-      };
-
-      setEditStaffData(details);
-    }
-
-    page.openEdit(membershipId);
-  };
 
   // ─── Delete Staff Confirmation ───────────────────────────────
   const handleDeleteConfirm = async () => {
@@ -175,30 +154,13 @@ export default function StaffPage() {
       overlays={
         <>
           <AddStaffDialog
-            open={page.formOpen && !page.formId}
+            open={page.formOpen}
             onClose={page.close}
             businessId={businessId}
             onSuccess={() => {
               fetchStaff();
               page.close();
             }}
-          />
-
-          {/* Edit Staff Dialog */}
-          <EditStaffDialog
-            open={page.formOpen && Boolean(page.formId)}
-            onClose={() => {
-              page.close();
-              setEditStaffData(null);
-            }}
-            membershipId={page.formId}
-            businessId={businessId}
-            onSuccess={() => {
-              fetchStaff();
-              page.close();
-              setEditStaffData(null);
-            }}
-            staffData={editStaffData}
           />
 
           {/* View Details Drawer */}
@@ -207,7 +169,6 @@ export default function StaffPage() {
             onClose={page.close}
             membershipId={page.viewId}
             businessId={businessId}
-            onEdit={handleEdit}
           />
 
           {/* Remove Staff Confirm Dialog */}

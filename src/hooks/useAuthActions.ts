@@ -1,12 +1,7 @@
 // hooks/useAuthActions.ts
 import { useState } from "react";
 import { FirebaseError } from "firebase/app";
-import {
-  GoogleAuthProvider,
-  signInWithPopup,
-  sendPasswordResetEmail,
-} from "firebase/auth";
-
+import { sendPasswordResetEmail } from "firebase/auth";
 import { auth } from "@/config/firebase";
 import { loginWithEmail } from "@/services/authServices";
 import { LoginForm, ResetEmailForm } from "@/utils/schema";
@@ -50,26 +45,6 @@ export function useAuthActions() {
     }
   };
 
-  // Google sign in
-  const [googleLoading, setGoogleLoading] = useState(false);
-  const [googleError, setGoogleError] = useState("");
-
-  const signIn = async () => {
-    if (googleLoading) return;
-    setGoogleLoading(true);
-    setGoogleError("");
-    try {
-      const provider = new GoogleAuthProvider();
-      provider.setCustomParameters({ prompt: "select_account" });
-      await signInWithPopup(auth, provider);
-      // Same as above: no token storage, no manual routing
-    } catch (err) {
-      setGoogleError(getAuthMessage(err, "Google sign-in failed"));
-    } finally {
-      setGoogleLoading(false);
-    }
-  };
-
   // Password reset
   const [open, setOpen] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
@@ -100,7 +75,6 @@ export function useAuthActions() {
 
   return {
     submit, loading, error,
-    signIn, googleLoading, googleError,
     open, openModal, closeModal, resetSubmit, resetLoading, resetError, success, sentTo,
   };
-}
+}

@@ -34,9 +34,6 @@ export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
 
 export type DeliveryChannel = 'EMAIL' | 'WHATSAPP' | 'SMS';
 
-// Constants (can be moved to a constants file)
-//export const TASK_TYPES = ['GST', 'TDS', 'ROC', 'ITR', 'MSME'];
-
 // ─────────────────────────────────────────────
 // Nested Structures
 // ─────────────────────────────────────────────
@@ -52,7 +49,7 @@ export interface TaskAssignee {
 }
 
 export interface ReminderSchedule {
-  deliveryChannel: DeliveryChannel;
+  deliveryChannel: DeliveryChannel | 'IN_APP' | string;
   daysBeforeDueDate: number;
   messageTemplateId: string;
 }
@@ -159,36 +156,33 @@ export interface TaskResponse {
  */
 
 // ─────────────────────────────────────────────
-// Create Task Request — updated
+// 3️⃣ Create Task Request
 // ─────────────────────────────────────────────
 export interface CreateTaskDto {
-
-  title?: string;
-  taskName?: string;
+  title: string;
+  taskName: string;
   subjectId: string;
   dueDate: string;
-  taskDefinitionId?: string;   // ← ADD
-  taskType?: string | null;
-  category?: string | null;
   description?: string;
-  status?: string;             // ← ADD
   notes?: string;
-  priority: TaskPriority;
-  assignedStaffId?: string;     // ← renamed from assignedStaffId
-  frequency?: string; // ← ADD for task frequency
+  taskType?: string;
+  frequency?: string;
+  periodLabel?: string;
+  taskDefinitionId?: string;
+  periodStart?: string;
+  periodEnd?: string;
+  category?: string;
+  priority: TaskPriority | string;
+  assignedStaffId?: string;
+  status?: string;
+  metadata?: Record<string, unknown>;
   remindersScheduled?: ReminderSchedule[];
 }
 // ─────────────────────────────────────────────
 // 4️⃣ Update Task Request
+// Backend PATCH accepts ONLY these fields:
 // ─────────────────────────────────────────────
 export interface UpdateTaskDto {
-  title?: string;
-  taskName?: string;
-  subjectId?: string;
-  taskDefinitionId?: string;
-  taskType?: string | null;
-  category?: string | null;
-  frequency?: string;
   description?: string;
   notes?: string;
   status?: TaskStatus;
@@ -196,7 +190,6 @@ export interface UpdateTaskDto {
   dueDate?: string;
   assignedStaffId?: string;
   metadata?: TaskMetadata;
-  remindersScheduled?: ReminderSchedule[];
 }
 
 //to Create Reminder

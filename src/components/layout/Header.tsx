@@ -103,7 +103,9 @@ interface PeopleDropdownProps {
 function PeopleDropdown({ pathname, onNavigate }: PeopleDropdownProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const isPeopleActive = PEOPLE_ITEMS.some((item) => pathname?.startsWith(item.href));
+  const isPeopleActive = PEOPLE_ITEMS.some((item) =>
+    pathname?.startsWith(item.href),
+  );
 
   useClickOutside([ref], () => setOpen(false));
 
@@ -157,10 +159,7 @@ interface ProfileDropdownProps {
   onNavigate: (href: string) => void;
 }
 
-function ProfileDropdown({
-  email,
-  onNavigate,
-}: ProfileDropdownProps) {
+function ProfileDropdown({ email, onNavigate }: ProfileDropdownProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -178,7 +177,11 @@ function ProfileDropdown({
       heading: "PROFILE",
       items: [
         { label: "User Profile", icon: User, href: "/user-profile" },
-        { label: "Business Profile", icon: Building2, href: "/business-profile" },
+        {
+          label: "Business Profile",
+          icon: Building2,
+          href: "/business-profile",
+        },
       ],
     },
     {
@@ -191,7 +194,11 @@ function ProfileDropdown({
     {
       heading: "PREFERENCES",
       items: [
-        { label: "Subscription & Billing", icon: CreditCard, href: "/subscription" },
+        {
+          label: "Subscription & Billing",
+          icon: CreditCard,
+          href: "/subscription",
+        },
         { label: "Notification Settings", icon: Bell, href: "/notifications" },
       ],
     },
@@ -236,7 +243,9 @@ function ProfileDropdown({
           <div className="p-2 shadow-2xl bg-[var(--surface)] border border-[var(--border)] rounded-2xl flex flex-col gap-0.5 max-h-[380px] overflow-y-auto">
             {sections.map(({ heading, items }, idx) => (
               <div key={heading}>
-                {idx > 0 && <div className="border-t border-[var(--border)] my-1" />}
+                {idx > 0 && (
+                  <div className="border-t border-[var(--border)] my-1" />
+                )}
 
                 <div className="px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wider text-[var(--accent)]">
                   {heading}
@@ -281,9 +290,9 @@ function ProfileDropdown({
 export function Header() {
   const [isDark, setIsDark] = useState(false);
 
-  const { user } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const { user, loading } = useAuth();
 
   // Sync dark class on <html>
   const toggleTheme = () => {
@@ -334,11 +343,13 @@ export function Header() {
         </button>
 
         {/* User / Login */}
-        {user ? (
-          <ProfileDropdown
-            email={user.email ?? "U"}
-            onNavigate={goTo}
-          />
+        {/* User / Login */}
+        {loading ? (
+          <div className="flex h-10 w-24 items-center justify-center">
+            <span className="loading loading-spinner loading-md text-[var(--primary)] dark:text-[var(--accent)]" />
+          </div>
+        ) : user ? (
+          <ProfileDropdown email={user.email ?? "U"} onNavigate={goTo} />
         ) : (
           <button
             type="button"

@@ -7,11 +7,7 @@ export interface TemplatePlaceholderValues {
   YOURCONTACTNUMBER?: string;
 }
 
-/**
- * Replaces [PLACEHOLDER] and {{placeholder}} tokens in a template string
- * with real values. Falls back to the literal [KEY] token if no value given,
- * so missing data is visible rather than silently blank.
- */
+
 export function replaceTemplatePlaceholders(
   text: string,
   values: TemplatePlaceholderValues,

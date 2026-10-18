@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { Eye, Pencil, Trash2, Calendar } from "lucide-react";
 import { useWorkspace } from "@/context/WorkspaceContext";
 import { TaskListItem } from "@/types/task.types";
@@ -87,7 +87,6 @@ function getTaskTypeBadgeClass(val?: string | null) {
     return "bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300";
   return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300";
 }
-
 
 function StatusPill({ status }: { status?: string }) {
   const s = (status || "").toUpperCase();
@@ -256,7 +255,8 @@ export default function TasksPage() {
   const { businessId } = useWorkspace();
   const id = businessId!;
 
-  const { tasks, loading, error, setError, refetch, removeTask } = useTasks(id);
+  const { tasks, loading, error, setError, refetch, removeTask, patchTask } =
+    useTasks(id);
   const filters = useTaskFilters(tasks);
   const { sorted, sortProps } = useSortedItems(
     filters.filteredTasks,
@@ -276,28 +276,41 @@ export default function TasksPage() {
     });
   };
 
-  const handleUpdateCell = async ({
-    row,
-    field,
-    newValue,
-  }: {
-    row: TaskListItem;
-    field: string;
-    newValue: unknown;
-  }) => {
-    let value = newValue;
-    if (field === "taskType") {
-      const matched = TASK_TYPES.find(
-        (t) =>
-          t.label === newValue ||
-          t.value === newValue ||
-          t.apiValue === newValue,
-      );
-      if (matched) value = matched.apiValue;
-    }
-    await updateTask(id, row.id, { [field]: value });
-    refetch();
-  };
+  const updateAction = useAsyncAction();
+  const { run: runUpdate } = updateAction;
+
+  const handleUpdateCell = useCallback(
+    async ({
+      row,
+      field,
+      newValue,
+    }: {
+      row: TaskListItem;
+      field: string;
+      newValue: unknown;
+    }) => {
+      if (!id) return;
+
+      let value = newValue;
+      if (field === "taskType") {
+        const matched = TASK_TYPES.find(
+          (t) =>
+            t.label === newValue ||
+            t.value === newValue ||
+            t.apiValue === newValue,
+        );
+        if (matched) value = matched.apiValue;
+      }
+
+      await runUpdate(() => updateTask(id, row.id, { [field]: value }), {
+        successMessage: "Task updated successfully",
+        errorMessage: "Failed to update task",
+        // onSuccess: () =>
+        //   patchTask(row.id, { [field]: value } as Partial<TaskListItem>),
+      });
+    },
+    [id],
+  );
 
   const actions = useMemo<GridAction<TaskListItem>[]>(
     () =>

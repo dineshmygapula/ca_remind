@@ -2,16 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import {
-  Container,
-  Box,
-  Typography,
-  Button,
-  LinearProgress,
-  CircularProgress,
-  Alert,
-} from '@mui/material';
-import EmojiEventsOutlinedIcon from '@mui/icons-material/EmojiEventsOutlined';
+import { Trophy, Loader2, AlertCircle } from 'lucide-react';
 import { getOrganizations } from '@/services/organizationService';
 
 export default function PlanTrialPage() {
@@ -48,119 +39,87 @@ export default function PlanTrialPage() {
     router.push('/business-create');
   };
 
-  // ── Loading ──────────────────────────────────────────
   if (loadingOrg) {
     return (
-      <Container maxWidth="sm">
-        <Box sx={{ mt: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-          <CircularProgress size={36} />
-          <Typography variant="body2" color="text.secondary">
-            Loading...
-          </Typography>
-        </Box>
-      </Container>
+      <div className="min-h-screen bg-[var(--bg)] flex flex-col items-center justify-center p-4">
+        <Loader2 className="w-8 h-8 animate-spin text-[var(--primary)] mb-3" />
+        <p className="text-sm font-semibold text-[var(--text-secondary)]">Loading...</p>
+      </div>
     );
   }
 
-  // ── Org load failed ──────────────────────────────────
   if (!organizationId && error) {
     return (
-      <Container maxWidth="sm">
-        <Box sx={{ mt: 6 }}>
-          <Alert
-            severity="error"
-            action={
-              <Typography
-                variant="body2"
-                sx={{ cursor: 'pointer', color: 'primary.main', fontWeight: 600, whiteSpace: 'nowrap' }}
-                onClick={() => router.push('/organization-create')}
-              >
-                Create Org
-              </Typography>
-            }
+      <div className="min-h-screen bg-[var(--bg)] flex flex-col items-center justify-center p-4">
+        <div className="max-w-md w-full bg-[var(--surface)] border border-rose-200 dark:border-rose-900 rounded-2xl p-6 shadow-lg text-center">
+          <AlertCircle className="w-10 h-10 text-rose-500 mx-auto mb-3" />
+          <h2 className="text-base font-bold text-[var(--heading)] mb-2">Organization Error</h2>
+          <p className="text-xs text-[var(--text-secondary)] mb-5">{error}</p>
+          <button
+            type="button"
+            onClick={() => router.push('/organization-create')}
+            className="w-full py-2.5 rounded-xl bg-[var(--primary)] text-white font-bold text-xs shadow-md hover:bg-[var(--primary-hover)] transition-all cursor-pointer"
           >
-            {error}
-          </Alert>
-        </Box>
-      </Container>
+            Create Organization
+          </button>
+        </div>
+      </div>
     );
   }
 
-  // ── Main Render ──────────────────────────────────────
   return (
-    <Box sx={{ minHeight: '100vh', backgroundColor: 'background.default', display: 'flex', flexDirection: 'column' }}>
-
-      {/* Progress bar — uses primary.main from theme by default */}
-      <LinearProgress
-        variant="determinate"
-        value={66}
-        sx={{ height: 4 }}
-      />
+    <div className="min-h-screen bg-[var(--bg)] flex flex-col">
+      {/* Progress bar */}
+      <div className="h-1 w-full bg-slate-100 dark:bg-slate-800">
+        <div className="h-1 bg-[var(--primary)] w-2/3 transition-all duration-300" />
+      </div>
 
       {/* Step label */}
-      <Box sx={{ px: 3, pt: 1.5 }}>
-        <Typography variant="body2" color="text.secondary">
-          Step 2 of 3 · Organization
-        </Typography>
-      </Box>
+      <div className="px-6 pt-3 text-xs font-semibold text-[var(--text-secondary)]">
+        Step 2 of 3 · Organization
+      </div>
 
       {/* Main content */}
-      <Container maxWidth="sm" sx={{ flex: 1, display: 'flex', flexDirection: 'column', pt: 5, pb: 4 }}>
+      <div className="max-w-md mx-auto w-full flex-1 flex flex-col justify-center px-4 py-8">
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-6 sm:p-8 shadow-xl text-center">
+          {/* Badge icon */}
+          <div className="flex justify-center mb-5">
+            <div className="w-16 h-16 rounded-2xl bg-[var(--accent)]/15 border border-[var(--accent)]/30 flex items-center justify-center text-[var(--accent)] shadow-sm">
+              <Trophy className="w-8 h-8 stroke-[2.5]" />
+            </div>
+          </div>
 
-        {/* Badge icon — uses primary.main from theme */}
-        <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
-          <Box
-            sx={{
-              width: 80,
-              height: 80,
-              borderRadius: '50%',
-              border: '3px solid',
-              borderColor: 'primary.main',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <EmojiEventsOutlinedIcon sx={{ fontSize: 44, color: 'primary.main' }} />
-          </Box>
-        </Box>
+          {/* Title */}
+          <h1 className="text-2xl font-black text-[var(--heading)] tracking-tight mb-3">
+            You're on the Free plan
+          </h1>
 
-        {/* Title — h5 from theme provides fontWeight: 600, fontSize: 1.2rem */}
-        <Typography variant="h5" gutterBottom>
-          You're on the Free plan
-        </Typography>
+          {/* Description */}
+          <p className="text-xs text-[var(--text-secondary)] leading-relaxed mb-8">
+            Your organization starts on Free. You can explore paid plans or start a free
+            trial anytime from the next screen—or skip and finish setting up your first
+            business.
+          </p>
 
-        {/* Description — body1 from theme provides fontSize: 0.95rem, color: #334155 */}
-        <Typography variant="body1" color="text.secondary" sx={{ lineHeight: 1.7, mb: 5 }}>
-          Your organization starts on Free. You can explore paid plans or start a free
-          trial anytime from the next screen—or skip and finish setting up your first
-          business.
-        </Typography>
+          <div className="flex flex-col gap-3">
+            <button
+              type="button"
+              onClick={handleViewPlans}
+              className="w-full py-3 rounded-xl bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white font-bold text-sm shadow-md hover:shadow-lg transition-all cursor-pointer"
+            >
+              View plans &amp; trial
+            </button>
 
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-
-          {/* Primary button — uses MuiButton contained styles from theme */}
-          <Button
-            variant="contained"
-            size="large"
-            fullWidth
-            onClick={handleViewPlans}
-          >
-            View plans &amp; trial
-          </Button>
-
-          {/* Outlined button — uses MuiButton outlined styles from theme */}
-          <Button
-            variant="outlined"
-            size="large"
-            fullWidth
-            onClick={handleContinueToBusiness}
-          >
-            Continue to business
-          </Button>
-
-        </Box>
-      </Container>
-    </Box>
+            <button
+              type="button"
+              onClick={handleContinueToBusiness}
+              className="w-full py-3 rounded-xl border border-[var(--border)] font-semibold text-sm text-[var(--text-primary)] hover:bg-[var(--border)]/40 transition-colors cursor-pointer"
+            >
+              Continue to business
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

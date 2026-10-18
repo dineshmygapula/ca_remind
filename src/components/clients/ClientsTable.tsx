@@ -1,10 +1,22 @@
-'use client';
+"use client";
 
-import React, { useState, useMemo } from 'react';
-import { Eye, Pencil, Trash2, Mail, Phone, Building2, X, ShieldCheck } from 'lucide-react';
-import CommonDataGrid, { GridAction, GridColumn, createTableActions } from '@/components/common/CommonTable';
-import { SubjectListItem } from '@/types/subject';
-import { updateSubject } from '@/services/subjectService';
+import React, { useState, useMemo } from "react";
+import {
+  Eye,
+  Pencil,
+  Trash2,
+  Mail,
+  Phone,
+  Building2,
+  X,
+  ShieldCheck,
+} from "lucide-react";
+import CommonDataGrid, {
+  GridAction,
+  GridColumn,
+  createTableActions,
+} from "@/components/common/CommonTable";
+import { SubjectListItem } from "@/types/subject";
 
 interface ClientsTableProps {
   clients: SubjectListItem[];
@@ -13,17 +25,23 @@ interface ClientsTableProps {
   onView: (clientId: string) => void;
   onEdit: (clientId: string) => void;
   onDelete: (clientId: string, clientName: string) => void;
+  onUpdateCell?: (params: {
+    row: SubjectListItem;
+    field: string;
+    newValue: unknown;
+    oldValue?: unknown;
+  }) => Promise<void>;
   onRefresh?: () => void;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────
 const getInitials = (name?: string) => {
-  if (!name) return 'CL';
+  if (!name) return "CL";
   return name
-    .split(' ')
+    .split(" ")
     .filter(Boolean)
     .map((n) => n[0])
-    .join('')
+    .join("")
     .toUpperCase()
     .slice(0, 2);
 };
@@ -33,29 +51,29 @@ const COMPLIANCE_STYLES: Record<
   { bg: string; text: string; border: string }
 > = {
   gst: {
-    bg: 'bg-slate-100 dark:bg-slate-800',
-    text: 'text-slate-700 dark:text-slate-300',
-    border: 'border-slate-200/60 dark:border-slate-700',
+    bg: "bg-slate-100 dark:bg-slate-800",
+    text: "text-slate-700 dark:text-slate-300",
+    border: "border-slate-200/60 dark:border-slate-700",
   },
   tds: {
-    bg: 'bg-blue-50 dark:bg-blue-950/40',
-    text: 'text-blue-700 dark:text-blue-300',
-    border: 'border-blue-200/60 dark:border-blue-800/40',
+    bg: "bg-blue-50 dark:bg-blue-950/40",
+    text: "text-blue-700 dark:text-blue-300",
+    border: "border-blue-200/60 dark:border-blue-800/40",
   },
   itr: {
-    bg: 'bg-indigo-50 dark:bg-indigo-950/40',
-    text: 'text-indigo-700 dark:text-indigo-300',
-    border: 'border-indigo-200/60 dark:border-indigo-800/40',
+    bg: "bg-indigo-50 dark:bg-indigo-950/40",
+    text: "text-indigo-700 dark:text-indigo-300",
+    border: "border-indigo-200/60 dark:border-indigo-800/40",
   },
   roc: {
-    bg: 'bg-purple-50 dark:bg-purple-950/40',
-    text: 'text-purple-700 dark:text-purple-300',
-    border: 'border-purple-200/60 dark:border-purple-800/40',
+    bg: "bg-purple-50 dark:bg-purple-950/40",
+    text: "text-purple-700 dark:text-purple-300",
+    border: "border-purple-200/60 dark:border-purple-800/40",
   },
   msme: {
-    bg: 'bg-amber-50 dark:bg-amber-950/40',
-    text: 'text-amber-700 dark:text-amber-300',
-    border: 'border-amber-200/60 dark:border-amber-800/40',
+    bg: "bg-amber-50 dark:bg-amber-950/40",
+    text: "text-amber-700 dark:text-amber-300",
+    border: "border-amber-200/60 dark:border-amber-800/40",
   },
 };
 
@@ -63,9 +81,9 @@ function getComplianceStyle(name: string) {
   const key = name.toLowerCase();
   return (
     COMPLIANCE_STYLES[key] || {
-      bg: 'bg-slate-100 dark:bg-slate-800',
-      text: 'text-slate-700 dark:text-slate-300',
-      border: 'border-slate-200/60 dark:border-slate-700',
+      bg: "bg-slate-100 dark:bg-slate-800",
+      text: "text-slate-700 dark:text-slate-300",
+      border: "border-slate-200/60 dark:border-slate-700",
     }
   );
 }
@@ -96,9 +114,9 @@ export default function ClientsTable({
   onView,
   onEdit,
   onDelete,
+  onUpdateCell,
   onRefresh,
 }: ClientsTableProps) {
-  // Popover state for showing all compliances when user clicks "+N more"
   const [compliancesModal, setCompliancesModal] = useState<{
     clientName: string;
     compliances: string[];
@@ -107,15 +125,16 @@ export default function ClientsTable({
   const columns: GridColumn<SubjectListItem>[] = useMemo(
     () => [
       {
-        headerName: 'Client',
-        field: 'displayName',
+        headerName: "Client",
+        field: "displayName",
         minWidth: 250,
         flex: 2.2,
         cellRenderer: (p) => {
           const row = p.data;
           if (!row) return null;
 
-          const displayName = row.displayName || row.name || 'Unnamed Client';
+          const displayName =
+            row.displayName || (row as any).name || "Unnamed Client";
           const businessName = row.businessName;
           const initials = getInitials(displayName);
 
@@ -135,7 +154,7 @@ export default function ClientsTable({
                       <span>{businessName}</span>
                     </>
                   ) : (
-                    'Individual Client'
+                    "Individual Client"
                   )}
                 </span>
               </div>
@@ -144,8 +163,8 @@ export default function ClientsTable({
         },
       },
       {
-        headerName: 'Email Address',
-        field: 'email',
+        headerName: "Email Address",
+        field: "email",
         minWidth: 200,
         flex: 1.3,
         cellRenderer: (p) => {
@@ -160,8 +179,8 @@ export default function ClientsTable({
         },
       },
       {
-        headerName: 'Phone Number',
-        field: 'phone',
+        headerName: "Phone Number",
+        field: "phone",
         minWidth: 170,
         flex: 1.1,
         cellRenderer: (p) => {
@@ -176,12 +195,13 @@ export default function ClientsTable({
         },
       },
       {
-        headerName: 'GSTIN',
-        field: 'gstin',
+        headerName: "GSTIN",
+        field: "gstin",
         minWidth: 155,
         flex: 1,
         cellRenderer: (p) => {
-          if (!p.value) return <span className="text-slate-400 text-xs">—</span>;
+          if (!p.value)
+            return <span className="text-slate-400 text-xs">—</span>;
           return (
             <span className="inline-flex items-center justify-center h-6 font-mono text-xs font-semibold px-2.5 rounded-lg leading-none border border-divider bg-bg/80 text-txt-main shrink-0">
               {p.value}
@@ -190,8 +210,8 @@ export default function ClientsTable({
         },
       },
       {
-        headerName: 'Compliances',
-        field: 'activeCompliances',
+        headerName: "Compliances",
+        field: "activeCompliances",
         minWidth: 210,
         flex: 1.4,
         cellRenderer: (p) => {
@@ -200,7 +220,6 @@ export default function ClientsTable({
             return <span className="text-slate-400 text-xs">No services</span>;
           }
 
-          // Show maximum 2 items, then "+N more" button on overflow
           const MAX_VISIBLE = 2;
           const visible = list.slice(0, MAX_VISIBLE);
           const remaining = list.length - MAX_VISIBLE;
@@ -226,7 +245,10 @@ export default function ClientsTable({
                   onClick={(e) => {
                     e.stopPropagation();
                     setCompliancesModal({
-                      clientName: p.data?.displayName || p.data?.name || 'Client',
+                      clientName:
+                        p.data?.displayName ||
+                        (p.data as any)?.name ||
+                        "Client",
                       compliances: list,
                     });
                   }}
@@ -240,20 +262,20 @@ export default function ClientsTable({
         },
       },
       {
-        headerName: 'Status',
-        field: 'isActive',
+        headerName: "Status",
+        field: "isActive",
         minWidth: 120,
         flex: 0.9,
         editable: true,
-        cellEditor: 'agSelectCellEditor',
+        cellEditor: "agSelectCellEditor",
         cellEditorParams: {
-          values: ['Active', 'Inactive'],
+          values: ["Active", "Inactive"],
         },
-        valueFormatter: (p) => (p.value ? 'Active' : 'Inactive'),
+        valueFormatter: (p) => (p.value ? "Active" : "Inactive"),
         cellRenderer: (p) => <StatusBadge active={Boolean(p.data?.isActive)} />,
       },
     ],
-    []
+    [],
   );
 
   const actions = useMemo(
@@ -261,9 +283,9 @@ export default function ClientsTable({
       createTableActions<SubjectListItem>({
         onView: (row) => onView(row.id),
         onEdit: (row) => onEdit(row.id),
-        onDelete: (row) => onDelete(row.id, row.displayName || 'Client'),
+        onDelete: (row) => onDelete(row.id, row.displayName || "Client"),
       }),
-    [onView, onEdit, onDelete]
+    [onView, onEdit, onDelete],
   );
 
   return (
@@ -274,14 +296,7 @@ export default function ClientsTable({
         actions={actions}
         isLoading={loading}
         rowHeight={64}
-        onUpdateCell={async ({ row, field, newValue }) => {
-          if (!businessId) return;
-          const valToSave = field === 'isActive' ? newValue === 'Active' : newValue;
-          await updateSubject(businessId, row.id, {
-            [field]: valToSave,
-          });
-          onRefresh?.();
-        }}
+        onUpdateCell={onUpdateCell}
         emptyMessage="No clients found"
       />
 
@@ -314,7 +329,7 @@ export default function ClientsTable({
 
             <div>
               <p className="text-xs text-txt-sub mb-3">
-                All registered compliances for{' '}
+                All registered compliances for{" "}
                 <strong className="text-txt-main">
                   {compliancesModal.clientName}
                 </strong>

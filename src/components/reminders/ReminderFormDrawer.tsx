@@ -1,6 +1,12 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
 import {
   Loader2,
   AlertCircle,
@@ -15,36 +21,38 @@ import {
   X,
   Clock,
   Calendar,
-} from 'lucide-react';
-import Drawer from '@/components/common/Drawer';
-import DrawerSection from '@/components/common/DrawerSection';
-import WhatsAppIcon from '@/components/common/WhatsAppIcon';
-import SearchableSelect from '@/components/common/SearchableSelect';
-import { useAsyncAction } from '@/hooks/useAnyAction';
+} from "lucide-react";
+import Drawer from "@/components/common/Drawer";
+import DrawerSection from "@/components/common/DrawerSection";
+import WhatsAppIcon from "@/components/common/WhatsAppIcon";
+import SearchableSelect from "@/components/common/SearchableSelect";
+import ClientSelector from "@/components/common/ClientSelector";
+import DeliveryChannelSelector from "@/components/common/DeliveryChannelSelector";
+import { useAsyncAction } from "@/hooks/useAnyAction";
 import {
   CreateReminderPayload,
   CreateReminderFormState,
   DEFAULT_REMINDER_FORM,
   ReminderChannel,
   ReminderStatus,
-} from '@/types/reminders.types';
+} from "@/types/reminders.types";
 import {
   createReminder,
   getReminderById,
   updateReminder,
-} from '@/services/reminderService';
-import { getSubjects } from '@/services/subjectService';
-import { getTaskDefinitions } from '@/services/taskDefinitionService';
-import { getTasks, createTask } from '@/services/taskService';
-import { getV2ReminderDefinitions } from '@/services/reminderDefinitionService';
-import { getMessageTemplates } from '@/services/messageTemplateService';
-import { getBusinesses } from '@/services/businessService';
-import { SubjectListItem } from '@/types/subject';
-import { TaskDefinitionListItem } from '@/types/taskDefinition.types';
-import { TaskListItem, CreateTaskDto } from '@/types/task.types';
-import { V2ReminderDefinition } from '@/types/v2ReminderDefinition.types';
-import { MessageTemplateListItem } from '@/types/messageTemplate.types';
-import { replaceTemplatePlaceholders } from '@/utils/templatePlaceholders';
+} from "@/services/reminderService";
+import { getSubjects } from "@/services/subjectService";
+import { getTaskDefinitions } from "@/services/taskDefinitionService";
+import { getTasks, createTask } from "@/services/taskService";
+import { getV2ReminderDefinitions } from "@/services/reminderDefinitionService";
+import { getMessageTemplates } from "@/services/messageTemplateService";
+import { getBusinesses } from "@/services/businessService";
+import { SubjectListItem } from "@/types/subject";
+import { TaskDefinitionListItem } from "@/types/taskDefinition.types";
+import { TaskListItem, CreateTaskDto } from "@/types/task.types";
+import { V2ReminderDefinition } from "@/types/v2ReminderDefinition.types";
+import { MessageTemplateListItem } from "@/types/messageTemplate.types";
+import { replaceTemplatePlaceholders } from "@/utils/templatePlaceholders";
 
 interface ReminderFormDrawerProps {
   open: boolean;
@@ -62,21 +70,21 @@ export interface ExtendedReminderFormState extends CreateReminderFormState {
 }
 
 const STATUS_OPTIONS: { value: ReminderStatus; label: string }[] = [
-  { value: 'SCHEDULED', label: 'Scheduled' },
-  { value: 'SENT', label: 'Sent' },
-  { value: 'FAILED', label: 'Failed' },
-  { value: 'CANCELLED', label: 'Cancelled' },
+  { value: "SCHEDULED", label: "Scheduled" },
+  { value: "SENT", label: "Sent" },
+  { value: "FAILED", label: "Failed" },
+  { value: "CANCELLED", label: "Cancelled" },
 ];
 
 const INPUT =
-  'w-full h-11 rounded-xl border border-divider bg-bg/50 px-3.5 ' +
-  'text-sm font-medium text-txt-main placeholder:text-txt-sub/60 ' +
-  'focus:bg-surface focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/15 transition-all';
+  "w-full h-11 rounded-xl border border-divider bg-bg/50 px-3.5 " +
+  "text-sm font-medium text-txt-main placeholder:text-txt-sub/60 " +
+  "focus:bg-surface focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/15 transition-all";
 
 const SELECT =
-  'w-full h-11 rounded-xl border border-divider bg-bg/50 px-3.5 ' +
-  'text-sm font-medium text-txt-main appearance-none cursor-pointer ' +
-  'focus:bg-surface focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/15 transition-all';
+  "w-full h-11 rounded-xl border border-divider bg-bg/50 px-3.5 " +
+  "text-sm font-medium text-txt-main appearance-none cursor-pointer " +
+  "focus:bg-surface focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/15 transition-all";
 
 export default function ReminderFormDrawer({
   open,
@@ -89,21 +97,29 @@ export default function ReminderFormDrawer({
   const isEditMode = Boolean(reminderId);
 
   // ── Form State ──────────────────────────────────────────────────────────────
-  const [form, setForm] = useState<ExtendedReminderFormState>(DEFAULT_REMINDER_FORM);
-  const [editStatus, setEditStatus] = useState<ReminderStatus>('SCHEDULED');
-  const [editScheduledAt, setEditScheduledAt] = useState('');
-  const [editReminderTaskTitle, setEditReminderTaskTitle] = useState('');
+  const [form, setForm] = useState<ExtendedReminderFormState>(
+    DEFAULT_REMINDER_FORM,
+  );
+  const [editStatus, setEditStatus] = useState<ReminderStatus>("SCHEDULED");
+  const [editScheduledAt, setEditScheduledAt] = useState("");
+  const [editReminderTaskTitle, setEditReminderTaskTitle] = useState("");
 
   // ── Master Data Cache (prevent reloading & blinking) ───────────────────────
   const [clients, setClients] = useState<SubjectListItem[]>([]);
-  const [taskDefinitions, setTaskDefinitions] = useState<TaskDefinitionListItem[]>([]);
+  const [taskDefinitions, setTaskDefinitions] = useState<
+    TaskDefinitionListItem[]
+  >([]);
   const [tasks, setTasks] = useState<TaskListItem[]>([]);
-  const [reminderDefinitions, setReminderDefinitions] = useState<V2ReminderDefinition[]>([]);
-  const [messageTemplates, setMessageTemplates] = useState<MessageTemplateListItem[]>([]);
-  const [businessName, setBusinessName] = useState('');
-  const [businessPhone, setBusinessPhone] = useState('');
+  const [reminderDefinitions, setReminderDefinitions] = useState<
+    V2ReminderDefinition[]
+  >([]);
+  const [messageTemplates, setMessageTemplates] = useState<
+    MessageTemplateListItem[]
+  >([]);
+  const [businessName, setBusinessName] = useState("");
+  const [businessPhone, setBusinessPhone] = useState("");
   const [loadingInitial, setLoadingInitial] = useState(false);
-  const [localError, setLocalError] = useState('');
+  const [localError, setLocalError] = useState("");
 
   const masterDataLoadedRef = useRef(false);
 
@@ -115,7 +131,7 @@ export default function ReminderFormDrawer({
     if (!businessId) return;
     try {
       setLoadingInitial(true);
-      setLocalError('');
+      setLocalError("");
 
       const [
         clientsRes,
@@ -133,23 +149,30 @@ export default function ReminderFormDrawer({
         getBusinesses(organizationId),
       ]);
 
-      if (clientsRes.status === 'fulfilled') setClients(clientsRes.value || []);
-      if (taskDefsRes.status === 'fulfilled') setTaskDefinitions(taskDefsRes.value || []);
-      if (tasksRes.status === 'fulfilled') setTasks(tasksRes.value || []);
-      if (reminderDefsRes.status === 'fulfilled')
+      if (clientsRes.status === "fulfilled") setClients(clientsRes.value || []);
+      if (taskDefsRes.status === "fulfilled")
+        setTaskDefinitions(taskDefsRes.value || []);
+      if (tasksRes.status === "fulfilled") setTasks(tasksRes.value || []);
+      if (reminderDefsRes.status === "fulfilled")
         setReminderDefinitions(reminderDefsRes.value || []);
-      if (templatesRes.status === 'fulfilled') setMessageTemplates(templatesRes.value || []);
+      if (templatesRes.status === "fulfilled")
+        setMessageTemplates(templatesRes.value || []);
 
-      if (businessesRes.status === 'fulfilled' && businessesRes.value?.length) {
+      if (businessesRes.status === "fulfilled" && businessesRes.value?.length) {
         const currentBiz =
-          businessesRes.value.find((b) => b.id === businessId) || businessesRes.value[0];
-        setBusinessName(currentBiz.name || '');
-        setBusinessPhone(currentBiz.phone || '');
+          businessesRes.value.find((b) => b.id === businessId) ||
+          businessesRes.value[0];
+        setBusinessName(currentBiz.name || "");
+        setBusinessPhone(currentBiz.phone || "");
       }
 
       masterDataLoadedRef.current = true;
     } catch (err: unknown) {
-      setLocalError(err instanceof Error ? err.message : 'Failed to load form dependencies.');
+      setLocalError(
+        err instanceof Error
+          ? err.message
+          : "Failed to load form dependencies.",
+      );
     } finally {
       setLoadingInitial(false);
     }
@@ -160,10 +183,10 @@ export default function ReminderFormDrawer({
     if (!reminderId || !businessId) return;
     try {
       setLoadingInitial(true);
-      setLocalError('');
+      setLocalError("");
       const rem = await getReminderById(businessId, reminderId);
       setEditStatus(rem.status);
-      setEditReminderTaskTitle(rem.task?.title || 'Reminder Details');
+      setEditReminderTaskTitle(rem.task?.title || "Reminder Details");
 
       if (rem.scheduledAt) {
         const d = new Date(rem.scheduledAt);
@@ -172,10 +195,12 @@ export default function ReminderFormDrawer({
           .slice(0, 16);
         setEditScheduledAt(isoLocal);
       } else {
-        setEditScheduledAt('');
+        setEditScheduledAt("");
       }
     } catch (err: unknown) {
-      setLocalError(err instanceof Error ? err.message : 'Failed to load reminder.');
+      setLocalError(
+        err instanceof Error ? err.message : "Failed to load reminder.",
+      );
     } finally {
       setLoadingInitial(false);
     }
@@ -184,21 +209,21 @@ export default function ReminderFormDrawer({
   // ── Open / Reset Trigger (Stable, no loops) ─────────────────────────────────
   useEffect(() => {
     if (open) {
-      setLocalError('');
+      setLocalError("");
       if (isEditMode) {
         fetchSingleReminder();
       } else {
         // Reset form for new reminder
         setForm({
           ...DEFAULT_REMINDER_FORM,
-          channel: 'WHATSAPP',
+          channel: "WHATSAPP",
         });
         if (!masterDataLoadedRef.current) {
           fetchMasterData();
         }
       }
     } else {
-      setLocalError('');
+      setLocalError("");
       saveAction.reset();
     }
   }, [open, isEditMode, reminderId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -206,25 +231,27 @@ export default function ReminderFormDrawer({
   // ── Client Selection ────────────────────────────────────────────────────────
   const selectedClient = useMemo(
     () => clients.find((c) => c.id === form.targetUserId) || null,
-    [clients, form.targetUserId]
+    [clients, form.targetUserId],
   );
 
   const handleClientChange = (client: SubjectListItem | null) => {
     setForm((prev) => ({
       ...prev,
-      targetUserId: client ? client.id : '',
-      selectedTaskId: '',
-      selectedTaskDefinitionId: '',
-      taskName: '',
-      dueDate: '',
-      messageTemplateId: '',
+      targetUserId: client ? client.id : "",
+      selectedTaskId: "",
+      selectedTaskDefinitionId: "",
+      taskName: "",
+      dueDate: "",
+      messageTemplateId: "",
     }));
   };
 
   // ── Task Definition Selection & Synchronous Cascade ─────────────────────────
   const selectedTaskDef = useMemo(
-    () => taskDefinitions.find((td) => td.id === form.selectedTaskDefinitionId) || null,
-    [taskDefinitions, form.selectedTaskDefinitionId]
+    () =>
+      taskDefinitions.find((td) => td.id === form.selectedTaskDefinitionId) ||
+      null,
+    [taskDefinitions, form.selectedTaskDefinitionId],
   );
 
   const handleTaskTypeChange = (taskDefinitionId: string) => {
@@ -236,7 +263,7 @@ export default function ReminderFormDrawer({
       autoTaskName = `${selectedClient.displayName || selectedClient.businessName} - ${matchedDef.name}`;
     }
 
-    let nextDueDate = '';
+    let nextDueDate = "";
     if (matchedDef.dueDate) {
       nextDueDate = matchedDef.dueDate.slice(0, 10);
     } else {
@@ -247,14 +274,16 @@ export default function ReminderFormDrawer({
 
     // Match reminder definition if available
     const matchedReminderDef = reminderDefinitions.find(
-      (rd) => rd.taskDefinitionId === taskDefinitionId
+      (rd) => rd.taskDefinitionId === taskDefinitionId,
     );
 
     // Auto-match message template synchronously
     const matchedTemplate = messageTemplates.find(
       (t) =>
-        t.name?.toLowerCase().includes(matchedDef.taskType?.toLowerCase() || '') ||
-        t.name?.toLowerCase().includes(matchedDef.name?.toLowerCase() || '')
+        t.name
+          ?.toLowerCase()
+          .includes(matchedDef.taskType?.toLowerCase() || "") ||
+        t.name?.toLowerCase().includes(matchedDef.name?.toLowerCase() || ""),
     );
 
     setForm((prev) => ({
@@ -262,27 +291,30 @@ export default function ReminderFormDrawer({
       selectedTaskDefinitionId: taskDefinitionId,
       taskName: autoTaskName,
       dueDate: nextDueDate,
-      channel: (matchedReminderDef?.channel as ReminderChannel) || prev.channel || 'WHATSAPP',
+      channel:
+        (matchedReminderDef?.channel as ReminderChannel) ||
+        prev.channel ||
+        "WHATSAPP",
       reminderDefinitionId: matchedReminderDef?.id || prev.reminderDefinitionId,
       messageTemplateId: matchedTemplate?.id || prev.messageTemplateId,
-      category: (matchedDef as any).category || 'COMPLIANCE',
+      category: (matchedDef as any).category || "COMPLIANCE",
     }));
   };
 
   // ── Live Message Preview Calculation ────────────────────────────────────────
   const selectedTemplate = useMemo(
     () => messageTemplates.find((t) => t.id === form.messageTemplateId) || null,
-    [messageTemplates, form.messageTemplateId]
+    [messageTemplates, form.messageTemplateId],
   );
 
   const previewContent = useMemo(() => {
     if (!selectedTemplate) return null;
 
-    const isEmail = form.channel === 'EMAIL';
-    const isWhatsapp = form.channel === 'WHATSAPP';
-    const isSms = form.channel === 'SMS';
+    const isEmail = form.channel === "EMAIL";
+    const isWhatsapp = form.channel === "WHATSAPP";
+    const isSms = form.channel === "SMS";
 
-    const rawSubject = selectedTemplate.templates?.email?.subject || '';
+    const rawSubject = selectedTemplate.templates?.email?.subject || "";
     const rawBody =
       (isEmail ? selectedTemplate.templates?.email?.body : null) ||
       (isWhatsapp ? selectedTemplate.templates?.whatsapp?.body : null) ||
@@ -290,22 +322,27 @@ export default function ReminderFormDrawer({
       selectedTemplate.templates?.email?.body ||
       selectedTemplate.templates?.whatsapp?.body ||
       (selectedTemplate as any).body ||
-      '';
+      "";
 
     const placeholderValues: Record<string, string> = {
-      CLIENTNAME: selectedClient?.displayName || selectedClient?.businessName || 'Client',
-      BUSINESSNAME: selectedClient?.businessName || '',
+      CLIENTNAME:
+        selectedClient?.displayName || selectedClient?.businessName || "Client",
+      BUSINESSNAME: selectedClient?.businessName || "",
       DUEDATE: form.scheduledAt
-        ? new Date(form.scheduledAt).toLocaleDateString('en-IN')
-        : form.dueDate || 'Due Date',
-      SERVICETYPE: selectedTaskDef?.name || 'Compliance',
-      YOURFIRMNAME: businessName || 'Our Firm',
-      YOURCONTACTNUMBER: businessPhone || '',
+        ? new Date(form.scheduledAt).toLocaleDateString("en-IN")
+        : form.dueDate || "Due Date",
+      SERVICETYPE: selectedTaskDef?.name || "Compliance",
+      YOURFIRMNAME: businessName || "Our Firm",
+      YOURCONTACTNUMBER: businessPhone || "",
     };
 
     return {
-      subject: rawSubject ? replaceTemplatePlaceholders(rawSubject, placeholderValues) : '',
-      body: rawBody ? replaceTemplatePlaceholders(rawBody, placeholderValues) : '',
+      subject: rawSubject
+        ? replaceTemplatePlaceholders(rawSubject, placeholderValues)
+        : "",
+      body: rawBody
+        ? replaceTemplatePlaceholders(rawBody, placeholderValues)
+        : "",
     };
   }, [
     selectedTemplate,
@@ -320,12 +357,13 @@ export default function ReminderFormDrawer({
 
   // ── Validation ──────────────────────────────────────────────────────────────
   const validateCreate = (): string | null => {
-    if (!form.targetUserId) return 'Please select a client.';
-    if (!form.selectedTaskDefinitionId) return 'Please select a task definition.';
-    if (!form.taskName.trim()) return 'Please enter a task name.';
-    if (!form.channel) return 'Please select a delivery channel.';
+    if (!form.targetUserId) return "Please select a client.";
+    if (!form.selectedTaskDefinitionId)
+      return "Please select a task definition.";
+    if (!form.taskName.trim()) return "Please enter a task name.";
+    if (!form.channel) return "Please select a delivery channel.";
     if (!form.sendNow && !form.scheduledAt)
-      return 'Please specify a scheduled date and time.';
+      return "Please specify a scheduled date and time.";
     return null;
   };
 
@@ -337,7 +375,9 @@ export default function ReminderFormDrawer({
           if (!reminderId) return;
           await updateReminder(businessId, reminderId, {
             status: editStatus,
-            scheduledAt: editScheduledAt ? new Date(editScheduledAt).toISOString() : undefined,
+            scheduledAt: editScheduledAt
+              ? new Date(editScheduledAt).toISOString()
+              : undefined,
           });
         } else {
           const valErr = validateCreate();
@@ -353,8 +393,8 @@ export default function ReminderFormDrawer({
               title: form.taskName.trim(),
               taskName: form.taskName.trim(),
               dueDate: form.dueDate || new Date().toISOString().slice(0, 10),
-              category: form.category || 'COMPLIANCE',
-              priority: 'MEDIUM',
+              category: form.category || "COMPLIANCE",
+              priority: "MEDIUM",
             };
             const createdTask = await createTask(businessId, newTaskDto);
             resolvedTaskId = createdTask.id;
@@ -363,7 +403,7 @@ export default function ReminderFormDrawer({
           const payload: CreateReminderPayload = {
             taskId: resolvedTaskId,
             reminderDefinitionId: form.reminderDefinitionId,
-            reminderSource: form.reminderSource || 'MANUAL',
+            reminderSource: form.reminderSource || "MANUAL",
             channel: form.channel as ReminderChannel,
             targetUserId: form.targetUserId,
             messageTemplateId: form.messageTemplateId,
@@ -379,55 +419,36 @@ export default function ReminderFormDrawer({
       },
       {
         successMessage: isEditMode
-          ? 'Reminder updated successfully'
-          : 'Reminder created successfully',
+          ? "Reminder updated successfully"
+          : "Reminder created successfully",
         errorMessage: isEditMode
-          ? 'Failed to update reminder'
-          : 'Failed to create reminder',
+          ? "Failed to update reminder"
+          : "Failed to create reminder",
         showSuccessToast: true,
         showErrorToast: true,
         onSuccess: () => {
           onSuccess();
           onClose();
         },
-      }
+      },
     );
   };
-
-  // Reusable channel options
-  const channelList: {
-    id: ReminderChannel;
-    label: string;
-    icon: React.ReactNode;
-  }[] = [
-    {
-      id: 'WHATSAPP',
-      label: 'WhatsApp',
-      icon: <WhatsAppIcon className="w-5 h-5" />,
-    },
-    {
-      id: 'EMAIL',
-      label: 'Email',
-      icon: <Mail className="w-5 h-5" />,
-    },
-    {
-      id: 'SMS',
-      label: 'SMS',
-      icon: <Smartphone className="w-5 h-5" />,
-    },
-  ];
 
   return (
     <Drawer
       open={open}
       onClose={onClose}
-      title={isEditMode ? editReminderTaskTitle || 'Edit Reminder' : 'Create reminder'}
+      title={
+        isEditMode
+          ? editReminderTaskTitle || "Edit Reminder"
+          : "Create reminder"
+      }
       width="lg"
       submitVariant="gold"
       onSubmit={handleSubmit}
       onCancel={onClose}
       cancelLabel="Cancel"
-      submitLabel={isEditMode ? 'Save changes' : 'Create reminder'}
+      submitLabel={isEditMode ? "Save changes" : "Create reminder"}
       submitting={saveAction.loading}
       customHeader={
         <div className="bg-[#0F1E36] px-6 py-5 flex items-center justify-between text-white shrink-0 border-b border-white/10 select-none">
@@ -441,10 +462,12 @@ export default function ReminderFormDrawer({
             </div>
             <div className="min-w-0">
               <p className="text-xs font-bold text-[#F59E0B] uppercase tracking-wider mb-0.5">
-                {isEditMode ? 'Update reminder' : 'New reminder'}
+                {isEditMode ? "Update reminder" : "New reminder"}
               </p>
               <h2 className="text-lg font-extrabold leading-tight text-white tracking-tight truncate">
-                {isEditMode ? editReminderTaskTitle || 'Edit Reminder' : 'Create reminder'}
+                {isEditMode
+                  ? editReminderTaskTitle || "Edit Reminder"
+                  : "Create reminder"}
               </h2>
             </div>
           </div>
@@ -492,11 +515,17 @@ export default function ReminderFormDrawer({
                   <div className="relative">
                     <select
                       value={editStatus}
-                      onChange={(e) => setEditStatus(e.target.value as ReminderStatus)}
+                      onChange={(e) =>
+                        setEditStatus(e.target.value as ReminderStatus)
+                      }
                       className={`${SELECT} pr-9`}
                     >
                       {STATUS_OPTIONS.map((opt) => (
-                        <option key={opt.value} value={opt.value} className="bg-surface">
+                        <option
+                          key={opt.value}
+                          value={opt.value}
+                          className="bg-surface"
+                        >
                           {opt.label}
                         </option>
                       ))}
@@ -527,44 +556,12 @@ export default function ReminderFormDrawer({
           <div className="space-y-4">
             {/* Step 1: Client Selection */}
             <DrawerSection step={1} title="Client" required>
-              <div className="space-y-2">
-                <SearchableSelect<SubjectListItem>
-                  options={clients}
-                  value={selectedClient}
-                  onChange={handleClientChange}
-                  getOptionLabel={(c) => c.displayName || c.businessName || 'Unnamed'}
-                  getOptionKey={(c) => c.id}
-                  placeholder="Search and select client"
-                  emptyMessage="No active clients found"
-                  renderOption={(c) => (
-                    <div className="flex flex-col py-0.5">
-                      <span className="font-semibold text-txt-main text-sm">
-                        {c.displayName || c.businessName}
-                      </span>
-                      {c.email && (
-                        <span className="text-xs text-txt-sub">{c.email}</span>
-                      )}
-                    </div>
-                  )}
-                />
-
-                {selectedClient && (
-                  <div className="flex items-center justify-between px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-divider text-xs">
-                    <div className="flex items-center gap-2 text-txt-sub">
-                      <Building2 className="w-3.5 h-3.5 text-amber-500" />
-                      <span>
-                        Selected:{' '}
-                        <strong className="text-txt-main">
-                          {selectedClient.displayName || selectedClient.businessName}
-                        </strong>
-                      </span>
-                    </div>
-                    <span className="font-mono text-[11px] text-txt-sub">
-                      {selectedClient.phone || selectedClient.email || ''}
-                    </span>
-                  </div>
-                )}
-              </div>
+              <ClientSelector
+                clients={clients}
+                value={selectedClient}
+                onChange={handleClientChange}
+                required
+              />
             </DrawerSection>
 
             {/* Step 2: Task Details */}
@@ -583,11 +580,15 @@ export default function ReminderFormDrawer({
                     >
                       <option value="" disabled>
                         {!form.targetUserId
-                          ? 'Select a client first'
-                          : 'Select task definition'}
+                          ? "Select a client first"
+                          : "Select task definition"}
                       </option>
                       {taskDefinitions.map((td) => (
-                        <option key={td.id} value={td.id} className="bg-surface">
+                        <option
+                          key={td.id}
+                          value={td.id}
+                          className="bg-surface"
+                        >
                           {td.name} ({td.taskType})
                         </option>
                       ))}
@@ -621,40 +622,11 @@ export default function ReminderFormDrawer({
               required
               subtitle="Pick one or more"
             >
-              <div className="grid grid-cols-3 gap-3">
-                {channelList.map((ch) => {
-                  const isSelected = form.channel === ch.id;
-                  return (
-                    <button
-                      type="button"
-                      key={ch.id}
-                      onClick={() =>
-                        setForm((p) => ({ ...p, channel: ch.id }))
-                      }
-                      className={`flex flex-col items-center justify-center gap-2 py-4 px-3 rounded-2xl border transition-all text-center cursor-pointer ${
-                        isSelected
-                          ? 'bg-[#0F1E36] text-white border-[#0F1E36] shadow-md ring-2 ring-[#0F1E36]/20'
-                          : 'bg-surface text-txt-main border-divider hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50'
-                      }`}
-                    >
-                      <div
-                        className={`transition-transform duration-150 ${
-                          isSelected ? 'scale-110 text-white' : 'text-txt-sub'
-                        }`}
-                      >
-                        {ch.icon}
-                      </div>
-                      <span
-                        className={`text-xs font-bold tracking-tight ${
-                          isSelected ? 'text-white' : 'text-txt-main'
-                        }`}
-                      >
-                        {ch.label}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
+              <DeliveryChannelSelector
+                label=""
+                value={form.channel}
+                onChange={(ch) => setForm((p) => ({ ...p, channel: ch }))}
+              />
             </DrawerSection>
 
             {/* Step 4: Message Template & Preview */}
@@ -664,11 +636,16 @@ export default function ReminderFormDrawer({
                   <select
                     value={form.messageTemplateId}
                     onChange={(e) =>
-                      setForm((p) => ({ ...p, messageTemplateId: e.target.value }))
+                      setForm((p) => ({
+                        ...p,
+                        messageTemplateId: e.target.value,
+                      }))
                     }
                     className={`${SELECT} pr-9`}
                   >
-                    <option value="">Auto-matched to the task definition</option>
+                    <option value="">
+                      Auto-matched to the task definition
+                    </option>
                     {messageTemplates.map((t) => (
                       <option key={t.id} value={t.id} className="bg-surface">
                         {t.name}
@@ -707,14 +684,15 @@ export default function ReminderFormDrawer({
                           Message
                         </span>
                         <p className="text-txt-sub whitespace-pre-wrap leading-relaxed bg-slate-50/60 dark:bg-slate-900/40 p-3 rounded-lg border border-divider/50">
-                          {previewContent.body || 'Template loaded'}
+                          {previewContent.body || "Template loaded"}
                         </p>
                       </div>
                     </div>
                   </div>
                 ) : (
                   <div className="rounded-xl border border-dashed border-divider bg-slate-50/50 dark:bg-slate-900/20 p-4 text-center text-xs text-txt-sub">
-                    Select a client and task definition to automatically generate the personalized message preview.
+                    Select a client and task definition to automatically
+                    generate the personalized message preview.
                   </div>
                 )}
               </div>
@@ -729,8 +707,8 @@ export default function ReminderFormDrawer({
                     onClick={() => setForm((p) => ({ ...p, sendNow: true }))}
                     className={`h-11 rounded-xl border font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
                       form.sendNow
-                        ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                        : 'bg-surface text-txt-main border-divider hover:bg-slate-50 dark:hover:bg-slate-800'
+                        ? "bg-blue-600 text-white border-blue-600 shadow-sm"
+                        : "bg-surface text-txt-main border-divider hover:bg-slate-50 dark:hover:bg-slate-800"
                     }`}
                   >
                     <Clock className="w-4 h-4" />
@@ -742,8 +720,8 @@ export default function ReminderFormDrawer({
                     onClick={() => setForm((p) => ({ ...p, sendNow: false }))}
                     className={`h-11 rounded-xl border font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
                       !form.sendNow
-                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
-                        : 'bg-surface text-txt-main border-divider hover:bg-slate-50 dark:hover:bg-slate-800'
+                        ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
+                        : "bg-surface text-txt-main border-divider hover:bg-slate-50 dark:hover:bg-slate-800"
                     }`}
                   >
                     <Calendar className="w-4 h-4" />
@@ -754,7 +732,8 @@ export default function ReminderFormDrawer({
                 {!form.sendNow && (
                   <div className="pt-2">
                     <label className="block text-xs font-bold text-txt-main mb-1.5">
-                      Scheduled Date &amp; Time <span className="text-red-500">*</span>
+                      Scheduled Date &amp; Time{" "}
+                      <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="datetime-local"
@@ -766,7 +745,8 @@ export default function ReminderFormDrawer({
                       className={INPUT}
                     />
                     <p className="text-[11px] text-txt-sub mt-1">
-                      The reminder notification will be dispatched automatically at this time.
+                      The reminder notification will be dispatched automatically
+                      at this time.
                     </p>
                   </div>
                 )}
