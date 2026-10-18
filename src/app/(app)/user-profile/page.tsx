@@ -22,8 +22,7 @@ import { getCurrentUser, updateUser } from '@/services/userService';
 import { User, UpdateUserDto } from '@/types/user';
 import { useToast } from '@/context/ToastContext';
 import Link from 'next/link';
-
-// Imports are unchanged from your current file (no new ones needed).
+import UserProfileSkeleton from '@/components/common/UserProfileSkeleton';
 
 // Shared style tokens for this page
 const labelCls = "block mb-2 text-[13.5px] font-bold text-txt-main";
@@ -123,12 +122,7 @@ export default function UserProfilePage() {
     (user?.lastName?.[0] || '').toUpperCase();
 
   if (loading) {
-    return (
-      <div className="flex min-h-[70vh] flex-col items-center justify-center bg-bg text-txt-sub">
-        <Loader2 className="h-9 w-9 animate-spin text-[var(--primary)] mb-3" />
-        <span className="text-base font-semibold">Loading user profile...</span>
-      </div>
-    );
+    return <UserProfileSkeleton />;
   }
 
   return (

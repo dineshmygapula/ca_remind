@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   Building2,
@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { createOrganization } from "@/services/organizationService";
 import { useWorkspace } from "@/context/WorkspaceContext";
+import { useAuth } from "@/context/AuthContext";
 import EmailField from "@/components/common/EmailField";
 import NameField from "@/components/common/NameField";
 import { BillingMeta, OrganizationFormData } from "@/types/organizations";
@@ -26,6 +27,7 @@ import {
 export default function OrganizationForm() {
   const router = useRouter();
   const { refresh } = useWorkspace();
+  const { user } = useAuth();
 
   const [formData, setFormData] = useState<OrganizationFormData>(EMPTY_FORM);
   const [billingMeta, setBillingMeta] = useState<BillingMeta>(EMPTY_BILLING_META);
@@ -33,6 +35,12 @@ export default function OrganizationForm() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [submitAttempted, setSubmitAttempted] = useState(false);
+
+  useEffect(() => {
+    if (user?.email) {
+      setFormData((prev) => (prev.billingEmail ? prev : { ...prev, billingEmail: user.email ?? "" }));
+    }
+  }, [user]);
 
   const nameRegex = /^[A-Za-z0-9\s&.,'\-()]+$/;
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -78,8 +86,8 @@ export default function OrganizationForm() {
       });
 
       setSuccess(true);
-      refresh();
-      setTimeout(() => router.push("/plan-trial"), 1500);
+      await refresh();
+      setTimeout(() => router.push("/business-create"), 1000);
     } catch (err: unknown) {
       setError(
         err instanceof Error ? err.message : "An unknown error occurred"

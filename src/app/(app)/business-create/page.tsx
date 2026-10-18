@@ -13,15 +13,21 @@ import type { CreateBusinessDto } from "@/types/business";
 
 export default function BusinessCreatePage() {
   const router = useRouter();
-  const { refresh } = useWorkspace();
+  const { refresh, orgId: workspaceOrgId } = useWorkspace();
 
   const [formData, setFormData] = useState<BusinessFormData>(EMPTY_BUSINESS_FORM);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const [organizationId, setOrganizationId] = useState<string>("");
-  const [loadingOrg, setLoadingOrg] = useState(true);
+  const [organizationId, setOrganizationId] = useState<string>(workspaceOrgId || "");
+  const [loadingOrg, setLoadingOrg] = useState(!workspaceOrgId);
 
   useEffect(() => {
+    if (workspaceOrgId) {
+      setOrganizationId(workspaceOrgId);
+      setLoadingOrg(false);
+      return;
+    }
+
     const fetchOrg = async () => {
       try {
         const orgs = await getOrganizations();
@@ -38,7 +44,7 @@ export default function BusinessCreatePage() {
     };
 
     fetchOrg();
-  }, []);
+  }, [workspaceOrgId]);
 
   const handleFieldChange = (field: keyof BusinessFormData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -81,7 +87,7 @@ export default function BusinessCreatePage() {
       };
 
       await createBusiness(organizationId, payload);
-      refresh();
+      await refresh();
       router.push("/dashboard");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to create business");
@@ -92,9 +98,31 @@ export default function BusinessCreatePage() {
 
   if (loadingOrg) {
     return (
-      <div className="min-h-screen bg-[var(--bg)] flex flex-col items-center justify-center p-4">
-        <Loader2 className="w-8 h-8 animate-spin text-[var(--primary)] mb-3" />
-        <p className="text-sm font-semibold text-[var(--text-secondary)]">Loading organization...</p>
+      <div className="min-h-screen bg-[var(--bg)] py-10 px-4 sm:px-6 flex justify-center animate-fade-in">
+        <div className="max-w-xl w-full bg-[var(--surface)] border border-[var(--border)] rounded-2xl shadow-xl overflow-hidden">
+          <div className="h-1 bg-[var(--primary)] w-full" />
+          <div className="p-6 sm:p-8 space-y-6">
+            <div className="space-y-2">
+              <div className="skeleton h-7 w-48 rounded-lg" />
+              <div className="skeleton h-4 w-72 rounded-md" />
+            </div>
+            <div className="space-y-4 pt-2">
+              <div className="space-y-2">
+                <div className="skeleton h-4 w-28 rounded-md" />
+                <div className="skeleton h-11 w-full rounded-xl" />
+              </div>
+              <div className="space-y-2">
+                <div className="skeleton h-4 w-28 rounded-md" />
+                <div className="skeleton h-11 w-full rounded-xl" />
+              </div>
+              <div className="space-y-2">
+                <div className="skeleton h-4 w-36 rounded-md" />
+                <div className="skeleton h-11 w-full rounded-xl" />
+              </div>
+              <div className="skeleton h-12 w-full rounded-xl mt-4" />
+            </div>
+          </div>
+        </div>
       </div>
     );
   }

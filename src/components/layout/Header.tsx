@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { useRouter } from "nextjs-toploader/app";
 import {
@@ -27,10 +27,21 @@ import {
 import { signOut } from "firebase/auth";
 import { auth } from "@/config/firebase";
 import { useAuth } from "@/context/AuthContext";
+import { useWorkspace } from "@/context/WorkspaceContext";
 import { Logo } from "../common/Logo";
 import { useClickOutside } from "@/hooks/useClickOutside";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
+
+const BUSINESS_ROUTES = [
+  "/dashboard",
+  "/tasks",
+  "/task-definitions",
+  "/reminders",
+  "/clients",
+  "/staff",
+  "/templates",
+];
 
 const NAV_ITEMS = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -293,6 +304,22 @@ export function Header() {
   const router = useRouter();
   const pathname = usePathname();
   const { user, loading } = useAuth();
+  const { businessId, orgId, status } = useWorkspace();
+
+  // Redirect if on a business-scoped route without business or organization
+  useEffect(() => {
+    if (loading || status === "loading") return;
+    const isBusinessRoute = BUSINESS_ROUTES.some(
+      (route) => pathname === route || pathname?.startsWith(route + "/")
+    );
+    if (isBusinessRoute) {
+      if (status === "no_org" || !orgId) {
+        router.replace("/organization-create");
+      } else if (status === "no_business" || !businessId) {
+        router.replace("/business-create");
+      }
+    }
+  }, [pathname, status, loading, orgId, businessId, router]);
 
   // Sync dark class on <html>
   const toggleTheme = () => {
@@ -303,7 +330,22 @@ export function Header() {
     });
   };
 
-  const goTo = (href: string) => router.push(href);
+  const goTo = (href: string) => {
+    const isBusinessRoute = BUSINESS_ROUTES.some(
+      (route) => href === route || href.startsWith(route + "/")
+    );
+    if (isBusinessRoute) {
+      if (status === "no_org" || !orgId) {
+        router.push("/organization-create");
+        return;
+      }
+      if (status === "no_business" || !businessId) {
+        router.push("/business-create");
+        return;
+      }
+    }
+    router.push(href);
+  };
 
   return (
     <header className="navbar bg-[var(--surface)] border-b border-[var(--border)] px-4 sm:px-8 py-3 shadow-md transition-colors duration-300 sticky top-0 z-40">

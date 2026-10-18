@@ -248,8 +248,8 @@ export default function RemindersPage() {
   );
 
   const page = useResourcePageState();
-  const deleteAction = useAsyncAction();
-  const updateAction = useAsyncAction();
+  const { run } = useAsyncAction();
+  const action = useAsyncAction();
   // const { run: runUpdate } = updateAction;
   const handleDeleteConfirm = async () => {
     const target = page.deleteTarget;
@@ -292,7 +292,10 @@ export default function RemindersPage() {
         }
       }
     }
-    await updateReminder(id, row.id, { [field]: value });
+    await run(() => updateReminder(id, row.id, { [field]: value }), {
+      successMessage: "Reminder updated successfully",
+      errorMessage: "Reminder updation failed",
+    });
     (row as any)[field] = value;
   };
 
@@ -320,7 +323,7 @@ export default function RemindersPage() {
       // onDismissError={() => setError("")}
       onDismissError={() => {
         clearError();
-        updateAction.clearError();
+        action.clearError();
       }}
       filters={
         <PageFilterBar
@@ -379,7 +382,7 @@ export default function RemindersPage() {
             }
             confirmLabel="Delete"
             variant="danger"
-            loading={deleteAction.loading}
+            loading={action.loading}
             onConfirm={handleDeleteConfirm}
             onCancel={page.cancelDelete}
           />

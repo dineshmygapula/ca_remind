@@ -9,8 +9,8 @@ import { PasswordField } from "../ui/PasswordField";
 import { PasswordRequirements } from "./PasswordRequirements";
 import { signupSchema } from "@/utils/schema";
 import { useSignup } from "@/hooks/useSignup";
-import { SignupSuccess } from "./SignupSucces";
-import GoogleIcon from "../common/GoogleIcon";
+import { GoogleSignInButton } from "../common/GoogleSignInButton";
+import { useRedirectIfSignedIn } from "@/hooks/useRedirectAfterSignin";
 
 const ErrorAlert = ({ message }: { message: string }) => (
   <div
@@ -23,14 +23,9 @@ const ErrorAlert = ({ message }: { message: string }) => (
 );
 
 export default function SignupForm() {
-  const {
-    submit, loading, error, showResend, resendLoading,
-    resendVerification, googleSignIn, signupDone, registeredEmail, goToLogin,
-  } = useSignup();
+  useRedirectIfSignedIn();
 
-  if (signupDone) {
-    return <SignupSuccess email={registeredEmail} onGoToLogin={goToLogin} />;
-  }
+  const { submit, loading, error, setError } = useSignup();
 
   return (
     <AuthLayout mode="signup">
@@ -44,18 +39,6 @@ export default function SignupForm() {
       </div>
 
       {error && <ErrorAlert message={error} />}
-
-      {showResend && (
-        <button
-          type="button"
-          onClick={resendVerification}
-          disabled={resendLoading}
-          className="btn btn-outline mb-5 w-full h-[54px] min-h-[54px] rounded-[14px] border-[var(--border)] text-[15.5px] font-bold text-[var(--primary)] flex items-center justify-center gap-3 disabled:opacity-50"
-        >
-          {resendLoading && <Loader2 className="w-5 h-5 animate-spin" />}
-          {resendLoading ? "Resending..." : "Resend verification email"}
-        </button>
-      )}
 
       <FormWrapper
         schema={signupSchema}
@@ -89,15 +72,7 @@ export default function SignupForm() {
 
       <div className="divider text-xs font-bold tracking-wider text-[var(--text-secondary)] my-6">OR</div>
 
-      <button
-        type="button"
-        onClick={googleSignIn}
-        disabled={loading}
-        className="btn btn-outline w-full h-[54px] min-h-[54px] rounded-[14px] border-[var(--border)] text-[15.5px] font-bold flex items-center justify-center gap-3 disabled:opacity-50"
-      >
-        <GoogleIcon />
-        <span>Continue with Google</span>
-      </button>
+      <GoogleSignInButton disabled={loading} onError={setError} />
 
       <p className="text-center text-sm text-[var(--text-secondary)] mt-6">
         Already have an account?{" "}

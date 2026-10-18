@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { Mail, ArrowRight, Loader2, AlertCircle } from "lucide-react";
 import { AuthLayout } from "../wrappers/AuthLayout";
@@ -9,7 +10,7 @@ import { PasswordField } from "../ui/PasswordField";
 import { CheckboxField } from "../ui/CheckboxField";
 import { ForgotPasswordModal } from "./ForgotPasswordModal";
 import { loginSchema } from "@/utils/schema";
-import GoogleIcon from "../common/GoogleIcon";
+import GoogleSignInButton from "../common/GoogleSignInButton";
 import { useAuthActions } from "@/hooks/useAuthActions";
 import { useRedirectIfSignedIn } from "@/hooks/useRedirectAfterSignin";
 
@@ -25,10 +26,10 @@ const ErrorAlert = ({ message }: { message: string }) => (
 
 export default function LoginForm() {
   useRedirectIfSignedIn();
+  const [googleError, setGoogleError] = useState("");
 
   const {
     submit, loading, error,
-    signIn: googleSignIn, googleLoading, googleError,
     open, openModal, closeModal, resetSubmit, resetLoading, resetError, success, sentTo,
   } = useAuthActions();
 
@@ -75,7 +76,7 @@ export default function LoginForm() {
 
         <button
           type="submit"
-          disabled={loading || googleLoading}
+          disabled={loading}
           className="btn w-full h-[54px] min-h-[54px] rounded-[14px] bg-[var(--primary)] border-none text-white text-base font-extrabold flex items-center justify-center gap-2.5 disabled:opacity-50 shadow-[0_8px_20px_rgba(20,34,77,0.22)] hover:shadow-[0_10px_24px_rgba(20,34,77,0.3)]"
         >
           {loading ? (
@@ -88,17 +89,7 @@ export default function LoginForm() {
 
       <div className="divider text-xs font-bold tracking-wider text-[var(--text-secondary)] my-6">OR</div>
 
-      <button
-        type="button"
-        onClick={googleSignIn}
-        disabled={googleLoading || loading}
-        
-        className="btn btn-outline w-full h-[54px] min-h-[54px] rounded-[14px] border-[var(--border)] !text-slate-900 hover:!text-slate-900 dark:!text-slate-100 dark:hover:!text-slate-100 bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700 text-[15.5px] font-bold flex items-center justify-center gap-3 disabled:opacity-50"
-
-      >
-        {googleLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <GoogleIcon />}
-        <span>Continue with Google</span>
-      </button>
+      <GoogleSignInButton disabled={loading} onError={setGoogleError} />
 
       <p className="text-center text-sm text-[var(--text-secondary)] mt-6">
         Don't have an account?{" "}

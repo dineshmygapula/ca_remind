@@ -159,8 +159,7 @@ export default function TemplatesTable({
   onRefresh,
 }: TemplatesTableProps) {
   const [togglingId, setTogglingId] = useState<string | null>(null);
-  const updateAction = useAsyncAction();
-  const { run: runUpdate } = updateAction;
+  const { run } = useAsyncAction();
 
   const columns = useMemo<GridColumn<MessageTemplateListItem>[]>(
     () => [
@@ -325,13 +324,13 @@ export default function TemplatesTable({
       rowHeight={64}
       onUpdateCell={async ({ row, field, newValue }) => {
         if (!businessId) return;
-        await runUpdate(
+        await run(
           () =>
             updateMessageTemplate(businessId, row.id, { [field]: newValue }),
           {
             successMessage: `${field} updated successfully`,
             errorMessage: "Failed to update template",
-            onSuccess: () => onRefresh?.(),
+            // onSuccess: () => onRefresh?.(),
           },
         );
       }}

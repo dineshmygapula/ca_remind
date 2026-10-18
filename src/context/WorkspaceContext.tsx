@@ -11,7 +11,7 @@ interface WorkspaceContextType {
   status: Status;
   orgId: string | null;
   businessId: string | null;
-  refresh: () => void;
+  refresh: () => Promise<{ orgId: string | null; businessId: string | null }>;
 }
 
 const WorkspaceContext = createContext<WorkspaceContextType | null>(null);
@@ -24,38 +24,39 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   });
   const [fetching, setFetching] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-  const [tick, setTick] = useState(0);
 
-  const refresh = useCallback(() => setTick((t) => t + 1), []);
-
-  useEffect(() => {
+  const fetchWorkspace = useCallback(async () => {
     if (!user) {
       setIds({ orgId: null, businessId: null });
       setError(null);
-      setFetching(true); // ready for the next login, avoids a flash of "no_org"
-      return;
+      setFetching(false);
+      return { orgId: null, businessId: null };
     }
 
-    let cancelled = false; // prevents stale responses overwriting newer ones
     setFetching(true);
     setError(null);
 
-    (async () => {
-      try {
-        const [org] = await getOrganizations();
-        const [biz] = org ? await getBusinesses(org.id) : [];
-        if (!cancelled) setIds({ orgId: org?.id ?? null, businessId: biz?.id ?? null });
-      } catch (e) {
-        if (!cancelled) setError(e as Error);
-      } finally {
-        if (!cancelled) setFetching(false);
-      }
-    })();
+    try {
+      const [org] = await getOrganizations();
+      const [biz] = org ? await getBusinesses(org.id) : [];
+      const newIds = { orgId: org?.id ?? null, businessId: biz?.id ?? null };
+      setIds(newIds);
+      return newIds;
+    } catch (e) {
+      setError(e as Error);
+      return { orgId: null, businessId: null };
+    } finally {
+      setFetching(false);
+    }
+  }, [user]);
 
-    return () => {
-      cancelled = true;
-    };
-  }, [user, tick]);
+  useEffect(() => {
+    fetchWorkspace();
+  }, [fetchWorkspace]);
+
+  const refresh = useCallback(async () => {
+    return await fetchWorkspace();
+  }, [fetchWorkspace]);
 
   const status: Status =
     authLoading ? "loading"

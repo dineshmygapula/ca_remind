@@ -25,6 +25,8 @@ import { getBusinesses, updateBusiness } from '@/services/businessService';
 import { Business, BusinessType, UpdateBusinessDto, BusinessAddress } from '@/types/business';
 import { useToast } from '@/context/ToastContext';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import BusinessProfileSkeleton from '@/components/common/BusinessProfileSkeleton';
 
 const BUSINESS_TYPE_OPTIONS: { value: BusinessType; label: string }[] = [
   { value: 'ACCOUNTS', label: 'Accounting / CA Firm' },
@@ -35,6 +37,7 @@ const BUSINESS_TYPE_OPTIONS: { value: BusinessType; label: string }[] = [
 ];
 
 export default function BusinessProfilePage() {
+  const router = useRouter();
   const toast = useToast();
   const [business, setBusiness] = useState<Business | null>(null);
   const [orgId, setOrgId] = useState('');
@@ -74,7 +77,7 @@ export default function BusinessProfilePage() {
 
       const businesses = await getBusinesses(organizationId);
       if (!businesses || businesses.length === 0) {
-        setError('No business found.');
+        setBusiness(null);
         return;
       }
 
@@ -182,10 +185,33 @@ export default function BusinessProfilePage() {
   };
 
   if (loading) {
+    return <BusinessProfileSkeleton />;
+  }
+
+  if (!business) {
     return (
-      <div className="flex min-h-[70vh] flex-col items-center justify-center bg-bg text-txt-sub">
-        <Loader2 className="h-9 w-9 animate-spin text-[var(--accent)] mb-3" />
-        <span className="text-sm font-medium">Loading business profile...</span>
+      <div className="min-h-screen bg-bg py-16 px-4 sm:px-6 flex items-center justify-center">
+        <div className="max-w-md w-full bg-[var(--surface)] border border-[var(--border)] rounded-3xl p-8 shadow-xl text-center space-y-6">
+          <div className="w-16 h-16 mx-auto rounded-2xl bg-[var(--primary)]/10 text-[var(--primary)] dark:bg-[var(--accent)]/15 dark:text-[var(--accent)] flex items-center justify-center shadow-inner">
+            <Building2 className="w-8 h-8" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-xl font-black text-[var(--heading)] tracking-tight">
+              No Business Found
+            </h2>
+            <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+              You don&apos;t have any business yet. Please create your business to get started.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => router.push('/business-create')}
+            className="btn w-full h-11 rounded-xl bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white border-none font-bold text-xs flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all cursor-pointer"
+          >
+            <Building2 className="w-4 h-4" />
+            Create Your Business
+          </button>
+        </div>
       </div>
     );
   }

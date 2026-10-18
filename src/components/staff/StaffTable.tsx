@@ -1,10 +1,15 @@
-'use client';
+"use client";
 
-import React, { useMemo } from 'react';
-import { Eye, Trash2, Mail, Phone, UserX } from 'lucide-react';
-import CommonDataGrid, { GridAction, GridColumn, createTableActions } from '@/components/common/CommonTable';
-import { StaffMember, UpdateStaffDto } from '@/types/staff.types';
-import { updateStaff } from '@/services/staffService';
+import React, { useMemo } from "react";
+import { Eye, Trash2, Mail, Phone, UserX } from "lucide-react";
+import CommonDataGrid, {
+  GridAction,
+  GridColumn,
+  createTableActions,
+} from "@/components/common/CommonTable";
+import { StaffMember, UpdateStaffDto } from "@/types/staff.types";
+import { updateStaff } from "@/services/staffService";
+import { useAsyncAction } from "@/hooks/useAnyAction";
 
 interface StaffTableProps {
   staff: StaffMember[];
@@ -20,19 +25,19 @@ interface StaffTableProps {
 const getFullName = (member: StaffMember) => {
   return (
     member.userName ||
-    `${member.firstName ?? ''} ${member.lastName ?? ''}`.trim() ||
+    `${member.firstName ?? ""} ${member.lastName ?? ""}`.trim() ||
     member.email ||
-    'Unknown User'
+    "Unknown User"
   );
 };
 
 const getInitials = (name?: string) => {
-  if (!name) return '??';
+  if (!name) return "??";
   return name
-    .split(' ')
+    .split(" ")
     .filter(Boolean)
     .map((n) => n[0])
-    .join('')
+    .join("")
     .toUpperCase()
     .slice(0, 2);
 };
@@ -41,21 +46,21 @@ function StaffRoleBadge({ role }: { role?: string }) {
   if (!role) return <span className="text-slate-400 text-xs">—</span>;
   const upper = role.toUpperCase();
 
-  if (upper === 'ADMIN' || upper === 'OWNER') {
+  if (upper === "ADMIN" || upper === "OWNER") {
     return (
       <span className="inline-block px-3 py-0.5 rounded-full text-xs font-semibold bg-[#f5f3ff] text-[#6d28d9] dark:bg-purple-950/40 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/40">
         {upper}
       </span>
     );
   }
-  if (upper === 'MANAGER') {
+  if (upper === "MANAGER") {
     return (
       <span className="inline-block px-3 py-0.5 rounded-full text-xs font-semibold bg-[#eff6ff] text-[#1d4ed8] dark:bg-blue-950/40 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800/40">
         {upper}
       </span>
     );
   }
-  if (upper === 'ACCOUNTANT') {
+  if (upper === "ACCOUNTANT") {
     return (
       <span className="inline-block px-3 py-0.5 rounded-full text-xs font-semibold bg-[#ecfdf5] text-[#047857] dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/40">
         {upper}
@@ -70,8 +75,8 @@ function StaffRoleBadge({ role }: { role?: string }) {
   );
 }
 
-function StaffStatusBadge({ status }: { status: 'ACTIVE' | 'INACTIVE' }) {
-  if (status === 'ACTIVE') {
+function StaffStatusBadge({ status }: { status: "ACTIVE" | "INACTIVE" }) {
+  if (status === "ACTIVE") {
     return (
       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#ecfdf5] text-[#047857] dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200/60">
         <span className="h-1.5 w-1.5 rounded-full bg-[#10b981]" />
@@ -96,11 +101,12 @@ export default function StaffTable({
   onDelete,
   onRefresh,
 }: StaffTableProps) {
+  const { run } = useAsyncAction();
   const columns: GridColumn<StaffMember>[] = useMemo(
     () => [
       {
-        headerName: 'Staff Member',
-        field: 'userName',
+        headerName: "Staff Member",
+        field: "userName",
         minWidth: 260,
         flex: 2.2,
         editable: true,
@@ -110,19 +116,19 @@ export default function StaffTable({
           const displayUserName = params.value || member.userName;
           const fullName =
             displayUserName ||
-            `${member.firstName ?? ''} ${member.lastName ?? ''}`.trim() ||
+            `${member.firstName ?? ""} ${member.lastName ?? ""}`.trim() ||
             member.email ||
-            'Unknown User';
+            "Unknown User";
           const initials = getInitials(fullName);
-          const isActive = (member.status || 'ACTIVE') === 'ACTIVE';
+          const isActive = (member.status || "ACTIVE") === "ACTIVE";
 
           return (
             <div className="flex items-center gap-3 py-1">
               <span
                 className={`w-11 h-9 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 ${
                   isActive
-                    ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border border-blue-200/50'
-                    : 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500 border border-slate-200/50'
+                    ? "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border border-blue-200/50"
+                    : "bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500 border border-slate-200/50"
                 }`}
               >
                 {isActive ? initials : <UserX className="h-4 w-4" />}
@@ -134,7 +140,7 @@ export default function StaffTable({
                 <span className="text-xs text-slate-500 dark:text-slate-400 truncate">
                   {displayUserName && displayUserName !== fullName
                     ? `@${displayUserName}`
-                    : member.email || 'Team member'}
+                    : member.email || "Team member"}
                 </span>
               </div>
             </div>
@@ -142,8 +148,8 @@ export default function StaffTable({
         },
       },
       {
-        headerName: 'Email Address',
-        field: 'email',
+        headerName: "Email Address",
+        field: "email",
         minWidth: 200,
         flex: 1.4,
         cellRenderer: (params) => {
@@ -158,13 +164,14 @@ export default function StaffTable({
         },
       },
       {
-        headerName: 'Phone Number',
-        field: 'phone',
+        headerName: "Phone Number",
+        field: "phone",
         minWidth: 160,
         flex: 1.1,
         editable: true,
         cellRenderer: (params) => {
-          const phone = params.value || params.data?.phone || params.data?.phoneMasked;
+          const phone =
+            params.value || params.data?.phone || params.data?.phoneMasked;
           if (!phone) return <span className="text-slate-400 text-xs">—</span>;
           return (
             <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-700 dark:text-slate-300">
@@ -175,41 +182,42 @@ export default function StaffTable({
         },
       },
       {
-        headerName: 'Role',
-        field: 'role',
+        headerName: "Role",
+        field: "role",
         minWidth: 140,
         flex: 1,
         editable: true,
-        cellEditor: 'agSelectCellEditor',
+        cellEditor: "agSelectCellEditor",
         cellEditorParams: {
-          values: ['Accountant', 'Manager', 'Admin'],
+          values: ["Accountant", "Manager", "Admin"],
         },
         cellRenderer: (params) => {
-          const role = params.value || params.data?.roles?.[0] || params.data?.role;
+          const role =
+            params.value || params.data?.roles?.[0] || params.data?.role;
           return <StaffRoleBadge role={role} />;
         },
       },
       {
-        headerName: 'Status',
-        field: 'status',
+        headerName: "Status",
+        field: "status",
         minWidth: 120,
         flex: 0.9,
         editable: true,
-        cellEditor: 'agSelectCellEditor',
+        cellEditor: "agSelectCellEditor",
         cellEditorParams: {
-          values: ['ACTIVE', 'INACTIVE'],
+          values: ["ACTIVE", "INACTIVE"],
         },
         valueFormatter: (p) =>
-          p.value === 'ACTIVE' || p.value === true ? 'ACTIVE' : 'INACTIVE',
+          p.value === "ACTIVE" || p.value === true ? "ACTIVE" : "INACTIVE",
         cellRenderer: (params) => {
-          const status = (params.value || params.data?.status || 'ACTIVE') as
-            | 'ACTIVE'
-            | 'INACTIVE';
+          const status = (params.value || params.data?.status || "ACTIVE") as
+            | "ACTIVE"
+            | "INACTIVE";
           return <StaffStatusBadge status={status} />;
         },
       },
     ],
-    []
+    [],
   );
 
   const actions: GridAction<StaffMember>[] = useMemo(
@@ -218,7 +226,7 @@ export default function StaffTable({
         onView: (member) => onView(member.id),
         onDelete: (member) => onDelete(member.id, getFullName(member)),
       }),
-    [onView, onDelete]
+    [onView, onDelete],
   );
 
   return (
@@ -232,19 +240,23 @@ export default function StaffTable({
       onUpdateCell={async ({ row, field, newValue }) => {
         if (!businessId) return;
         const dto: UpdateStaffDto = {};
-        if (field === 'role') {
+        if (field === "role") {
           dto.membership = { roles: [String(newValue)] };
-        } else if (field === 'status') {
-          dto.membership = { isActive: newValue === 'ACTIVE' || newValue === true };
-        } else if (field === 'phone') {
+        } else if (field === "status") {
+          dto.membership = {
+            isActive: newValue === "ACTIVE" || newValue === true,
+          };
+        } else if (field === "phone") {
           dto.user = { phone: String(newValue).trim() };
-        } else if (field === 'userName') {
+        } else if (field === "userName") {
           dto.user = { userName: String(newValue).trim() };
         }
-        await updateStaff(businessId, row.id, dto);
-        onRefresh?.();
+        await run(() => updateStaff(businessId, row.id, dto), {
+          successMessage: "Staff updated successfully",
+          errorMessage: "Staff updation failed",
+        });
+        // onRefresh?.();
       }}
     />
   );
 }
-
