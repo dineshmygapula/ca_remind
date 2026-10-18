@@ -1,39 +1,117 @@
 "use client";
 
-import { useState } from "react";
-import {
-  Paper,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  IconButton,
-  Chip,
-  Tooltip,
-  Typography,
-  Box,
-  CircularProgress,
-  Switch,
-  FormControlLabel,
-} from "@mui/material";
-import {
-  Visibility as ViewIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-} from "@mui/icons-material";
-import { TaskDefinitionListItem } from "../../types/taskDefinition.types";
+import { useState, useMemo, useRef } from "react";
+import { Eye, Pencil, Trash2, Loader2 } from "lucide-react";
+import CommonDataGrid, {
+  GridAction,
+  GridColumn,
+  createTableActions,
+} from "@/components/common/CommonTable";
+import { TaskDefinitionListItem } from "@/types/taskDefinition.types";
 import { updateTaskDefinition } from "@/services/taskDefinitionService";
-
+import { useToast } from "@/context/ToastContext";
+import { DueDate } from "@/components/common/DueDate";
+import { useAsyncAction } from "@/hooks/useAnyAction";
 interface TaskDefinitionsTableProps {
   definitions: TaskDefinitionListItem[];
   loading: boolean;
-  businessId: string; // ✅ needed for API call
+  businessId: string;
   onView: (definitionId: string) => void;
   onEdit: (definitionId: string) => void;
   onDelete: (definitionId: string, name: string) => void;
-  onRefresh: () => void; // ✅ refresh list after toggle
+  onRefresh: () => void;
+}
+
+function getRuleTypePrefix(val?: string) {
+  if (!val) return "RULE";
+  const upper = val.toUpperCase();
+  if (upper.includes("GST")) return "GST";
+  if (upper.includes("TDS")) return "TDS";
+  if (upper.includes("ITR")) return "ITR";
+  if (upper.includes("ROC")) return "ROC";
+  if (upper.includes("MSME")) return "MSME";
+  return val.split("_")[0] || "RULE";
+}
+
+function getRuleBadgeClass(val?: string) {
+  const prefix = getRuleTypePrefix(val);
+  if (prefix === "TDS")
+    return "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300";
+  if (prefix === "ITR")
+    return "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300";
+  if (prefix === "GST")
+    return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300";
+  if (prefix === "ROC")
+    return "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300";
+  return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300";
+}
+
+function getTaskTypeDescription(taskType?: string, name?: string) {
+  const key = (taskType || name || "").toUpperCase();
+  if (key.includes("GST")) return "Goods & Services Tax";
+  if (key.includes("TDS")) return "Tax Deducted at Source";
+  if (key.includes("ITR")) return "Income Tax Return";
+  if (key.includes("ROC")) return "Registrar of Companies";
+  if (key.includes("MSME")) return "Ministry of MSME";
+  return taskType || "Compliance Rule";
+}
+
+function formatSchedulePattern(pattern?: string) {
+  switch (pattern?.toLowerCase()) {
+    case "monthly":
+      return "Monthly";
+    case "quarterly":
+      return "Quarterly";
+    case "half_yearly":
+    case "halfyearly":
+      return "Half-Yearly";
+    case "yearly":
+      return "Yearly";
+    case "one_time":
+    case "onetime":
+      return "One Time";
+    default:
+      return pattern || "—";
+  }
+}
+
+function ScheduleBadge({ pattern }: { pattern?: string }) {
+  const label = formatSchedulePattern(pattern);
+  const p = pattern?.toLowerCase() || "";
+
+  if (p === "yearly") {
+    return (
+      <span className="inline-block px-3 py-0.5 rounded-full text-xs font-semibold bg-[#fef3c7] text-[#b45309] dark:bg-amber-950/40 dark:text-amber-300">
+        {label}
+      </span>
+    );
+  }
+  if (p === "quarterly") {
+    return (
+      <span className="inline-block px-3 py-0.5 rounded-full text-xs font-semibold bg-[#f3e8ff] text-[#7e22ce] dark:bg-purple-950/40 dark:text-purple-300">
+        {label}
+      </span>
+    );
+  }
+  if (p === "monthly") {
+    return (
+      <span className="inline-block px-3 py-0.5 rounded-full text-xs font-semibold bg-[#e0f2fe] text-[#0369a1] dark:bg-blue-950/40 dark:text-blue-300">
+        {label}
+      </span>
+    );
+  }
+  if (p.includes("half")) {
+    return (
+      <span className="inline-block px-3 py-0.5 rounded-full text-xs font-semibold bg-[#ccfbf1] text-[#0f766e] dark:bg-teal-950/40 dark:text-teal-300">
+        {label}
+      </span>
+    );
+  }
+  return (
+    <span className="inline-block px-3 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+      {label}
+    </span>
+  );
 }
 
 export default function TaskDefinitionsTable({
@@ -45,394 +123,246 @@ export default function TaskDefinitionsTable({
   onDelete,
   onRefresh,
 }: TaskDefinitionsTableProps) {
-  // ─── Toggle Loading State ─────────────────────────────────────────────────
-  // Tracks which definition ID + field is currently being toggled
+  const toast = useToast();
+
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [togglingField, setTogglingField] = useState<
     "autoCreateTasks" | "autoCreateReminders" | null
   >(null);
 
-  // ─── Toggle Handler ───────────────────────────────────────────────────────
+  // remove: import { useToast } from "@/context/ToastContext";
+
+  // inside the component, replacing `const toast = useToast();`
+  const toggleAction = useAsyncAction();
+  const updateAction = useAsyncAction();
+  const { run } = useAsyncAction();
+  const togglingRef = useRef(false);
+
   const handleToggle = async (
     e: React.MouseEvent,
     def: TaskDefinitionListItem,
     field: "autoCreateTasks" | "autoCreateReminders",
   ) => {
-    e.stopPropagation(); // prevent row click (view drawer)
+    e.stopPropagation();
+    if (e.detail > 1 || togglingRef.current) return; // ignore double-click / in-flight
 
+    togglingRef.current = true;
     setTogglingId(def.id);
     setTogglingField(field);
 
-    try {
-      await updateTaskDefinition(businessId, def.id, {
-        [field]: !def[field], // flip current value
-      });
-      onRefresh(); // re-fetch list to reflect updated value
-    } catch (err) {
-      console.error(`❌ Failed to toggle ${field}:`, err);
-    } finally {
-      setTogglingId(null);
-      setTogglingField(null);
-    }
+    const nextVal = !def[field];
+    const label = field === "autoCreateTasks" ? "Auto Tasks" : "Auto Reminders";
+
+    await run(
+      () => updateTaskDefinition(businessId, def.id, { [field]: nextVal }),
+      {
+        successMessage: `${label} turned ${nextVal ? "ON" : "OFF"}`,
+        errorMessage: `Failed to toggle ${label.toLowerCase()}`,
+        onSuccess: () => onRefresh?.(),
+      },
+    );
+
+    togglingRef.current = false;
+    setTogglingId(null);
+    setTogglingField(null);
   };
 
-  const isToggling = (
-    id: string,
-    field: "autoCreateTasks" | "autoCreateReminders",
-  ) => togglingId === id && togglingField === field;
+  const columns: GridColumn<TaskDefinitionListItem>[] = useMemo(
+    () => [
+      {
+        headerName: "Rule",
+        field: "name",
+        minWidth: 260,
+        flex: 2.5,
+        editable: true,
+        cellRenderer: (p) => {
+          if (!p.data) return null;
+          const ruleName = p.value || p.data.name || "—";
+          return (
+            <div className="flex items-center gap-3 py-1">
+              <span
+                className={`w-11 h-9 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 ${getRuleBadgeClass(
+                  p.data.taskType || ruleName,
+                )}`}
+              >
+                {getRuleTypePrefix(p.data.taskType || ruleName)}
+              </span>
+              <div className="flex flex-col min-w-0">
+                <span className="font-bold text-sm text-[var(--primary)] dark:text-slate-100 truncate">
+                  {ruleName}
+                </span>
+                <span className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                  {getTaskTypeDescription(p.data.taskType, ruleName)}
+                </span>
+              </div>
+            </div>
+          );
+        },
+      },
+      {
+        headerName: "Schedule",
+        field: "schedulePattern",
+        minWidth: 140,
+        flex: 1,
+        cellRenderer: (p) => (
+          <ScheduleBadge pattern={p.data?.schedulePattern} />
+        ),
+      },
+      {
+        headerName: "Auto task",
+        colId: "autoCreateTasks",
+        minWidth: 130,
+        flex: 1,
+        cellRenderer: (p) => {
+          const row = p.data;
+          if (!row) return null;
+          const isToggling =
+            togglingId === row.id && togglingField === "autoCreateTasks";
+          const checked = Boolean(row.autoCreateTasks);
 
-  // ─── Loading State ────────────────────────────────────────────────────────
-  if (loading) {
-    return (
-      <Paper sx={{ p: 8, textAlign: "center" }}>
-        <CircularProgress />
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-          Loading task definitions...
-        </Typography>
-      </Paper>
-    );
-  }
+          return (
+            <div
+              className="flex h-full items-center gap-2 cursor-pointer select-none"
+              onClick={(e) => handleToggle(e, row, "autoCreateTasks")}
+            >
+              {isToggling ? (
+                <Loader2 className="h-4 w-4 animate-spin text-slate-500" />
+              ) : (
+                <div
+                  className={`w-9 h-5 rounded-full p-0.5 flex items-center transition-colors relative ${
+                    checked ? "bg-[#14224D]" : "bg-slate-300 dark:bg-slate-700"
+                  }`}
+                >
+                  <div
+                    className={`w-4 h-4 bg-white rounded-full shadow-xs transition-transform ${
+                      checked ? "translate-x-4" : "translate-x-0"
+                    }`}
+                  />
+                </div>
+              )}
+              <span
+                className={`text-xs font-semibold ${
+                  checked
+                    ? "text-slate-900 dark:text-white"
+                    : "text-slate-500 dark:text-slate-400"
+                }`}
+              >
+                {checked ? "On" : "Off"}
+              </span>
+            </div>
+          );
+        },
+      },
+      {
+        headerName: "Auto reminder",
+        colId: "autoCreateReminders",
+        minWidth: 140,
+        flex: 1,
+        cellRenderer: (p) => {
+          const row = p.data;
+          if (!row) return null;
+          const isToggling =
+            togglingId === row.id && togglingField === "autoCreateReminders";
+          const checked = Boolean(row.autoCreateReminders);
 
-  // ─── Empty State ──────────────────────────────────────────────────────────
-  if (definitions.length === 0) {
-    return (
-      <Paper sx={{ p: 8, textAlign: "center" }}>
-        <Typography variant="h6" color="text.secondary">
-          No task definitions found
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-          Create your first task definition to get started
-        </Typography>
-      </Paper>
-    );
-  }
+          return (
+            <div
+              className="flex h-full items-center gap-2 cursor-pointer select-none"
+              onClick={(e) => handleToggle(e, row, "autoCreateReminders")}
+            >
+              {isToggling ? (
+                <Loader2 className="h-4 w-4 animate-spin text-slate-500" />
+              ) : (
+                <div
+                  className={`w-9 h-5 rounded-full p-0.5 flex items-center transition-colors relative ${
+                    checked ? "bg-[#1e293b]" : "bg-slate-300 dark:bg-slate-700"
+                  }`}
+                >
+                  <div
+                    className={`w-4 h-4 bg-white rounded-full shadow-xs transition-transform ${
+                      checked ? "translate-x-4" : "translate-x-0"
+                    }`}
+                  />
+                </div>
+              )}
+              <span
+                className={`text-xs font-semibold ${
+                  checked
+                    ? "text-slate-900 dark:text-white"
+                    : "text-slate-500 dark:text-slate-400"
+                }`}
+              >
+                {checked ? "On" : "Off"}
+              </span>
+            </div>
+          );
+        },
+      },
+      {
+        headerName: "Status",
+        field: "isActive",
+        cellDataType: false,
+        minWidth: 110,
+        flex: 0.9,
+        editable: true,
+        cellEditor: "agSelectCellEditor",
+        cellEditorParams: { values: [true, false] },
+        valueFormatter: (p) => (p.value ? "Active" : "Inactive"),
+        cellRenderer: (p) =>
+          p.value ? (
+            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#059669] dark:text-emerald-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#10b981]" />
+              Active
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+              Inactive
+            </span>
+          ),
+      },
+      {
+        headerName: "Next due",
+        field: "dueDate",
+        minWidth: 160,
+        flex: 1.3,
+        cellRenderer: (p) => <DueDate value={p.value || p.data?.dueDate} />,
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [togglingId, togglingField],
+  );
 
-  // ─── Helpers ──────────────────────────────────────────────────────────────
-  /* const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case "URGENT":
-        return "error";
-      case "HIGH":
-        return "warning";
-      case "MEDIUM":
-        return "info";
-      case "LOW":
-        return "default";
-      default:
-        return "default";
-    } 
-  };*/
+  const actions: GridAction<TaskDefinitionListItem>[] = useMemo(
+    () =>
+      createTableActions<TaskDefinitionListItem>({
+        onView: (row) => onView(row.id),
+        onEdit: (row) => onEdit(row.id),
+        onDelete: (row) => onDelete(row.id, row.name),
+      }),
+    [onView, onEdit, onDelete],
+  );
 
-  const formatSchedulePattern = (pattern: string) => {
-    switch (pattern) {
-      case "monthly":
-        return "Monthly";
-      case "quarterly":
-        return "Quarterly";
-      case "half_yearly":
-      case "halfYearly":
-        return "Half-Yearly";
-      case "yearly":
-        return "Yearly";
-      case "one_time":
-        return "One Time";
-      default:
-        return pattern;
-    }
-  };
-
-  const getDaysUntilDue = (dueDate: string) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const due = new Date(dueDate);
-    due.setHours(0, 0, 0, 0);
-    const diffDays = Math.ceil(
-      (due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
-    );
-    if (diffDays < 0) return `${Math.abs(diffDays)} days overdue`;
-    if (diffDays === 0) return "Due today";
-    if (diffDays === 1) return "Due tomorrow";
-    return `in ${diffDays} days`;
-  };
-
-  // ─── Table ────────────────────────────────────────────────────────────────
   return (
-    <TableContainer component={Paper} sx={{ overflowX: "auto" }}>
-      <Table sx={{ minWidth: 750 }}>
-        <TableHead>
-          <TableRow
-            sx={{
-              backgroundColor: "#F8FAFC",
-            }}
-          >
-            <TableCell
-              sx={{
-                fontWeight: 700,
-                color: "#0b1f3a",
-                fontSize: "0.8rem",
-                textTransform: "uppercase",
-                letterSpacing: "0.04em",
-              }}
-            >
-              Task Name
-            </TableCell>
-            <TableCell sx={{ fontWeight: 600 }}>Task Type</TableCell>
-            <TableCell sx={{ fontWeight: 600 }}>Schedule</TableCell>
-            {/* <TableCell sx={{ fontWeight: 600 }}>Priority</TableCell> */}
-            {/* ✅ Replaced Chip column with Switch column */}
-            <TableCell sx={{ fontWeight: 600 }}>Auto Tasks</TableCell>
-            <TableCell sx={{ fontWeight: 600 }}>Auto Reminders</TableCell>
-            <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
-            <TableCell sx={{ fontWeight: 600 }}>Next Due Date</TableCell>
-            <TableCell align="right" sx={{ fontWeight: 600 }}>
-              Actions
-            </TableCell>
-          </TableRow>
-        </TableHead>
-
-        <TableBody>
-          {definitions.map((def) => (
-            <TableRow
-              key={def.id}
-              hover
-              sx={{ cursor: "pointer", "&:hover": { bgcolor: "action.hover" } }}
-              onClick={() => onView(def.id)}
-            >
-              {/* Task Name */}
-              <TableCell>
-                <Typography variant="body2" fontWeight={600}>
-                  {def.name}
-                </Typography>
-              </TableCell>
-
-              {/* Task Type */}
-              <TableCell>
-                <Typography variant="body2">{def.taskType}</Typography>
-              </TableCell>
-
-              {/* Schedule */}
-              <TableCell>
-                <Chip
-                  label={formatSchedulePattern(def.schedulePattern)}
-                  size="small"
-                  sx={{
-                    bgcolor: "#EFF6FF",
-                    color: "#2563EB",
-                    border: "1px solid #DBEAFE",
-
-                    fontWeight: 600,
-                    fontSize: "0.72rem",
-                  }}
-                />
-              </TableCell>
-
-              {/* Priority */}
-              {/* <TableCell>
-                <Chip
-                  label={def.priority}
-                  size="small"
-                  sx={{
-                    bgcolor:
-                      def.priority === "URGENT"
-                        ? "#FEF2F2"
-                        : def.priority === "HIGH"
-                          ? "#FFF7ED"
-                          : def.priority === "MEDIUM"
-                            ? "#EFF6FF"
-                            : "#F8FAFC",
-
-                    color:
-                      def.priority === "URGENT"
-                        ? "#DC2626"
-                        : def.priority === "HIGH"
-                          ? "#EA580C"
-                          : def.priority === "MEDIUM"
-                            ? "#2563EB"
-                            : "#64748B",
-
-                    border: "1px solid",
-                    borderColor: "divider",
-
-                    fontWeight: 600,
-                    fontSize: "0.72rem",
-                  }}
-                />
-              </TableCell>
- */}
-              {/* ✅ Auto Create Tasks — Switch */}
-              <TableCell onClick={(e) => e.stopPropagation()}>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                  {isToggling(def.id, "autoCreateTasks") ? (
-                    <CircularProgress size={18} />
-                  ) : (
-                    <FormControlLabel
-                      control={
-                        <Switch
-                          size="small"
-                          checked={!!def.autoCreateTasks}
-                          onChange={(e) =>
-                            handleToggle(
-                              e as unknown as React.MouseEvent,
-                              def,
-                              "autoCreateTasks",
-                            )
-                          }
-                          color="success"
-                        />
-                      }
-                      label={
-                        <Typography
-                          variant="caption"
-                          sx={{
-                            color: def.autoCreateTasks
-                              ? "success.main"
-                              : "text.disabled",
-                            fontWeight: 600,
-                          }}
-                        >
-                          {def.autoCreateTasks ? "ON" : "OFF"}
-                        </Typography>
-                      }
-                      sx={{ m: 0 }}
-                    />
-                  )}
-                </Box>
-              </TableCell>
-
-              {/* ✅ Auto Create Reminders — Switch */}
-              <TableCell onClick={(e) => e.stopPropagation()}>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                  {isToggling(def.id, "autoCreateReminders") ? (
-                    <CircularProgress size={18} />
-                  ) : (
-                    <FormControlLabel
-                      control={
-                        <Switch
-                          size="small"
-                          checked={!!def.autoCreateReminders}
-                          onChange={(e) =>
-                            handleToggle(
-                              e as unknown as React.MouseEvent,
-                              def,
-                              "autoCreateReminders",
-                            )
-                          }
-                          color="success"
-                        />
-                      }
-                      label={
-                        <Typography
-                          variant="caption"
-                          sx={{
-                            color: def.autoCreateReminders
-                              ? "success.main"
-                              : "text.disabled",
-                            fontWeight: 600,
-                          }}
-                        >
-                          {def.autoCreateReminders ? "ON" : "OFF"}
-                        </Typography>
-                      }
-                      sx={{ m: 0 }}
-                    />
-                  )}
-                </Box>
-              </TableCell>
-
-              {/* Status */}
-              <TableCell>
-                <Chip
-                  label={def.isActive ? "Active" : "Inactive"}
-                  size="small"
-                  sx={{
-                    bgcolor: def.isActive ? "#E8F5E9" : "#F1F5F9",
-
-                    color: def.isActive ? "#2E7D32" : "#64748B",
-
-                    border: "1px solid",
-                    borderColor: "divider",
-
-                    fontWeight: 600,
-                    fontSize: "0.72rem",
-                  }}
-                />
-              </TableCell>
-
-              {/* Next Due Date */}
-              <TableCell>
-                {def.dueDate ? (
-                  <Box>
-                    <Typography
-                      variant="body2"
-                      sx={{ fontFamily: "monospace", fontWeight: 600 }}
-                    >
-                      {new Date(def.dueDate).toLocaleDateString()}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {getDaysUntilDue(def.dueDate)}
-                    </Typography>
-                  </Box>
-                ) : (
-                  <Typography variant="body2" color="text.disabled">
-                    Not scheduled
-                  </Typography>
-                )}
-              </TableCell>
-
-              {/* Actions */}
-              <TableCell align="right" onClick={(e) => e.stopPropagation()}>
-                <Tooltip title="View Details">
-                  <IconButton
-                    size="small"
-                    onClick={() => onView(def.id)}
-                    sx={{
-                      color: "#5A6380",
-                      "&:hover": {
-                        color: "#1A1F36",
-                        backgroundColor: "rgba(90,99,128,0.08)",
-                      },
-                    }}
-                  >
-                    <ViewIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-
-                <Tooltip title="Edit Definition">
-                  <IconButton
-                    size="small"
-                    onClick={() => onEdit(def.id)}
-                    sx={{
-                      color: "#5A6380",
-                      "&:hover": {
-                        color: "#1A1F36",
-                        backgroundColor: "rgba(90,99,128,0.08)",
-                      },
-                    }}
-                  >
-                    <EditIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-
-                <Tooltip title="Delete Definition">
-                  <IconButton
-                    size="small"
-                    onClick={() => onDelete(def.id, def.name)}
-                    sx={{
-                      color: "#5A6380",
-                      "&:hover": {
-                        color: "#C0392B",
-                        backgroundColor: "rgba(192,57,43,0.08)",
-                      },
-                    }}
-                  >
-                    <DeleteIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </TableContainer>
+    <CommonDataGrid<TaskDefinitionListItem>
+      rowData={definitions}
+      columns={columns}
+      actions={actions}
+      isLoading={loading}
+      // actionStyle="ghost"
+      rowHeight={64}
+      onUpdateCell={async ({ row, field, newValue }) => {
+        if (!businessId) return;
+        await run(
+          () => updateTaskDefinition(businessId, row.id, { [field]: newValue }),
+          {
+            successMessage: "Rule updated successfully",
+            errorMessage: "Failed to update rule",
+            onSuccess: () => onRefresh?.(),
+          },
+        );
+      }}
+      emptyMessage="No task definitions found"
+    />
   );
 }

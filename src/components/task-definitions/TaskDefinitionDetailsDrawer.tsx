@@ -1,40 +1,32 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-
+import { useEffect, useState } from 'react';
 import {
-  Drawer,
-  Box,
-  Typography,
-  IconButton,
-  Stack,
-  Chip,
-  Divider,
-  CircularProgress,
-  Alert,
-  Button,
-} from "@mui/material";
-import {
-  Close as CloseIcon,
-  Edit as EditIcon,
-  CalendarToday as CalendarIcon,
-  Assignment as AssignmentIcon,
-  Category as CategoryIcon,
-  Repeat as FrequencyIcon,
-  ChecklistRtl as AutoTaskIcon,
-  NotificationAdd as AutoReminderIcon,
-} from "@mui/icons-material";
+  Pencil,
+  Calendar,
+  Layers,
+  Repeat,
+  CheckCircle2,
+  Bell,
+  FileText,
+  Clock,
+  UserPlus,
+  Loader2,
+  AlertCircle,
+  Sliders,
+  X,
+  Power,
+} from 'lucide-react';
+import Drawer from '@/components/common/Drawer';
 import {
   getTaskDefinitionById,
   updateTaskDefinition,
-} from "@/services/taskDefinitionService";
-//import { TaskDefinition } from '../../types/taskDefinition.types';
-import { MONTHS } from "../../constants/taskDefinition.constants";
-
-import { TaskDefinition } from "../../types/taskDefinition.types";
-import ReminderRulesListDrawer from "../reminderdefinitions/ReminderRulesListDrawer";
-import { getV2ReminderDefinitions } from "../../services/reminderDefinitionService";
-import { V2ReminderDefinition } from "@/types/v2ReminderDefinition.types";
+} from '@/services/taskDefinitionService';
+import { MONTHS } from '@/constants/taskDefinition.constants';
+import { TaskDefinition } from '@/types/taskDefinition.types';
+import ReminderRulesListDrawer from './ReminderRulesListDrawer';
+import { getV2ReminderDefinitions } from '@/services/reminderDefinitionService';
+import { V2ReminderDefinition } from '@/types/v2ReminderDefinition.types';
 
 interface TaskDefinitionDetailsDrawerProps {
   open: boolean;
@@ -43,7 +35,7 @@ interface TaskDefinitionDetailsDrawerProps {
   businessId: string;
   onEdit: (definitionId: string) => void;
   onRefresh?: () => void;
-  refreshKey?: number; // ✅ NEW
+  refreshKey?: number;
 }
 
 export default function TaskDefinitionDetailsDrawer({
@@ -53,43 +45,31 @@ export default function TaskDefinitionDetailsDrawer({
   businessId,
   onEdit,
   onRefresh,
-  refreshKey, // ✅ NEW
+  refreshKey,
 }: TaskDefinitionDetailsDrawerProps) {
   const [definition, setDefinition] = useState<TaskDefinition | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [toggling, setToggling] = useState(false); // ✅ for enable/disable button
+  const [error, setError] = useState('');
+  const [toggling, setToggling] = useState(false);
 
   const [reminderRulesOpen, setReminderRulesOpen] = useState(false);
-
-  const [reminderRules, setReminderRules] = useState<V2ReminderDefinition[]>(
-    [],
-  );
+  const [reminderRules, setReminderRules] = useState<V2ReminderDefinition[]>([]);
   const [loadingReminders, setLoadingReminders] = useState(false);
 
-  // ─── Fetch Definition Details ─────────────────────────────────────────────
+  // ─── Fetch Reminder Rules ───────────────────────────────────────────────
   useEffect(() => {
     if (!open || !definitionId || !businessId) return;
 
     const fetchReminderRules = async () => {
       try {
         setLoadingReminders(true);
-
         const allRules = await getV2ReminderDefinitions(businessId);
-
         const taskRules = allRules.filter(
-          (rule) => rule.taskDefinitionId === definitionId,
+          (rule) => rule.taskDefinitionId === definitionId
         );
-
         setReminderRules(taskRules);
-
-        console.log(
-          "📦 Reminder rules for task definition:",
-          definitionId,
-          taskRules,
-        );
-      } catch (error) {
-        console.error("Failed to load reminder rules", error);
+      } catch (err) {
+        console.error('Failed to load reminder rules', err);
         setReminderRules([]);
       } finally {
         setLoadingReminders(false);
@@ -97,21 +77,21 @@ export default function TaskDefinitionDetailsDrawer({
     };
 
     fetchReminderRules();
-  }, [open, businessId, definitionId]); // ✅ refreshKey added
+  }, [open, businessId, definitionId]);
 
-  // ─── Fetch Definition Details ─────────────────────────────────────────────
+  // ─── Fetch Definition Details ───────────────────────────────────────────
   useEffect(() => {
     if (!open || !definitionId || !businessId) return;
 
     const fetchDefinitionDetails = async () => {
       try {
         setLoading(true);
-        setError("");
+        setError('');
         const data = await getTaskDefinitionById(businessId, definitionId);
         setDefinition(data);
       } catch (err: unknown) {
         setError(
-          err instanceof Error ? err.message : "Failed to load task definition",
+          err instanceof Error ? err.message : 'Failed to load task definition'
         );
       } finally {
         setLoading(false);
@@ -121,15 +101,15 @@ export default function TaskDefinitionDetailsDrawer({
     fetchDefinitionDetails();
   }, [open, definitionId, businessId, refreshKey]);
 
-  // ─── Clear state when drawer closes ──────────────────────────────────────
+  // Clear state when drawer closes
   useEffect(() => {
     if (!open) {
       setDefinition(null);
-      setError("");
+      setError('');
     }
   }, [open]);
 
-  // ─── Enable / Disable Handler ─────────────────────────────────────────────
+  // ─── Enable / Disable Handler ───────────────────────────────────────────
   const handleToggleActive = async () => {
     if (!definition || !definitionId || !businessId) return;
     setToggling(true);
@@ -137,520 +117,387 @@ export default function TaskDefinitionDetailsDrawer({
       const updated = await updateTaskDefinition(businessId, definitionId, {
         isActive: !definition.isActive,
       });
-      setDefinition(updated); // reflect change instantly in drawer
-      onRefresh?.(); // refresh parent list if provided
+      setDefinition(updated);
+      onRefresh?.();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to update status");
+      setError(err instanceof Error ? err.message : 'Failed to update status');
     } finally {
       setToggling(false);
     }
   };
 
-  // ─── Helpers ─────────────────────────────────────────────────────────────
+  const getPriorityBadgeClass = (priority?: string) => {
+    switch (priority) {
+      case 'URGENT':
+        return 'bg-red-500/20 text-red-500 border-red-500/40';
+      case 'HIGH':
+        return 'bg-amber-500/20 text-amber-500 border-amber-500/40';
+      case 'MEDIUM':
+        return 'bg-blue-500/20 text-blue-500 border-blue-500/40';
+      case 'LOW':
+        return 'bg-slate-500/20 text-slate-400 border-slate-500/40';
+      default:
+        return 'bg-slate-400/20 text-slate-400 border-slate-400/40';
+    }
+  };
 
-  /* const Section = ({
-    title,
-    icon,
-    children,
-  }: {
-    title: string;
-    icon: React.ReactNode;
-    children: React.ReactNode;
-  }) => (
-    <Box sx={{ mb: 3 }}>
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
-        {icon}
-        <Typography
-          variant="overline"
-          sx={{
-            fontWeight: 700,
-            letterSpacing: "0.08em",
-            color: "text.secondary",
-          }}
-        >
-          {title}
-        </Typography>
-      </Box>
-      {children}
-    </Box>
-  ); */
+  const formatFrequencyLabel = (pattern?: string): string => {
+    switch (pattern) {
+      case 'monthly':
+        return 'Monthly';
+      case 'quarterly':
+        return 'Quarterly';
+      case 'half_yearly':
+      case 'halfYearly':
+        return 'Half-Yearly';
+      case 'yearly':
+        return 'Yearly';
+      case 'one_time':
+      case 'oneTime':
+        return 'One-Time';
+      default:
+        return pattern || '—';
+    }
+  };
+
+  const formatScheduleDetail = (def: TaskDefinition): string => {
+    const s = def.scheduleRule;
+    if (!s) return '—';
+
+    switch (s.pattern) {
+      case 'monthly':
+        return s.monthly?.day !== undefined ? `Day ${s.monthly.day} of every month` : 'Monthly';
+      case 'quarterly': {
+        const q = s.quarterly;
+        if (!q) return 'Quarterly';
+        const parts: string[] = [];
+        if (q.q1Month !== undefined && q.q1Day !== undefined) {
+          parts.push(`Q1: ${MONTHS.find((m) => m.value === q.q1Month)?.label || q.q1Month} ${q.q1Day}`);
+        }
+        if (q.q2Month !== undefined && q.q2Day !== undefined) {
+          parts.push(`Q2: ${MONTHS.find((m) => m.value === q.q2Month)?.label || q.q2Month} ${q.q2Day}`);
+        }
+        if (q.q3Month !== undefined && q.q3Day !== undefined) {
+          parts.push(`Q3: ${MONTHS.find((m) => m.value === q.q3Month)?.label || q.q3Month} ${q.q3Day}`);
+        }
+        if (q.q4Month !== undefined && q.q4Day !== undefined) {
+          parts.push(`Q4: ${MONTHS.find((m) => m.value === q.q4Month)?.label || q.q4Month} ${q.q4Day}`);
+        }
+        return parts.length ? parts.join(', ') : 'Quarterly';
+      }
+      case 'half_yearly': {
+        const h = s.halfYearly;
+        if (!h) return 'Half-Yearly';
+        const parts: string[] = [];
+        if (h.firstHalf) {
+          parts.push(`H1: ${MONTHS.find((m) => m.value === h.firstHalf?.month)?.label} ${h.firstHalf?.day}`);
+        }
+        if (h.secondHalf) {
+          parts.push(`H2: ${MONTHS.find((m) => m.value === h.secondHalf?.month)?.label} ${h.secondHalf?.day}`);
+        }
+        return parts.join(', ');
+      }
+      case 'yearly': {
+        const y = s.yearly;
+        if (!y) return 'Yearly';
+        const monthLabel = MONTHS.find((m) => m.value === y.month)?.label || y.month;
+        return `${monthLabel} ${y.day}`;
+      }
+      case 'one_time': {
+        const due = s.oneTime?.dueDate;
+        if (!due) return 'One-Time';
+        try {
+          return new Date(due).toLocaleDateString('en-IN');
+        } catch {
+          return due;
+        }
+      }
+      default:
+        return '—';
+    }
+  };
 
   const InfoRow = ({
     label,
     value,
-    icon,
+    icon: Icon,
   }: {
     label: string;
-    value: string | number | null | undefined;
-    icon?: React.ReactNode;
+    value: React.ReactNode;
+    icon: React.ComponentType<{ className?: string }>;
   }) => (
-    <Box sx={{ mb: 2, display: "flex", gap: 1.5, alignItems: "flex-start" }}>
-      {/* ✅ optional icon per row — matches mobile app icon-per-field style */}
-      {icon && (
-        <Box sx={{ mt: 0.3, color: "#94a3b8", flexShrink: 0 }}>{icon}</Box>
-      )}
-      <Box>
-        <Typography
-          variant="caption"
-          sx={{
-            display: "block",
-            mb: 0.3,
-            color: "#64748b",
-            fontWeight: 600,
-          }}
-        >
+    <div className="flex items-start gap-3 py-2.5 border-b border-divider/60 last:border-b-0">
+      <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-bg text-txt-sub">
+        <Icon className="h-4 w-4" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-[11px] font-bold uppercase tracking-wider text-txt-sub">
           {label}
-        </Typography>
-        <Typography
-          variant="body2"
-          sx={{
-            fontWeight: 500,
-            color: "#1e293b",
-            fontSize: "0.9rem",
-          }}
-        >
-          {value ?? "—"}
-        </Typography>
-      </Box>
-    </Box>
+        </p>
+        <div className="text-sm font-medium text-txt-main mt-0.5 break-words">
+          {value ?? '—'}
+        </div>
+      </div>
+    </div>
   );
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case "URGENT":
-        return "#ef4444";
-      case "HIGH":
-        return "#f59e0b";
-      case "MEDIUM":
-        return "#3b82f6";
-      case "LOW":
-        return "#64748b";
-      default:
-        return "#64748b";
-    }
-  };
-
-  // ─── Format schedule into human-readable string ───────────────────────────
-  // Returns plain string only (no JSX) — used in InfoRow value
-  const formatFrequencyLabel = (pattern: string): string => {
-    switch (pattern) {
-      case "monthly":
-        return "Monthly";
-      case "quarterly":
-        return "Quarterly";
-      case "half_yearly":
-        return "Half-Yearly";
-      case "yearly":
-        return "Yearly";
-      case "one_time":
-        return "One Time";
-      default:
-        return pattern;
-    }
-  };
-
-  const getMonthName = (monthNum: number): string => {
-    const month = MONTHS.find((m) => m.value === monthNum);
-    return month?.label || monthNum.toString();
-  };
-
-  // Returns a readable schedule detail string — e.g. "November 30th each year"
-  const formatScheduleDetail = (def: TaskDefinition): string => {
-    const { scheduleRule } = def;
-    if (!scheduleRule) return "Not configured";
-
-    const ordinal = (n: number) => {
-      const s = ["th", "st", "nd", "rd"];
-      const v = n % 100;
-      return n + (s[(v - 20) % 10] || s[v] || s[0]);
-    };
-
-    switch (scheduleRule.pattern) {
-      case "monthly":
-        return `${ordinal(scheduleRule.monthly?.day ?? 0)} of each month`;
-
-      case "quarterly": {
-        const q = scheduleRule.quarterly;
-        if (!q) return "Quarterly";
-        return [
-          `Q1: ${getMonthName(q.q1Month)} ${ordinal(q.q1Day)}`,
-          `Q2: ${getMonthName(q.q2Month)} ${ordinal(q.q2Day)}`,
-          `Q3: ${getMonthName(q.q3Month)} ${ordinal(q.q3Day)}`,
-          `Q4: ${getMonthName(q.q4Month)} ${ordinal(q.q4Day)}`,
-        ].join("  •  ");
-      }
-
-      case "half_yearly": {
-        const h = scheduleRule.halfYearly;
-        if (!h) return "Half-Yearly";
-        return [
-          `H1: ${getMonthName(h.firstHalf.month)} ${ordinal(h.firstHalf.day)}`,
-          `H2: ${getMonthName(h.secondHalf.month)} ${ordinal(h.secondHalf.day)}`,
-        ].join("  •  ");
-      }
-
-      case "yearly": {
-        const y = scheduleRule.yearly;
-        if (!y) return "Yearly";
-        return `${getMonthName(y.month)} ${ordinal(y.day)} each year`;
-      }
-
-      case "one_time":
-        if (scheduleRule.oneTime?.dueDate) {
-          return new Date(scheduleRule.oneTime.dueDate).toLocaleDateString();
-        }
-        return "One Time";
-
-      default:
-        return scheduleRule.pattern;
-    }
-  };
-
-  // ─── Render ───────────────────────────────────────────────────────────────
   return (
-    <Drawer
-      anchor="right"
-      open={open}
-      onClose={onClose}
-      PaperProps={{
-        sx: {
-          width: { xs: "100%", sm: 480 },
-          borderRadius: 0,
-          display: "flex",
-          flexDirection: "column",
-        },
-      }}
-    >
-      {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <Box
-        sx={{
-          background: "linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%)",
-          color: "#fff",
-          p: 3,
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          flexShrink: 0,
-        }}
+    <>
+      <Drawer
+        open={open}
+        onClose={onClose}
+        title={definition?.name || (loading ? 'Loading...' : 'Task Definition')}
+        width="lg"
+        customHeader={
+          <div className="bg-[#0B1528] px-6 py-5 flex items-center justify-between text-white shrink-0">
+            <div className="flex items-center gap-3.5 min-w-0">
+              <div className="w-10 h-10 rounded-xl bg-[#F59E0B] flex items-center justify-center text-slate-900 shadow-sm shrink-0">
+                <Sliders className="h-5 w-5 text-slate-900" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <p className="text-xs font-semibold text-[#F59E0B] uppercase tracking-wider">
+                    Rule Setup
+                  </p>
+                  {definition && (
+                    <span
+                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${definition.isActive
+                          ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+                          : 'bg-white/10 text-white/80 border-white/20'
+                        }`}
+                    >
+                      {definition.isActive ? 'Active' : 'Inactive'}
+                    </span>
+                  )}
+                </div>
+                <h2 className="text-lg font-bold leading-tight text-white truncate">
+                  {definition?.name || (loading ? 'Loading...' : 'Task Definition')}
+                </h2>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {definitionId && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onEdit(definitionId);
+                  }}
+                  className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
+                  title="Edit Rule"
+                >
+                  <Pencil className="h-4 w-4" />
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        }
+        footer={
+          definition ? (
+            <div className="flex items-center justify-between gap-3 w-full">
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-xl border border-divider py-2.5 px-6 text-sm font-semibold text-txt-main bg-surface transition-colors hover:bg-bg cursor-pointer"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={handleToggleActive}
+                disabled={toggling}
+                className={`inline-flex items-center gap-2 rounded-xl py-2.5 px-6 text-sm font-semibold shadow-xs transition-colors cursor-pointer disabled:opacity-50 ${definition.isActive
+                    ? 'border border-red-300 dark:border-rose-800 text-red-600 dark:text-rose-300 bg-red-50 dark:bg-rose-950/40 hover:bg-red-100'
+                    : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                  }`}
+              >
+                {toggling && <Loader2 className="h-4 w-4 animate-spin" />}
+                <Power className="h-4 w-4" />
+                <span>
+                  {toggling
+                    ? definition.isActive
+                      ? 'Disabling…'
+                      : 'Enabling…'
+                    : definition.isActive
+                      ? 'Disable Rule'
+                      : 'Enable Rule'}
+                </span>
+              </button>
+            </div>
+          ) : undefined
+        }
       >
-        <Box>
-          <Typography
-            variant="caption"
-            sx={{
-              color: "rgba(255,255,255,0.7)",
-              letterSpacing: "0.1em",
-              textTransform: "uppercase",
-            }}
-          >
-            Automatic Task & Reminder Setup
-          </Typography>
-          <Box
-            sx={{ display: "flex", alignItems: "center", gap: 1.5, mt: 0.5 }}
-          >
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>
-              {definition?.name || "Loading..."}
-            </Typography>
-            {/* Status badge in header — matches mobile */}
-            {definition && (
-              <Chip
-                label={definition.isActive ? "Active" : "Inactive"}
-                size="small"
-                sx={{
-                  bgcolor: definition.isActive
-                    ? "rgba(34,197,94,0.2)"
-                    : "rgba(255,255,255,0.15)",
-                  color: "#fff",
-                  fontWeight: 600,
-                  border: "1px solid rgba(255,255,255,0.3)",
-                }}
-              />
-            )}
-          </Box>
-        </Box>
-
-        <Box sx={{ display: "flex", gap: 1 }}>
-          {definitionId && (
-            <IconButton
-              onClick={() => onEdit(definitionId)}
-              sx={{
-                color: "#fff",
-                bgcolor: "rgba(255,255,255,0.15)",
-                "&:hover": { bgcolor: "rgba(255,255,255,0.25)" },
-              }}
-            >
-              <EditIcon fontSize="small" />
-            </IconButton>
-          )}
-          <IconButton
-            onClick={onClose}
-            sx={{
-              color: "#fff",
-              bgcolor: "rgba(255,255,255,0.15)",
-              "&:hover": { bgcolor: "rgba(255,255,255,0.25)" },
-            }}
-          >
-            <CloseIcon fontSize="small" />
-          </IconButton>
-        </Box>
-      </Box>
-
-      {/* ── Scrollable Content ─────────────────────────────────────────────── */}
-      <Box sx={{ p: 3, overflowY: "auto", flex: 1, bgcolor: "#f8fafc" }}>
         {loading && (
-          <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
-            <CircularProgress />
-          </Box>
+          <div className="flex flex-col items-center justify-center py-20 text-txt-sub">
+            <Loader2 className="h-8 w-8 animate-spin text-[#F59E0B] mb-2" />
+            <span className="text-sm font-medium">Loading rule details...</span>
+          </div>
         )}
 
         {error && (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            {error}
-          </Alert>
+          <div role="alert" className="alert alert-error mb-4 flex items-center gap-2 text-sm rounded-xl">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            <span>{error}</span>
+          </div>
         )}
 
         {definition && !loading && (
-          <Stack spacing={2.5}>
-            {/* ── Main Info Card — matches mobile's top white card ────────── */}
-            <Box
-              sx={{
-                bgcolor: "#fff",
-                borderRadius: 2,
-                border: "1px solid",
-                borderColor: "divider",
-                p: 2.5,
-              }}
-            >
-              {/* Priority chip row */}
-              <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mb: 2.5 }}>
-                <Chip
-                  label={definition.priority}
-                  size="small"
-                  sx={{
-                    bgcolor: getPriorityColor(definition.priority),
-                    color: "#fff",
-                    fontWeight: 600,
-                  }}
-                />
-                <Chip
-                  label={definition.subjectType}
-                  variant="outlined"
-                  size="small"
-                />
-              </Box>
+          <div className="space-y-5 py-2">
+            {/* ── Section 1: Main Details ── */}
+            <div className="rounded-2xl border border-divider bg-surface p-6 space-y-4 shadow-xs">
+              <div className="flex items-center justify-between pb-3 border-b border-divider">
+                <div className="flex items-center gap-2.5">
+                  <span className="w-6 h-6 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 text-xs font-bold flex items-center justify-center">
+                    1
+                  </span>
+                  <h3 className="text-base font-bold text-txt-main">Rule Overview</h3>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span
+                    className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider border ${getPriorityBadgeClass(
+                      definition.priority
+                    )}`}
+                  >
+                    {definition.priority ?? 'MEDIUM'}
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-bg text-txt-main border border-divider">
+                    {definition.subjectType ?? 'CLIENT'}
+                  </span>
+                </div>
+              </div>
 
-              <Divider sx={{ mb: 2.5 }} />
-
-              {/* Category */}
-              <InfoRow
-                label="Category"
-                value={definition.taskType}
-                icon={<CategoryIcon fontSize="small" />}
-              />
-
-              {/* Task title pattern — ✅ was missing */}
-              <InfoRow
-                label="Task title pattern"
-                value={definition.titleTemplate}
-                icon={<AssignmentIcon fontSize="small" />}
-              />
-
-              {/* Frequency — ✅ was missing, shown separately from schedule */}
-              <InfoRow
-                label="Frequency"
-                value={formatFrequencyLabel(definition.scheduleRule.pattern)}
-                icon={<FrequencyIcon fontSize="small" />}
-              />
-
-              {/* Schedule detail — ✅ now human-readable like mobile */}
-              <InfoRow
-                label="Schedule"
-                value={formatScheduleDetail(definition)}
-                icon={<CalendarIcon fontSize="small" />}
-              />
-
-              {/* Auto-create Tasks — ✅ was missing as InfoRow */}
-              <InfoRow
-                label="Auto-create Tasks"
-                value={definition.autoCreateTasks ? "Enabled" : "Disabled"}
-                icon={<AutoTaskIcon fontSize="small" />}
-              />
-
-              {/* Auto-create Reminders — ✅ was missing as InfoRow */}
-              <InfoRow
-                label="Auto-create Reminders"
-                value={definition.autoCreateReminders ? "Enabled" : "Disabled"}
-                icon={<AutoReminderIcon fontSize="small" />}
-              />
-
-              {definition.description && (
+              <div className="divide-y divide-divider">
                 <InfoRow
-                  label="Description"
-                  value={definition.description}
-                  icon={<AssignmentIcon fontSize="small" />}
+                  label="Category / Task Type"
+                  value={definition.taskType}
+                  icon={Layers}
                 />
-              )}
-
-              {definition.targetOffsetDays !== undefined &&
-                definition.targetOffsetDays !== 0 && (
+                <InfoRow
+                  label="Task Title Pattern"
+                  value={definition.titleTemplate}
+                  icon={FileText}
+                />
+                <InfoRow
+                  label="Frequency"
+                  value={formatFrequencyLabel(definition.scheduleRule?.pattern)}
+                  icon={Repeat}
+                />
+                <InfoRow
+                  label="Schedule Detail"
+                  value={formatScheduleDetail(definition)}
+                  icon={Calendar}
+                />
+                <InfoRow
+                  label="Auto-create Tasks"
+                  value={
+                    <span
+                      className={`inline-flex items-center gap-1.5 font-semibold text-xs ${definition.autoCreateTasks
+                          ? 'text-emerald-600 dark:text-emerald-400'
+                          : 'text-txt-sub'
+                        }`}
+                    >
+                      <CheckCircle2
+                        className={`h-3.5 w-3.5 ${definition.autoCreateTasks
+                            ? 'text-emerald-500'
+                            : 'text-slate-300 dark:text-slate-600'
+                          }`}
+                      />
+                      {definition.autoCreateTasks ? 'Enabled' : 'Disabled'}
+                    </span>
+                  }
+                  icon={CheckCircle2}
+                />
+                <InfoRow
+                  label="Auto-create Reminders"
+                  value={
+                    <span
+                      className={`inline-flex items-center gap-1.5 font-semibold text-xs ${definition.autoCreateReminders
+                          ? 'text-emerald-600 dark:text-emerald-400'
+                          : 'text-txt-sub'
+                        }`}
+                    >
+                      <Bell
+                        className={`h-3.5 w-3.5 ${definition.autoCreateReminders
+                            ? 'text-emerald-500'
+                            : 'text-slate-300 dark:text-slate-600'
+                          }`}
+                      />
+                      {definition.autoCreateReminders ? 'Enabled' : 'Disabled'}
+                    </span>
+                  }
+                  icon={Bell}
+                />
+                {definition.targetOffsetDays !== undefined &&
+                  definition.targetOffsetDays !== 0 && (
+                    <InfoRow
+                      label="Target Offset Days"
+                      value={`${definition.targetOffsetDays} days`}
+                      icon={Clock}
+                    />
+                  )}
+                {definition.description && (
                   <InfoRow
-                    label="Target Offset Days"
-                    value={`${definition.targetOffsetDays} days`}
-                    icon={<CalendarIcon fontSize="small" />}
+                    label="Description"
+                    value={definition.description}
+                    icon={FileText}
                   />
                 )}
-            </Box>
+              </div>
+            </div>
 
-            {/* ── Reminders Summary Card — matches mobile exactly ─────────── */}
-
-            <Box
-              sx={{
-                bgcolor: "#fff",
-                borderRadius: 2,
-                border: "1px solid",
-                borderColor: "divider",
-                p: 2.5,
-              }}
-            >
-              <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 0.5 }}>
-                Reminders
-              </Typography>
-
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+            {/* ── Section 2: Reminders Summary Card ── */}
+            <div className="rounded-2xl border border-divider bg-surface p-6 space-y-4 shadow-xs">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <span className="w-6 h-6 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 text-xs font-bold flex items-center justify-center">
+                    2
+                  </span>
+                  <h3 className="text-base font-bold text-txt-main">Reminder Rules</h3>
+                </div>
+                <span className="text-xs font-semibold text-txt-sub">
+                  {reminderRules.length} rule{reminderRules.length !== 1 ? 's' : ''} configured
+                </span>
+              </div>
+              <p className="text-xs text-txt-sub">
                 {loadingReminders
-                  ? "Loading reminder rules..."
-                  : `${reminderRules.length} reminder rule${
-                      reminderRules.length !== 1 ? "s" : ""
-                    } configured`}
-              </Typography>
-
-              {/* Only show link when rules exist */}
+                  ? 'Loading reminder rules...'
+                  : `${reminderRules.length} reminder rule${reminderRules.length !== 1 ? 's' : ''
+                  } configured for this task rule.`}
+              </p>
               {!loadingReminders && reminderRules.length > 0 && (
-                <Typography
-                  variant="body2"
+                <button
+                  type="button"
                   onClick={() => setReminderRulesOpen(true)}
-                  sx={{
-                    color: "primary.main",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    textDecoration: "underline",
-                    textUnderlineOffset: 3,
-                    "&:hover": { opacity: 0.8 },
-                    display: "inline-block",
-                    mt: 0.5,
-                  }}
+                  className="rounded-xl border border-divider bg-bg/50 px-4 py-2 text-xs font-bold text-txt-main hover:bg-bg transition-colors inline-flex items-center gap-1.5 cursor-pointer"
                 >
-                  View Reminder Rules
-                </Typography>
+                  <Bell className="h-3.5 w-3.5 text-[#F59E0B]" />
+                  <span>View Reminder Rules &rarr;</span>
+                </button>
               )}
-            </Box>
-
-            {/* ── Assign Employee Card — matches mobile "Coming soon" ────── */}
-            <Box
-              sx={{
-                bgcolor: "background.paper",
-                borderRadius: 2,
-                border: "1px solid",
-                borderColor: "divider",
-                p: 2.5,
-              }}
-            >
-              <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1 }}>
-                Assign Employee
-              </Typography>
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 1,
-                  color: "text.disabled",
-                }}
-              >
-                <Box
-                  sx={{
-                    width: 20,
-                    height: 20,
-                    borderRadius: "50%",
-                    border: "1.5px solid",
-                    borderColor: "text.disabled",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: "1rem",
-                    lineHeight: 1,
-                    flexShrink: 0,
-                  }}
-                >
-                  +
-                </Box>
-                <Typography variant="body2" color="text.disabled">
-                  Assign Employee (Coming soon)
-                </Typography>
-              </Box>
-            </Box>
-          </Stack>
+            </div>
+          </div>
         )}
-      </Box>
-     <ReminderRulesListDrawer
-  open={reminderRulesOpen}
-  onClose={() => setReminderRulesOpen(false)}
-  taskDefinitionId={definitionId}
-  taskDefinitionName={definition?.name || ""}
-  businessId={businessId}
-  preloadedRules={reminderRules}   
-  onEditRule={(ruleId: string) => {
-    setReminderRulesOpen(false);
-    console.log("Edit rule:", ruleId);
-  }}
-/>
+      </Drawer>
 
-      {/* ── Enable / Disable Button ── */}
-      {definition && (
-        <Box
-          sx={{
-            p: 2,
-            bgcolor: "#fff",
-            borderTop: "1px solid",
-            borderColor: "divider",
-            flexShrink: 0,
-          }}
-        >
-          <Button
-            fullWidth
-            variant={definition.isActive ? "outlined" : "contained"}
-            onClick={handleToggleActive}
-            disabled={toggling}
-            startIcon={
-              toggling ? <CircularProgress size={16} color="inherit" /> : null
-            }
-            sx={{
-              py: 1.5,
-              borderRadius: 3,
-              fontWeight: 700,
-              fontSize: "1rem",
-              textTransform: "none",
-              ...(definition.isActive
-                ? {
-                    borderColor: "#ef4444",
-                    color: "#ef4444",
-                    "&:hover": { bgcolor: "#fef2f2", borderColor: "#dc2626" },
-                  }
-                : {
-                    bgcolor: "#16a34a",
-                    "&:hover": { bgcolor: "#15803d" },
-                    "&:disabled": { bgcolor: "#86efac", color: "#fff" },
-                  }),
-            }}
-          >
-            {toggling
-              ? definition.isActive
-                ? "Disabling…"
-                : "Enabling…"
-              : definition.isActive
-                ? "Disable"
-                : "Enable"}
-          </Button>
-        </Box>
-      )}
-    </Drawer>
+      <ReminderRulesListDrawer
+        open={reminderRulesOpen}
+        onClose={() => setReminderRulesOpen(false)}
+        taskDefinitionId={definitionId}
+        taskDefinitionName={definition?.name || ''}
+        businessId={businessId}
+        preloadedRules={reminderRules}
+        onEditRule={(ruleId: string) => {
+          setReminderRulesOpen(false);
+          console.log('Edit rule:', ruleId);
+        }}
+      />
+    </>
   );
 }

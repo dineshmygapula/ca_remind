@@ -1,290 +1,262 @@
 "use client";
 
-import {
-  Paper,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  IconButton,
-  Chip,
-  Tooltip,
-  Typography,
-  Box,
-  Avatar,
-  CircularProgress,
-} from "@mui/material";
-import {
-  Visibility as ViewIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-  PersonOff as InactiveIcon,
-} from "@mui/icons-material";
-import { StaffMember } from "@/types/staff.types";
+import React, { useMemo } from "react";
+import { Eye, Trash2, Mail, Phone, UserX } from "lucide-react";
+import CommonDataGrid, {
+  GridAction,
+  GridColumn,
+  createTableActions,
+} from "@/components/common/CommonTable";
+import { StaffMember, UpdateStaffDto } from "@/types/staff.types";
+import { updateStaff } from "@/services/staffService";
+import { useAsyncAction } from "@/hooks/useAnyAction";
 
 interface StaffTableProps {
   staff: StaffMember[];
   loading: boolean;
+  businessId?: string;
   onView: (membershipId: string) => void;
-  onEdit: (membershipId: string) => void;
   onDelete: (membershipId: string, staffName: string) => void;
+  onRefresh?: () => void;
+}
+
+// ── Helpers ──
+
+const getFullName = (member: StaffMember) => {
+  return (
+    member.userName ||
+    `${member.firstName ?? ""} ${member.lastName ?? ""}`.trim() ||
+    member.email ||
+    "Unknown User"
+  );
+};
+
+const getInitials = (name?: string) => {
+  if (!name) return "??";
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+};
+
+function StaffRoleBadge({ role }: { role?: string }) {
+  if (!role) return <span className="text-slate-400 text-xs">—</span>;
+  const upper = role.toUpperCase();
+
+  if (upper === "ADMIN" || upper === "OWNER") {
+    return (
+      <span className="inline-block px-3 py-0.5 rounded-full text-xs font-semibold bg-[#f5f3ff] text-[#6d28d9] dark:bg-purple-950/40 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/40">
+        {upper}
+      </span>
+    );
+  }
+  if (upper === "MANAGER") {
+    return (
+      <span className="inline-block px-3 py-0.5 rounded-full text-xs font-semibold bg-[#eff6ff] text-[#1d4ed8] dark:bg-blue-950/40 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800/40">
+        {upper}
+      </span>
+    );
+  }
+  if (upper === "ACCOUNTANT") {
+    return (
+      <span className="inline-block px-3 py-0.5 rounded-full text-xs font-semibold bg-[#ecfdf5] text-[#047857] dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/40">
+        {upper}
+      </span>
+    );
+  }
+
+  return (
+    <span className="inline-block px-3 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700">
+      {role}
+    </span>
+  );
+}
+
+function StaffStatusBadge({ status }: { status: "ACTIVE" | "INACTIVE" }) {
+  if (status === "ACTIVE") {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#ecfdf5] text-[#047857] dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200/60">
+        <span className="h-1.5 w-1.5 rounded-full bg-[#10b981]" />
+        <span>Active</span>
+      </span>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border border-slate-200/60">
+      <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
+      <span>Inactive</span>
+    </span>
+  );
 }
 
 export default function StaffTable({
   staff,
   loading,
+  businessId,
   onView,
-  onEdit,
   onDelete,
+  onRefresh,
 }: StaffTableProps) {
-  if (loading) {
-    return (
-      <Paper sx={{ p: 8, textAlign: "center" }}>
-        <CircularProgress />
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-          Loading staff members...
-        </Typography>
-      </Paper>
-    );
-  }
+  const { run } = useAsyncAction();
+  const columns: GridColumn<StaffMember>[] = useMemo(
+    () => [
+      {
+        headerName: "Staff Member",
+        field: "userName",
+        minWidth: 260,
+        flex: 2.2,
+        editable: true,
+        cellRenderer: (params) => {
+          const member = params.data;
+          if (!member) return null;
+          const displayUserName = params.value || member.userName;
+          const fullName =
+            displayUserName ||
+            `${member.firstName ?? ""} ${member.lastName ?? ""}`.trim() ||
+            member.email ||
+            "Unknown User";
+          const initials = getInitials(fullName);
+          const isActive = (member.status || "ACTIVE") === "ACTIVE";
 
-  if (staff.length === 0) {
-    return (
-      <Paper sx={{ p: 8, textAlign: "center" }}>
-        <Typography variant="h6" color="text.secondary">
-          No staff members found
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-          Add staff members to get started
-        </Typography>
-      </Paper>
-    );
-  }
+          return (
+            <div className="flex items-center gap-3 py-1">
+              <span
+                className={`w-11 h-9 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 ${
+                  isActive
+                    ? "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border border-blue-200/50"
+                    : "bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500 border border-slate-200/50"
+                }`}
+              >
+                {isActive ? initials : <UserX className="h-4 w-4" />}
+              </span>
+              <div className="flex flex-col min-w-0">
+                <span className="font-bold text-sm text-[var(--primary)] dark:text-slate-100 truncate">
+                  {fullName}
+                </span>
+                <span className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                  {displayUserName && displayUserName !== fullName
+                    ? `@${displayUserName}`
+                    : member.email || "Team member"}
+                </span>
+              </div>
+            </div>
+          );
+        },
+      },
+      {
+        headerName: "Email Address",
+        field: "email",
+        minWidth: 200,
+        flex: 1.4,
+        cellRenderer: (params) => {
+          const email = params.data?.email;
+          if (!email) return <span className="text-slate-400 text-xs">—</span>;
+          return (
+            <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-700 dark:text-slate-300">
+              <Mail className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+              <span className="truncate">{email}</span>
+            </div>
+          );
+        },
+      },
+      {
+        headerName: "Phone Number",
+        field: "phone",
+        minWidth: 160,
+        flex: 1.1,
+        editable: true,
+        cellRenderer: (params) => {
+          const phone =
+            params.value || params.data?.phone || params.data?.phoneMasked;
+          if (!phone) return <span className="text-slate-400 text-xs">—</span>;
+          return (
+            <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-700 dark:text-slate-300">
+              <Phone className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+              <span className="font-mono">{phone}</span>
+            </div>
+          );
+        },
+      },
+      {
+        headerName: "Role",
+        field: "role",
+        minWidth: 140,
+        flex: 1,
+        editable: true,
+        cellEditor: "agSelectCellEditor",
+        cellEditorParams: {
+          values: ["Accountant", "Manager", "Admin"],
+        },
+        cellRenderer: (params) => {
+          const role =
+            params.value || params.data?.roles?.[0] || params.data?.role;
+          return <StaffRoleBadge role={role} />;
+        },
+      },
+      {
+        headerName: "Status",
+        field: "status",
+        minWidth: 120,
+        flex: 0.9,
+        editable: true,
+        cellEditor: "agSelectCellEditor",
+        cellEditorParams: {
+          values: ["ACTIVE", "INACTIVE"],
+        },
+        valueFormatter: (p) =>
+          p.value === "ACTIVE" || p.value === true ? "ACTIVE" : "INACTIVE",
+        cellRenderer: (params) => {
+          const status = (params.value || params.data?.status || "ACTIVE") as
+            | "ACTIVE"
+            | "INACTIVE";
+          return <StaffStatusBadge status={status} />;
+        },
+      },
+    ],
+    [],
+  );
 
-  // ✅ Helper: full name
-  // ✅ Full name helper
-  const getFullName = (member: StaffMember) => {
-    return (
-      member.userName ||
-      `${member.firstName ?? ""} ${member.lastName ?? ""}`.trim() ||
-      member.email ||
-      "Unknown User"
-    );
-  };
-
-  // ✅ Initials helper
-  const getInitials = (name?: string) => {
-    if (!name) return "??";
-    return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2);
-  };
+  const actions: GridAction<StaffMember>[] = useMemo(
+    () =>
+      createTableActions<StaffMember>({
+        onView: (member) => onView(member.id),
+        onDelete: (member) => onDelete(member.id, getFullName(member)),
+      }),
+    [onView, onDelete],
+  );
 
   return (
-    <TableContainer component={Paper}>
-      <Table>
-        <TableHead>
-          <TableRow
-            sx={{
-              backgroundColor: "#F8FAFC",
-            }}
-          >
-            {[
-              "Staff Member",
-              "Email",
-              "Phone",
-              "Role",
-              "Status",
-              "Actions",
-            ].map((h) => (
-              <TableCell
-                key={h}
-                sx={{
-                  borderBottom: "1px solid #E2E8F0",
-                  py: 1.8,
-                }}
-              >
-                <Typography
-                  sx={{
-                    fontSize: "0.72rem",
-                    fontWeight: 700,
-                    color: "#64748B",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.08em",
-                    lineHeight: 1,
-                  }}
-                >
-                  {h}
-                </Typography>
-              </TableCell>
-            ))}
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {staff.map((member, index) => {
-            const fullName = getFullName(member);
-            const role = (member.roles?.[0] || "N/A").toUpperCase() || "N/A";
-
-            return (
-              <TableRow
-                key={member.id || index}
-                hover
-                sx={{
-                  cursor: "pointer",
-
-                  "&:hover": {
-                    backgroundColor: "#F8FAFC",
-                  },
-                }}
-                onClick={() => onView(member.id)}
-              >
-                {/* ✅ Staff Name + Avatar */}
-                <TableCell>
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-                    <Avatar
-                      sx={{
-                        bgcolor:
-                          member.status === "ACTIVE" ? "#DBEAFE" : "#F1F5F9",
-                        color:
-                          member.status === "ACTIVE" ? "#2563EB" : "#94A3B8",
-                        width: 40,
-                        height: 40,
-                      }}
-                    >
-                      {member.status === "ACTIVE" ? (
-                        getInitials(fullName)
-                      ) : (
-                        <InactiveIcon fontSize="small" />
-                      )}
-                    </Avatar>
-
-                    <Typography
-                      variant="body2"
-                      sx={{
-                        color: "#1E293B",
-                        fontWeight: 600,
-                      }}
-                    >
-                      {fullName}
-                    </Typography>
-                  </Box>
-                </TableCell>
-
-                {/* ✅ Email */}
-                <TableCell>
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      color: "#475569",
-                    }}
-                  >
-                    {member.email || "—"}
-                  </Typography>
-                </TableCell>
-
-                {/* ✅ Phone */}
-                <TableCell>
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      color: "#475569",
-                      letterSpacing: "0.02em",
-                    }}
-                  >
-                    {member.phone || member.phoneMasked || "—"}
-                  </Typography>
-                </TableCell>
-
-                {/* ✅ Role (FIXED) */}
-                <TableCell>
-                  <Chip
-                    label={role}
-                    size="small"
-                    sx={{
-                      bgcolor: "#EFF6FF",
-                      color: "#2563EB",
-
-                      border: "1px solid #DBEAFE",
-
-                      fontWeight: 600,
-                      fontSize: "0.72rem",
-                    }}
-                  />
-                </TableCell>
-
-                {/* ✅ Status */}
-                <TableCell>
-                  <Chip
-                    label={member.status === "ACTIVE" ? "Active" : "Inactive"}
-                    size="small"
-                    sx={{
-                      bgcolor:
-                        member.status === "ACTIVE" ? "#E8F5E9" : "#F1F5F9",
-
-                      color: member.status === "ACTIVE" ? "#2E7D32" : "#64748B",
-
-                      border: "1px solid",
-                      borderColor: "divider",
-
-                      fontWeight: 600,
-                      fontSize: "0.72rem",
-                    }}
-                  />
-                </TableCell>
-
-                {/* ✅ Actions */}
-                <TableCell align="right" onClick={(e) => e.stopPropagation()}>
-                  <Tooltip title="View Details">
-                    <IconButton
-                      size="small"
-                      onClick={() => onView(member.id)}
-                      sx={{
-                        color: "text.secondary",
-
-                        "&:hover": {
-                          color: "primary.main",
-                          backgroundColor: "#F1F5F9",
-                        },
-                      }}
-                    >
-                      {" "}
-                      <ViewIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-
-                  <Tooltip title="Edit Role">
-                    <IconButton size="small" onClick={() => onEdit(member.id)}>
-                      <EditIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-
-                  <Tooltip title="Remove Staff">
-                    <IconButton
-                      size="small"
-                      sx={{
-                        color: "#94A3B8",
-
-                        "&:hover": {
-                          color: "#DC2626",
-                          backgroundColor: "#FEF2F2",
-                        },
-                      }}
-                      onClick={() => onDelete(member.id, fullName)}
-                    >
-                      <DeleteIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
-    </TableContainer>
+    <CommonDataGrid<StaffMember>
+      rowData={staff}
+      columns={columns}
+      actions={actions}
+      isLoading={loading}
+      emptyMessage="No staff members found matching your search or filters."
+      rowHeight={64}
+      onUpdateCell={async ({ row, field, newValue }) => {
+        if (!businessId) return;
+        const dto: UpdateStaffDto = {};
+        if (field === "role") {
+          dto.membership = { roles: [String(newValue)] };
+        } else if (field === "status") {
+          dto.membership = {
+            isActive: newValue === "ACTIVE" || newValue === true,
+          };
+        } else if (field === "phone") {
+          dto.user = { phone: String(newValue).trim() };
+        } else if (field === "userName") {
+          dto.user = { userName: String(newValue).trim() };
+        }
+        await run(() => updateStaff(businessId, row.id, dto), {
+          successMessage: "Staff updated successfully",
+          errorMessage: "Staff updation failed",
+        });
+        // onRefresh?.();
+      }}
+    />
   );
 }

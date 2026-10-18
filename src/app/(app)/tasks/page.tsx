@@ -1,190 +1,406 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { Plus, X, Eye, Trash2 } from 'lucide-react';
-import { useWorkspace } from '@/context/WorkspaceContext';
+import { useCallback, useMemo } from "react";
+import { Eye, Pencil, Trash2, Calendar } from "lucide-react";
+import { useWorkspace } from "@/context/WorkspaceContext";
+import { TaskListItem } from "@/types/task.types";
+import CommonDataGrid, {
+  GridAction,
+  GridColumn,
+  createTableActions,
+} from "@/components/common/CommonTable";
+import PageFilterBar from "@/components/common/PageFilter";
+import ResourcePageLayout from "@/components/common/ResourcePageLayout";
+import TaskFormDialog from "@/components/tasks/TaskFormDialogue";
+import TaskDetailsDrawer from "@/components/tasks/TaskDetailsDrawer";
+import ConfirmDialog from "@/components/tasks/ConfirmDialog";
+import { useTasks } from "@/hooks/tasks/useTasks";
+import { useTaskFilters } from "@/hooks/tasks/useTaskFilters";
 
-import { TaskListItem } from '@/types/task.types';
-import CommonDataGrid, { GridAction, GridColumn } from '@/components/common/CommonTable';
-import { useTasks } from '@/hooks/tasks/useTasks';
-import { useTaskFilters } from '@/hooks/tasks/useTaskFilters';
-import PageFilterBar from '@/components/common/PageFilter';
-import TaskFormDialog from '@/components/tasks/TaskFormDialogue';
-import ConfirmDialog from '@/components/tasks/ConfirmDialog';
+import { updateTask } from "@/services/taskService";
+import { TASK_TYPES } from "@/constants/taskConstants";
+import {
+  compareDates,
+  compareStrings,
+  SortOption,
+  useSortedItems,
+} from "@/hooks/useSortedItems";
+import { useResourcePageState } from "@/hooks/useResourcePageState";
+import { useAsyncAction } from "@/hooks/useAnyAction";
+import PageSkeleton from "@/components/common/PageSkeleton";
+// import { DateCellEditor } from "@/components/grid/DateCellEditor";
+import { DueDate } from "@/components/common/DueDate";
+import { DateCellEditor } from "@/components/grid/DateCellEditor";
+
+const STATUS_VALUES = [
+  "OPEN",
+  "PENDING",
+  "IN_PROGRESS",
+  "COMPLETED",
+  "CLOSED",
+  "CANCELLED",
+];
+
+const SORT_OPTIONS: SortOption<TaskListItem>[] = [
+  {
+    key: "due_asc",
+    label: "Sort by due date",
+    compare: compareDates((t) => t.dueDate, "asc"),
+  },
+  {
+    key: "due_desc",
+    label: "Sort by due date (Latest)",
+    compare: compareDates((t) => t.dueDate, "desc"),
+  },
+  {
+    key: "title_asc",
+    label: "Sort by title (A-Z)",
+    compare: compareStrings((t) => t.title),
+  },
+  {
+    key: "client_asc",
+    label: "Sort by client (A-Z)",
+    compare: compareStrings((t) => t.subject?.name),
+  },
+];
+
+function getTaskTypePrefix(val?: string | null) {
+  if (!val) return "TASK";
+  const upper = val.toUpperCase();
+  if (upper.includes("GST")) return "GST";
+  if (upper.includes("TDS")) return "TDS";
+  if (upper.includes("ITR")) return "ITR";
+  if (upper.includes("ROC")) return "ROC";
+  if (upper.includes("MSME")) return "MSME";
+  return val.split("_")[0] || "TASK";
+}
+
+function getTaskTypeBadgeClass(val?: string | null) {
+  const prefix = getTaskTypePrefix(val);
+  if (prefix === "TDS")
+    return "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300";
+  if (prefix === "ITR")
+    return "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300";
+  if (prefix === "GST")
+    return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300";
+  if (prefix === "ROC")
+    return "bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300";
+  return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300";
+}
+
+function StatusPill({ status }: { status?: string }) {
+  const s = (status || "").toUpperCase();
+  if (s === "COMPLETED") {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#ecfdf5] text-[#047857] dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200/60">
+        <span className="w-1.5 h-1.5 rounded-full bg-[#10b981]" />
+        <span>Completed</span>
+      </span>
+    );
+  }
+  if (s === "IN_PROGRESS") {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#fffbeb] text-[#b45309] dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200/60">
+        <span className="w-1.5 h-1.5 rounded-full bg-[#f59e0b]" />
+        <span>In Progress</span>
+      </span>
+    );
+  }
+  if (s === "OPEN") {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#eff6ff] text-[#1d4ed8] dark:bg-blue-950/40 dark:text-blue-400 border border-blue-200/60">
+        <span className="w-1.5 h-1.5 rounded-full bg-[#3b82f6]" />
+        <span>Open</span>
+      </span>
+    );
+  }
+  if (s === "PENDING") {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#f5f3ff] text-[#6d28d9] dark:bg-purple-950/40 dark:text-purple-400 border border-purple-200/60">
+        <span className="w-1.5 h-1.5 rounded-full bg-[#8b5cf6]" />
+        <span>Pending</span>
+      </span>
+    );
+  }
+  if (s === "CLOSED") {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200/60">
+        <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+        <span>Closed</span>
+      </span>
+    );
+  }
+  if (s === "CANCELLED") {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#fef2f2] text-[#dc2626] dark:bg-rose-950/40 dark:text-rose-400 border border-rose-200/60">
+        <span className="w-1.5 h-1.5 rounded-full bg-[#ef4444]" />
+        <span>Cancelled</span>
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border border-slate-200/60">
+      <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+      <span>{status || "—"}</span>
+    </span>
+  );
+}
 
 const columns: GridColumn<TaskListItem>[] = [
-  { headerName: 'Title', field: 'title', minWidth: 220, flex: 2, editable: true },
   {
-    headerName: 'Client',
-    colId: 'client',
-    valueGetter: (p) => p.data?.subject?.name ?? '—',
-    minWidth: 180,
-  },
-  {
-    headerName: 'Task Type',
-    field: 'taskType',
-    minWidth: 150,
+    headerName: "Task",
+    field: "title",
+    minWidth: 260,
+    flex: 2.5,
     editable: true,
-    cellEditor: 'agSelectCellEditor',
-    cellEditorParams: {
-      values: ['Tax Filing', 'GST', 'Audit', 'Compliance', 'Accounting'],
+    cellRenderer: (p) => {
+      const row = p.data;
+      if (!row) return null;
+      const taskType = row.taskType || row.title || "";
+      const prefix = getTaskTypePrefix(taskType);
+      const badgeClass = getTaskTypeBadgeClass(taskType);
+      const clientName = row.subject?.name;
+
+      return (
+        <div className="flex items-center gap-3 py-1">
+          <span
+            className={`w-11 h-9 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 ${badgeClass}`}
+          >
+            {prefix}
+          </span>
+          <div className="flex flex-col min-w-0">
+            <span className="font-bold text-sm text-[var(--primary)] dark:text-slate-100 truncate">
+              {row.title || "—"}
+            </span>
+            <span className="text-xs text-slate-500 dark:text-slate-400 truncate">
+              {clientName ? `Client: ${clientName}` : "General task"}
+            </span>
+          </div>
+        </div>
+      );
     },
   },
-  { headerName: 'Status', field: 'status', minWidth: 140, editable: true },
   {
-    headerName: 'Due Date',
-    field: 'dueDate',
+    headerName: "Client",
+    colId: "client",
+    valueGetter: (p) => p.data?.subject?.name ?? "—",
+    minWidth: 160,
+    flex: 1.2,
+    cellRenderer: (p) => {
+      const name = p.data?.subject?.name;
+      if (!name) return <span className="text-xs text-slate-400">—</span>;
+      const initial = name.charAt(0).toUpperCase();
+
+      return (
+        <div className="flex items-center gap-2">
+          <span className="w-6 h-6 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-[10px] font-bold text-slate-600 dark:text-slate-300 shrink-0">
+            {initial}
+          </span>
+          <span className="font-semibold text-xs sm:text-sm text-slate-800 dark:text-slate-200 truncate">
+            {name}
+          </span>
+        </div>
+      );
+    },
+  },
+  {
+    headerName: "Task Type",
+    field: "taskType",
     minWidth: 130,
+    flex: 1,
     editable: true,
-    valueFormatter: (p) => (p.value ? new Date(p.value).toLocaleDateString() : '—'),
+    cellEditor: "agSelectCellEditor",
+    cellEditorParams: { values: TASK_TYPES.map((t) => t.label) },
+    cellRenderer: (p) => {
+      const val = p.value;
+      const prefix = getTaskTypePrefix(val);
+      return (
+        <span className="inline-block px-3 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+          {prefix}
+        </span>
+      );
+    },
+  },
+  {
+    headerName: "Status",
+    field: "status",
+    minWidth: 145,
+    flex: 1.1,
+    editable: true,
+    cellEditor: "agSelectCellEditor",
+    cellEditorParams: { values: STATUS_VALUES },
+    cellRenderer: (p) => <StatusPill status={p.value} />,
+  },
+  {
+    headerName: "Due Date",
+    field: "dueDate",
+    minWidth: 180,
+    flex: 1.4,
+    editable: true,
+    cellEditor: DateCellEditor,
+    cellEditorPopup: true,
+    cellEditorPopupPosition: "under",
+    cellRenderer: (p) => (
+      <DueDate
+        value={p.value}
+        completed={
+          p.data?.status === "COMPLETED" || p.data?.status === "CLOSED"
+        }
+      />
+    ),
   },
 ];
 
 export default function TasksPage() {
-  // Private layout guarantees status === 'ready', so businessId is always set
   const { businessId } = useWorkspace();
+  const id = businessId!;
 
-  const { tasks, loading, error, setError, refetch, removeTask, deleteLoading } =
-    useTasks(businessId!);
+  const { tasks, loading, error, setError, refetch, removeTask, patchTask } =
+    useTasks(id);
+  const filters = useTaskFilters(tasks);
+  const { sorted, sortProps } = useSortedItems(
+    filters.filteredTasks,
+    SORT_OPTIONS,
+  );
 
-  const {
-    searchQuery,
-    setSearchQuery,
-    values: filterValues,
-    onChange: onFilterChange,
-    filteredTasks,
-    reset: resetFilters,
-  } = useTaskFilters(tasks);
-
-  const [formDialogOpen, setFormDialogOpen] = useState(false);
-  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
-
-  const handleView = (taskId: string) => {
-    setSelectedTaskId(taskId);
-    setDrawerOpen(true);
-  };
-
-  const handleCreate = () => {
-    setEditingTaskId(null);
-    setFormDialogOpen(true);
-  };
-
-  const handleEdit = (taskId: string) => {
-    setEditingTaskId(taskId);
-    setFormDialogOpen(true);
-    setDrawerOpen(false);
-  };
-
-  const closeForm = () => {
-    setFormDialogOpen(false);
-    setEditingTaskId(null);
-  };
+  const page = useResourcePageState();
+  const deleteAction = useAsyncAction();
 
   const handleDeleteConfirm = async () => {
-    if (!deleteTarget) return;
-    try {
-      await removeTask(deleteTarget.id);
-      setDeleteTarget(null);
-    } catch {
-      // error is captured in `error` state by useTasks; dialog stays open for retry/cancel
-    }
+    const target = page.deleteTarget;
+    if (!target) return;
+    await deleteAction.run(() => removeTask(target.id), {
+      successMessage: `"${target.label}" deleted`,
+      errorMessage: "Failed to delete task",
+      onSuccess: page.cancelDelete,
+    });
   };
 
-  const actions: GridAction<TaskListItem>[] = [
-    { label: 'View', icon: <Eye className="h-4 w-4" />, variant: 'secondary', onClick: (row) => handleView(row.id) },
-    {
-      label: 'Delete',
-      icon: <Trash2 className="h-4 w-4" />,
-      variant: 'danger',
-      onClick: (row) => setDeleteTarget({ id: row.id, title: row.title }),
+  const updateAction = useAsyncAction();
+  const { run: runUpdate } = updateAction;
+
+  const handleUpdateCell = useCallback(
+    async ({
+      row,
+      field,
+      newValue,
+    }: {
+      row: TaskListItem;
+      field: string;
+      newValue: unknown;
+    }) => {
+      if (!id) return;
+
+      let value = newValue;
+      if (field === "taskType") {
+        const matched = TASK_TYPES.find(
+          (t) =>
+            t.label === newValue ||
+            t.value === newValue ||
+            t.apiValue === newValue,
+        );
+        if (matched) value = matched.apiValue;
+      }
+
+      await runUpdate(() => updateTask(id, row.id, { [field]: value }), {
+        successMessage: "Task updated successfully",
+        errorMessage: "Failed to update task",
+        // onSuccess: () =>
+        //   patchTask(row.id, { [field]: value } as Partial<TaskListItem>),
+      });
     },
-  ];
+    [id],
+  );
+
+  const actions = useMemo<GridAction<TaskListItem>[]>(
+    () =>
+      createTableActions<TaskListItem>({
+        onView: (r) => page.openView(r.id),
+        onEdit: (r) => page.openEdit(r.id),
+        onDelete: (r) => page.requestDelete(r.id, r.title),
+      }),
+    [page.openView, page.openEdit, page.requestDelete],
+  );
+
+  if (!businessId || loading) {
+    return <PageSkeleton />;
+  }
 
   return (
-    <div className="min-h-screen bg-bg py-8">
-      <div className="mx-auto max-w-7xl space-y-6 px-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-semibold text-txt-main">Tasks</h1>
-            <p className="mt-1 text-sm text-txt-sub">Manage all compliance tasks</p>
-          </div>
-          <button
-            type="button"
-            className="btn gap-2 border-none bg-navy text-white hover:bg-navy-hover"
-            onClick={handleCreate}
-          >
-            <Plus className="h-4 w-4" />
-            Create Task
-          </button>
-        </div>
-
-        {error && (
-          <div role="alert" className="alert alert-error flex items-center justify-between text-sm">
-            <span>{error}</span>
-            <button type="button" onClick={() => setError('')} aria-label="Dismiss error">
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        )}
-
+    <ResourcePageLayout
+      title="Tasks"
+      description="Manage all compliance tasks"
+      actionLabel="Create task"
+      onAction={page.openCreate}
+      error={error}
+      onDismissError={() => setError("")}
+      filters={
         <PageFilterBar
           type="tasks"
-          search={searchQuery}
-          onSearchChange={setSearchQuery}
-          values={filterValues}
-          onChange={onFilterChange}
-          onReset={resetFilters}
+          search={filters.searchQuery}
+          onSearchChange={filters.setSearchQuery}
+          values={filters.values}
+          onChange={filters.onChange}
+          onReset={filters.reset}
         />
-
-        {!loading && (
-          <p className="text-sm text-txt-sub">
-            Showing {filteredTasks.length} of {tasks.length} tasks
-          </p>
-        )}
-
-        <CommonDataGrid<TaskListItem>
-          rowData={filteredTasks}
-          columns={columns}
-          actions={actions}
-          isLoading={loading}
-          onRowClick={(row) => handleView(row.id)}
-          onRowDoubleClick={(row) => handleEdit(row.id)}
-          onCellValueChanged={({ row, field, newValue }) => {
-            // TODO: updateTask(businessId, row.id, { [field]: newValue })
-          }}
-          emptyMessage="No tasks found"
-        />
-
-        <TaskFormDialog
-          open={formDialogOpen}
-          taskId={editingTaskId ?? undefined}
-          businessId={businessId!}
-          onClose={closeForm}
-          onSuccess={() => {
-            refetch();
-            closeForm();
-          }}
-        />
-
-        <ConfirmDialog
-          open={!!deleteTarget}
-          title="Delete Task"
-          description={
-            <>
-              Are you sure you want to delete <strong>{deleteTarget?.title}</strong>? This
-              action cannot be undone.
-            </>
-          }
-          confirmLabel="Delete"
-          variant="danger"
-          loading={deleteLoading}
-          onConfirm={handleDeleteConfirm}
-          onCancel={() => setDeleteTarget(null)}
-        />
-      </div>
-    </div>
+      }
+      summary={
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-xl font-bold text-txt-main">
+            {sorted.length}
+          </span>
+          <span className="text-base font-normal text-txt-sub">tasks</span>
+        </div>
+      }
+      sort={sortProps}
+      overlays={
+        <>
+          <TaskDetailsDrawer
+            open={page.viewOpen}
+            taskId={page.viewId}
+            businessId={id}
+            onClose={page.close}
+            onEdit={page.openEdit}
+            onRefresh={refetch}
+          />
+          <TaskFormDialog
+            open={page.formOpen}
+            taskId={page.formId ?? undefined}
+            businessId={id}
+            onClose={page.close}
+            onSuccess={() => {
+              refetch();
+              page.close();
+            }}
+          />
+          <ConfirmDialog
+            open={!!page.deleteTarget}
+            title="Delete Task"
+            description={
+              <>
+                Are you sure you want to delete{" "}
+                <strong>{page.deleteTarget?.label}</strong>? This action cannot
+                be undone.
+              </>
+            }
+            confirmLabel="Delete"
+            variant="danger"
+            loading={deleteAction.loading}
+            onConfirm={handleDeleteConfirm}
+            onCancel={page.cancelDelete}
+          />
+        </>
+      }
+    >
+      <CommonDataGrid<TaskListItem>
+        rowData={sorted}
+        columns={columns}
+        actions={actions}
+        isLoading={loading}
+        rowHeight={64}
+        onUpdateCell={handleUpdateCell}
+        emptyMessage="No tasks found"
+      />
+    </ResourcePageLayout>
   );
 }

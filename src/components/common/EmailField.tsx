@@ -1,6 +1,5 @@
 'use client';
 
-import { TextField, Typography, Box } from "@mui/material";
 import { useState } from "react";
 
 type Props = {
@@ -8,7 +7,7 @@ type Props = {
   onChange: (value: string) => void;
   required?: boolean;
   label?: string;
-  placeholder?: string;   // ✅ NEW
+  placeholder?: string;
   forceError?: boolean;
 };
 
@@ -17,7 +16,7 @@ export default function EmailField({
   onChange,
   required = true,
   label = "Email",
-  placeholder = "Enter your email", // ✅ default placeholder
+  placeholder = "Enter your email",
   forceError = false,
 }: Props) {
   const [touched, setTouched] = useState(false);
@@ -37,22 +36,32 @@ export default function EmailField({
   const errorMessage = getError();
 
   return (
-    <Box sx={{ mb: 2 }}>
-      {/* ✅ STATIC LABEL */}
-      <Typography sx={{ mb: 0.5, fontWeight: 500 }}>
-        {label}
-      </Typography>
+    <div className="w-full mb-3">
+      {label && (
+        <label className={`block text-xs font-semibold mb-1.5 ${errorMessage ? "text-rose-500" : "text-[var(--text-secondary)]"}`}>
+          {label}
+          {required && <span className="text-rose-500 ml-1">*</span>}
+        </label>
+      )}
 
-      <TextField
+      <input
         type="email"
-        fullWidth
         value={value}
         placeholder={placeholder}
-        error={!!errorMessage}
-        helperText={errorMessage}
         onBlur={() => setTouched(true)}
         onChange={(e) => onChange(e.target.value)}
+        className={`w-full h-11 px-3.5 text-sm rounded-xl border bg-[var(--surface)] text-[var(--text-primary)] transition-colors outline-none placeholder:text-[var(--text-secondary)]/60 ${
+          errorMessage
+            ? "border-rose-500 focus:border-rose-600 focus:ring-1 focus:ring-rose-500"
+            : "border-[var(--border)] focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)]"
+        }`}
       />
-    </Box>
+
+      {errorMessage && (
+        <p className="text-xs text-rose-500 font-medium mt-1 ml-1">
+          {errorMessage}
+        </p>
+      )}
+    </div>
   );
 }

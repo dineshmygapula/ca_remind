@@ -1,33 +1,27 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from "react";
+import { useFormContext } from "react-hook-form";
+import { Plus, Pencil, AlertCircle, X, Loader2 } from "lucide-react";
+import Drawer from "@/components/common/Drawer";
+import { FormWrapper } from "@/components/wrappers/FormWrapper";
+import { useAsyncAction } from "@/hooks/useAnyAction";
+import { createTask, updateTask, getTaskById } from "@/services/taskService";
+import { SubjectListItem } from "@/types/subject";
+import { StaffMember } from "@/types/staff.types";
+import { MessageTemplateListItem } from "@/types/messageTemplate.types";
 import {
-  PlusCircle,
-  Pencil,
-  ChevronDown,
-  AlertCircle,
-  X,
-  Bell,
-  Calendar,
-  AlignLeft,
-  Tag,
-  Repeat,
-  Mail,
-  Sparkles,
-  User2,
-} from 'lucide-react';
-import Drawer from '@/components/common/Drawer';
-import SearchableSelect from '@/components/common/SearchableSelect';
+  DeliveryChannel,
+  TaskPriority,
+  CreateTaskDto,
+  UpdateTaskDto,
+} from "@/types/task.types";
+import { useTaskFormData } from "@/hooks/tasks/useTasksFormData";
+import { taskFormSchema, TaskFormValues } from "@/utils/schema";
 
-import { createTask, updateTask, getTaskById } from '@/services/taskService';
-import { SubjectListItem } from '@/types/subject';
-import { StaffMember } from '@/types/staff.types';
-import { MessageTemplateListItem } from '@/types/messageTemplate.types';
-import { TASK_TYPES, FREQUENCY_OPTIONS, DELIVERY_CHANNELS } from '@/constants/taskConstants';
-import { useTaskFormData } from '@/hooks/tasks/useTasksFormData';
-import { TaskFormData, useTaskForm } from '@/hooks/tasks/useTaskForm';
-
-// ─── Props ────────────────────────────────────────────────────────────────────
+import TaskClientSection from "./task-form/TaskClientSection";
+import TaskDetailsSection from "./task-form/TaskDetailsSection";
+import TaskRemindersSection from "./task-form/TaskRemindersSection";
 
 interface Props {
   open: boolean;
@@ -37,522 +31,439 @@ interface Props {
   taskId?: string;
 }
 
-// ─── Field primitives ─────────────────────────────────────────────────────────
+const TASK_FORM_ID = "task-form";
 
-const INPUT =
-  'w-full h-10 rounded-xl border border-[var(--border)] bg-[var(--surface)] ' +
-  'text-sm font-medium text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 ' +
-  'outline-none transition-all hover:border-[var(--accent)]/50 ' +
-  'focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/20';
+const DEFAULT_FORM_VALUES: TaskFormValues = {
+  subjectId: "",
+  taskDefinitionId: "",
+  taskType: "",
+  priority: "MEDIUM",
+  frequency: "one_time",
+  dueDate: "",
+  assignedStaffId: "",
+  notes: "",
+  remindersEnabled: true,
+  templateId: "",
+  deliveryChannel: "EMAIL",
+  daysBeforeDueDate: 1,
+};
 
-const TEXTAREA =
-  'w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] ' +
-  'text-sm font-medium text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/50 resize-none ' +
-  'outline-none transition-all hover:border-[var(--accent)]/50 ' +
-  'focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/20';
+function computeTitle(type?: string, date?: string) {
+  if (!type) return "";
+  if (!date) return type;
+  const d = new Date(date).toLocaleDateString("en-IN", {
+    month: "short",
+    year: "numeric",
+  });
+  return `${type} – ${d}`;
+}
 
-const SELECT =
-  'w-full h-10 rounded-xl border border-[var(--border)] bg-[var(--surface)] ' +
-  'text-sm font-medium text-[var(--text-primary)] ' +
-  'outline-none transition-all hover:border-[var(--accent)]/50 appearance-none ' +
-  'focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/20';
+function formatFrequency(frequency?: string): string {
+  if (!frequency) return "ONETIME";
+  const upper = frequency.toUpperCase();
+  if (upper === "ONE_TIME" || upper === "ONETIME") return "ONETIME";
+  if (upper === "HALF_YEARLY" || upper === "HALFYEARLY") return "HALF_YEARLY";
+  return upper;
+}
 
-// ─── FieldWrap ────────────────────────────────────────────────────────────────
-
-function FieldWrap({
-  label,
-  required,
-  helper,
-  icon: Icon,
-  children,
+function TaskFormContent({
+  clients,
+  clientsLoading,
+  selectedClient,
+  setSelectedClient,
+  staff,
+  staffLoading,
+  selectedStaff,
+  setSelectedStaff,
+  templates,
+  templatesLoading,
+  selectedTemplate,
+  setSelectedTemplate,
+  taskDefinitions,
+  business,
+  onTitleCalculated,
 }: {
-  label: string;
-  required?: boolean;
-  helper?: string;
-  icon?: React.ElementType;
-  children: React.ReactNode;
+  clients: SubjectListItem[];
+  clientsLoading: boolean;
+  selectedClient: SubjectListItem | null;
+  setSelectedClient: (client: SubjectListItem | null) => void;
+  staff: StaffMember[];
+  staffLoading: boolean;
+  selectedStaff: StaffMember | null;
+  setSelectedStaff: (staff: StaffMember | null) => void;
+  templates: MessageTemplateListItem[];
+  templatesLoading: boolean;
+  selectedTemplate: MessageTemplateListItem | null;
+  setSelectedTemplate: (tpl: MessageTemplateListItem | null) => void;
+  taskDefinitions: any[];
+  business: any;
+  onTitleCalculated: (title: string) => void;
 }) {
+  const { watch } = useFormContext<TaskFormValues>();
+  const watchedTaskType = watch("taskType");
+  const watchedDueDate = watch("dueDate");
+
+  const calculatedTitle = useMemo(
+    () => computeTitle(watchedTaskType, watchedDueDate),
+    [watchedTaskType, watchedDueDate],
+  );
+
+  useEffect(() => {
+    onTitleCalculated(calculatedTitle);
+  }, [calculatedTitle, onTitleCalculated]);
+
   return (
-    <div className="flex flex-col gap-1.5">
-      <label className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-wide text-txt-sub">
-        {Icon && <Icon className="w-3 h-3" />}
-        {label}
-        {required && <span className="text-[var(--accent)] ml-0.5">*</span>}
-      </label>
-      {helper && (
-        <p className="text-[11px] text-txt-sub/70 leading-snug -mt-0.5">{helper}</p>
-      )}
-      {children}
+    <div className="space-y-4">
+      <TaskClientSection
+        clients={clients}
+        clientsLoading={clientsLoading}
+        selectedClient={selectedClient}
+        onSelectClient={setSelectedClient}
+      />
+
+      <TaskDetailsSection
+        staff={staff}
+        staffLoading={staffLoading}
+        selectedStaff={selectedStaff}
+        onSelectStaff={setSelectedStaff}
+        taskDefinitions={taskDefinitions}
+        templates={templates}
+        onAutoSelectTemplate={setSelectedTemplate}
+        generatedTitle={calculatedTitle}
+      />
+
+      <TaskRemindersSection
+        templates={templates}
+        templatesLoading={templatesLoading}
+        selectedTemplate={selectedTemplate}
+        onSelectTemplate={setSelectedTemplate}
+        selectedClient={selectedClient}
+        business={business}
+      />
     </div>
   );
 }
 
-// ─── SelectWithIcon ───────────────────────────────────────────────────────────
+export default function TaskFormDialog({
+  open,
+  onClose,
+  businessId,
+  onSuccess,
+  taskId,
+}: Props) {
+  const mode: "create" | "edit" = taskId ? "edit" : "create";
 
-function SelectWithIcon({
-  value,
-  onChange,
-  options,
-  placeholder,
-  disabled,
-  icon: Icon,
-}: {
-  value: string | number;
-  onChange: (val: string) => void;
-  options: { value: string | number; label: string }[];
-  placeholder?: string;
-  disabled?: boolean;
-  icon?: React.ElementType;
-}) {
-  return (
-    <div className="relative">
-      {Icon && (
-        <Icon className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--accent)] pointer-events-none z-10" />
-      )}
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        disabled={disabled}
-        className={`${SELECT} ${Icon ? 'pl-9' : 'pl-3'} pr-8 ${
-          disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'
-        }`}
-      >
-        {placeholder && (
-          <option value="" disabled>
-            {placeholder}
-          </option>
-        )}
-        {options.map((o) => (
-          <option key={o.value} value={o.value} className="bg-[var(--surface)]">
-            {o.label}
-          </option>
-        ))}
-      </select>
-      <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-txt-sub/60 pointer-events-none" />
-    </div>
+  const [initialFormValues, setInitialFormValues] = useState<
+    TaskFormValues | undefined
+  >(undefined);
+  const [headerTitle, setHeaderTitle] = useState("");
+
+  const [selectedClient, setSelectedClient] = useState<SubjectListItem | null>(
+    null,
   );
-}
-
-// ─── Section card wrapper ─────────────────────────────────────────────────────
-
-function SectionCard({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-  return (
-    <div className={`rounded-2xl border border-[var(--border)] bg-[var(--surface)] ${className}`}>
-      {children}
-    </div>
-  );
-}
-
-// ─── Main component ───────────────────────────────────────────────────────────
-
-export default function TaskFormDialog({ open, onClose, businessId, onSuccess, taskId }: Props) {
-  const mode: 'create' | 'edit' = taskId ? 'edit' : 'create';
-
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setLocalError] = useState('');
-  const [loadingTask, setLoadingTask] = useState(false);
-  const [initialForm, setInitialForm] = useState<TaskFormData | undefined>(undefined);
-
-  const [selectedClient, setSelectedClient] = useState<SubjectListItem | null>(null);
   const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(null);
-  const [selectedTemplate, setSelectedTemplate] = useState<MessageTemplateListItem | null>(null);
+  const [selectedTemplate, setSelectedTemplate] =
+    useState<MessageTemplateListItem | null>(null);
+
+  // Reusable actions from useAnyAction
+  const saveAction = useAsyncAction();
+  const fetchTaskAction = useAsyncAction();
 
   const {
-    clients, clientsLoading,
-    staff, staffLoading,
-    templates, templatesLoading,
-    taskDefinitions, business,
+    clients,
+    clientsLoading,
+    staff,
+    staffLoading,
+    templates,
+    templatesLoading,
+    taskDefinitions,
+    business,
     error: fetchError,
     setError: setFetchError,
   } = useTaskFormData(businessId, open);
 
-  const {
-    form, set, setReminder,
-    generatedTaskTitle,
-    getValidDaysBeforeOptions,
-    replaceTemplatePlaceholders,
-    validate, toDto, reset,
-  } = useTaskForm({ initialForm, templates, taskDefinitions, selectedClient, business });
-
-  // ── Edit: fetch task ────────────────────────────────────────────────────────
+  // ── Edit Mode: fetch task details directly without complex mappers ─────────
   useEffect(() => {
     if (!open) return;
-    if (mode === 'create') { setInitialForm(undefined); return; }
+    if (mode === "create") {
+      setInitialFormValues(undefined);
+      setSelectedClient(null);
+      setSelectedStaff(null);
+      setSelectedTemplate(null);
+      setHeaderTitle("");
+      return;
+    }
     if (!taskId) return;
 
-    (async () => {
-      try {
-        setLoadingTask(true);
+    fetchTaskAction.run(
+      async () => {
         const task = await getTaskById(businessId, taskId);
-        const firstReminder = task.reminders?.upcoming?.[0];
-        const hasReminders = (task.reminders?.upcoming?.length ?? 0) > 0;
-        setInitialForm({
-          subjectId: task.subject?.id ?? '',
-          taskDefinitionId: '',
-          taskType: task.taskType ?? '',
-          taskPriority: 'MEDIUM',
-          frequency: task.frequency ?? 'ONETIME',
-          dueDate: (task.dates?.dueDate ?? task.dueDate ?? '').slice(0, 10),
-          assignedStaffId: task.assignee?.id ?? '',
-          templateId: firstReminder?.messageTemplateId ?? '',
-          notes: task.notes ?? '',
-          remindersEnabled: hasReminders,
-          reminder: {
-            deliveryChannel: (firstReminder?.deliveryChannel as import('@/types/task.types').DeliveryChannel) ?? 'EMAIL',
-            daysBeforeDueDate: firstReminder?.daysBeforeDueDate ?? 1,
-          },
+        const firstReminder =
+          (task.reminders?.upcoming?.[0] as any) ??
+          (task as any).remindersScheduled?.[0];
+
+        setInitialFormValues({
+          ...DEFAULT_FORM_VALUES,
+          subjectId: task.subject?.id || (task as any).subjectId || "",
+          taskDefinitionId: (task as any).taskDefinitionId || "",
+          taskType: task.taskType || "",
+          priority: ((task as any).priority || "MEDIUM") as TaskPriority,
+          frequency: task.frequency || "one_time",
+          dueDate: task.dueDate || task.dates?.dueDate?.slice(0, 10) || "",
+          assignedStaffId:
+            task.assignee?.id || (task as any).assignedStaffId || "",
+          notes: task.notes || (task as any).description || "",
+          remindersEnabled: Boolean(firstReminder),
+          templateId:
+            firstReminder?.messageTemplateId || firstReminder?.templateId || "",
+          deliveryChannel: (
+            firstReminder?.channel ||
+            firstReminder?.deliveryChannel ||
+            "EMAIL"
+          ).toUpperCase() as DeliveryChannel,
+          daysBeforeDueDate: firstReminder?.daysBeforeDueDate || 1,
         });
-      } catch (err) {
-        setLocalError(err instanceof Error ? err.message : 'Failed to load task');
-      } finally {
-        setLoadingTask(false);
-      }
-    })();
+
+        if (task.subject) {
+          setSelectedClient({
+            id: task.subject.id,
+            displayName: task.subject.name,
+            businessName:
+              (task.subject as any).businessName || task.subject.name,
+          } as SubjectListItem);
+        }
+        if (task.assignee) {
+          setSelectedStaff({
+            id: task.assignee.id,
+            firstName: task.assignee.name.split(" ")[0] ?? "",
+            lastName: task.assignee.name.split(" ").slice(1).join(" "),
+          } as StaffMember);
+        }
+      },
+      {
+        errorMessage: "Failed to load task details",
+        showErrorToast: false,
+      },
+    );
   }, [open, mode, taskId, businessId]);
 
-  // ── Prefill selects ─────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!initialForm) return;
-    if (initialForm.subjectId && clients.length)
-      setSelectedClient(clients.find((c) => c.id === initialForm.subjectId) ?? null);
-    if (initialForm.assignedStaffId && staff.length)
-      setSelectedStaff(staff.find((s) => s.id === initialForm.assignedStaffId) ?? null);
-    if (initialForm.templateId && templates.length)
-      setSelectedTemplate(templates.find((t) => t.id === initialForm.templateId) ?? null);
-  }, [initialForm, clients, staff, templates]);
-
-  const combinedError = error || fetchError;
-
   const handleClose = () => {
-    if (submitting) return;
-    setLocalError(''); setFetchError('');
-    setSelectedClient(null); setSelectedStaff(null); setSelectedTemplate(null);
-    reset(); onClose();
+    if (saveAction.loading) return;
+    setSelectedClient(null);
+    setSelectedStaff(null);
+    setSelectedTemplate(null);
+    fetchTaskAction.reset();
+    saveAction.reset();
+    setFetchError("");
+    onClose();
   };
 
-  const handleSubmit = async () => {
-    const validationError = validate();
-    if (validationError) { setLocalError(validationError); return; }
-    setSubmitting(true); setLocalError('');
-    try {
-      const dto = toDto();
-      if (mode === 'edit' && taskId) await updateTask(businessId, taskId, dto);
-      else await createTask(businessId, dto);
-      handleClose(); onSuccess?.();
-    } catch (err) {
-      setLocalError(err instanceof Error ? err.message : `Failed to ${mode} task`);
-    } finally {
-      setSubmitting(false);
+  const handleSubmit = async (data: TaskFormValues) => {
+    const title = computeTitle(data.taskType, data.dueDate);
+
+    // Compute period dates from dueDate in YYYY-MM-DD format
+    let periodLabel = "";
+    let periodStart = "";
+    let periodEnd = "";
+
+    if (data.dueDate) {
+      const datePart = data.dueDate.split("T")[0];
+      const [y, m] = datePart.split("-").map(Number);
+      if (y && m) {
+        const d = new Date(y, m - 1, 1);
+        periodLabel = d.toLocaleDateString("en-IN", {
+          month: "short",
+          year: "numeric",
+        });
+        const monthStr = String(m).padStart(2, "0");
+        const lastDay = String(new Date(y, m, 0).getDate()).padStart(2, "0");
+        periodStart = `${y}-${monthStr}-01`;
+        periodEnd = `${y}-${monthStr}-${lastDay}`;
+      }
     }
+
+    const matchedDef = taskDefinitions.find(
+      (def) =>
+        String(def.taskType).trim().toUpperCase() ===
+        data.taskType.trim().toUpperCase(),
+    );
+
+    await saveAction.run(
+      async () => {
+        if (mode === "edit" && taskId) {
+          // Backend UPDATE only accepts these 7 fields — send nothing else.
+          const updateDto: UpdateTaskDto = {
+            description: data.notes?.trim() || undefined,
+            notes: data.notes?.trim() || undefined,
+            status: "OPEN",
+            priority: data.priority,
+            dueDate: data.dueDate || undefined,
+            assignedStaffId: data.assignedStaffId?.trim() || undefined,
+          };
+          await updateTask(businessId, taskId, updateDto);
+        } else {
+          // CREATE accepts the exact required payload.
+          const createDto: CreateTaskDto = {
+            title,
+            taskName: title,
+            subjectId: data.subjectId,
+            dueDate: data.dueDate.split("T")[0],
+            description: data.notes?.trim() || "",
+            notes: data.notes?.trim() || "",
+            taskType: data.taskType,
+            frequency: formatFrequency(data.frequency),
+            periodLabel,
+            taskDefinitionId: data.taskDefinitionId || matchedDef?.id || "",
+            periodStart,
+            periodEnd,
+            category: matchedDef?.category || "COMPLIANCE",
+            priority: data.priority || "MEDIUM",
+            assignedStaffId: data.assignedStaffId?.trim() || "",
+            status: "OPEN",
+            metadata: {},
+            remindersScheduled:
+              data.remindersEnabled && data.templateId
+                ? [
+                    {
+                      deliveryChannel: data.deliveryChannel,
+                      daysBeforeDueDate: Number(data.daysBeforeDueDate) || 0,
+                      messageTemplateId: data.templateId,
+                    },
+                  ]
+                : [],
+          };
+          await createTask(businessId, createDto);
+        }
+      },
+      {
+        successMessage:
+          mode === "edit"
+            ? "Task updated successfully"
+            : "Task created successfully",
+        errorMessage:
+          mode === "edit" ? "Failed to update task" : "Failed to create task",
+        showSuccessToast: true,
+        showErrorToast: true,
+        onSuccess: () => {
+          onSuccess?.();
+          handleClose();
+        },
+      },
+    );
   };
 
-  const validDaysBeforeOptions = getValidDaysBeforeOptions(form.dueDate);
+  const currentDefaultValues =
+    mode === "edit" && initialFormValues
+      ? initialFormValues
+      : DEFAULT_FORM_VALUES;
+
+  const formKey =
+    mode === "edit"
+      ? `edit-${taskId}-${initialFormValues ? "loaded" : "pending"}`
+      : "create";
 
   return (
     <Drawer
       open={open}
       onClose={handleClose}
-      icon={mode === 'edit' ? <Pencil className="h-4 w-4" /> : <PlusCircle className="h-4 w-4" />}
-      eyebrow={mode === 'edit' ? 'Edit Task' : 'New Task'}
-      title={mode === 'edit' ? 'Update Task Details' : 'Create New Task'}
-      onCancel={handleClose}
-      onSubmit={handleSubmit}
-      submitLabel={mode === 'edit' ? 'Update Task' : 'Save Task'}
-      submitting={submitting || loadingTask}
-      submitVariant="success"
-      width="md"
+      title={mode === "edit" ? headerTitle || "Edit Task" : "Create Task"}
+      width="lg"
+      customHeader={
+        <div className="bg-[#0F1E36] px-6 py-5 flex items-center justify-between text-white shrink-0 border-b border-white/10 select-none">
+          <div className="flex items-center gap-3.5 min-w-0">
+            <div className="w-10 h-10 rounded-2xl bg-[#F59E0B] flex items-center justify-center text-slate-950 font-bold shadow-sm shrink-0">
+              {mode === "edit" ? (
+                <Pencil className="h-5 w-5 text-slate-950 stroke-[2.5]" />
+              ) : (
+                <Plus className="h-5 w-5 text-slate-950 stroke-[2.5]" />
+              )}
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-bold text-[#F59E0B] uppercase tracking-wider mb-0.5">
+                {mode === "edit" ? "Update task" : "New task"}
+              </p>
+              <h2 className="text-lg font-extrabold leading-tight text-white tracking-tight truncate">
+                {mode === "edit"
+                  ? headerTitle || "Update Task Details"
+                  : "Create New Task"}
+              </h2>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleClose}
+            disabled={saveAction.loading}
+            aria-label="Close"
+            className="rounded-xl bg-white/10 hover:bg-white/20 p-2 text-white/80 hover:text-white transition-colors cursor-pointer"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      }
+      footer={
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={handleClose}
+            disabled={saveAction.loading}
+            className="flex-1 rounded-xl border border-[var(--border)] py-2.5 text-sm font-semibold text-txt-main bg-[var(--bg)] transition-all hover:bg-[var(--border)]/60 disabled:opacity-50 cursor-pointer"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            form={TASK_FORM_ID}
+            disabled={saveAction.loading || fetchTaskAction.loading}
+            className="flex flex-[2] items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold bg-[#F59E0B] hover:bg-[#D97706] text-slate-950 shadow-md transition-all hover:shadow-lg disabled:opacity-60 cursor-pointer"
+          >
+            {saveAction.loading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>{mode === "edit" ? "Saving..." : "Creating..."}</span>
+              </>
+            ) : (
+              <span>{mode === "edit" ? "Save changes" : "Create task"}</span>
+            )}
+          </button>
+        </div>
+      }
     >
-      <div className="space-y-4">
-
-        {/* ── Error banner ─────────────────────────────────────────────── */}
-        {combinedError && (
-          <div role="alert" className="alert alert-error rounded-xl py-3 px-4 text-sm flex gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            <span className="flex-1 font-medium">{combinedError}</span>
-            <button
-              type="button"
-              onClick={() => { setLocalError(''); setFetchError(''); }}
-              className="btn btn-ghost btn-xs btn-circle"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
+      <div className="py-1">
+        {/* Loading Indicator */}
+        {fetchTaskAction.loading && (
+          <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 text-xs mb-4">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            <span>Loading task details...</span>
           </div>
         )}
 
-        {/* ── Client ───────────────────────────────────────────────────── */}
-        <SectionCard>
-          <div className="px-4 py-3 border-b border-[var(--border)] bg-[var(--bg)]">
-            <p className="text-[11px] font-extrabold uppercase tracking-widest text-[var(--accent)]">
-              Client
-            </p>
-          </div>
-          <div className="px-4 py-3">
-            <FieldWrap label="Select Client" required icon={User2}>
-              <SearchableSelect
-                options={clients}
-                value={selectedClient}
-                onChange={(client) => {
-                  setSelectedClient(client);
-                  set('subjectId', client?.id ?? '');
-                }}
-                getOptionLabel={(c) => c.displayName}
-                getOptionKey={(c) => c.id}
-                loading={clientsLoading}
-                placeholder="Search and select client..."
-                emptyMessage={
-                  clients.length === 0
-                    ? 'No clients found. Create a client first.'
-                    : 'No matching clients'
-                }
-              />
-            </FieldWrap>
-          </div>
-        </SectionCard>
-
-        {/* ── Task Details ─────────────────────────────────────────────── */}
-        <SectionCard>
-          <div className="px-4 py-3 border-b border-[var(--border)] bg-[var(--bg)]">
-            <p className="text-[11px] font-extrabold uppercase tracking-widest text-[var(--accent)]">
-              Task Details
-            </p>
-          </div>
-          <div className="px-4 py-4 grid grid-cols-2 gap-4">
-            <FieldWrap label="Task Type" required icon={Tag}>
-              <SelectWithIcon
-                value={form.taskType}
-                onChange={(val) => set('taskType', val)}
-                options={TASK_TYPES}
-                placeholder="Select type"
-                icon={Tag}
-              />
-            </FieldWrap>
-
-            <FieldWrap label="Frequency" required icon={Repeat}>
-              <SelectWithIcon
-                value={form.frequency}
-                onChange={(val) => set('frequency', val)}
-                options={FREQUENCY_OPTIONS}
-                icon={Repeat}
-              />
-            </FieldWrap>
-
-            <FieldWrap label="Due Date" required icon={Calendar}>
-              <div className="relative">
-                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--accent)] pointer-events-none z-10" />
-                <input
-                  type="date"
-                  value={form.dueDate}
-                  onChange={(e) => {
-                    const d = e.target.value;
-                    set('dueDate', d);
-                    const opts = getValidDaysBeforeOptions(d);
-                    if (!opts.some((o) => o.value === form.reminder.daysBeforeDueDate) && opts.length > 0)
-                      setReminder('daysBeforeDueDate', opts[0].value);
-                  }}
-                  className={`${INPUT} pl-9 pr-3`}
-                />
-              </div>
-            </FieldWrap>
-
-            <FieldWrap label="Task Title" icon={Sparkles}>
-              <div className="relative">
-                <Sparkles className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--accent)]/60 pointer-events-none z-10" />
-                <input
-                  readOnly
-                  value={generatedTaskTitle}
-                  placeholder="Auto-generated"
-                  className={`${INPUT} pl-9 pr-3 cursor-default bg-[var(--bg)] ${
-                    generatedTaskTitle ? 'text-txt-main' : 'text-txt-sub/50'
-                  }`}
-                />
-              </div>
-            </FieldWrap>
-
-            <div className="col-span-2">
-              <FieldWrap label="Assigned To" icon={User2}>
-                <SearchableSelect
-                  options={staff}
-                  value={selectedStaff}
-                  onChange={(member) => {
-                    setSelectedStaff(member);
-                    set('assignedStaffId', member?.id ?? '');
-                  }}
-                  getOptionLabel={(m) =>
-                    [m.firstName, m.lastName].filter(Boolean).join(' ') || m.email || m.id
-                  }
-                  getOptionKey={(m) => m.id}
-                  loading={staffLoading}
-                  placeholder="Search and select employee..."
-                  emptyMessage={
-                    staff.length === 0
-                      ? 'No staff found. Add a staff member first.'
-                      : 'No matching staff'
-                  }
-                />
-              </FieldWrap>
-            </div>
-
-            <div className="col-span-2">
-              <FieldWrap label="Notes" icon={AlignLeft}>
-                <div className="relative">
-                  <AlignLeft className="absolute left-3 top-3 w-3.5 h-3.5 text-[var(--accent)]/60 pointer-events-none z-10" />
-                  <textarea
-                    rows={2}
-                    value={form.notes}
-                    onChange={(e) => set('notes', e.target.value)}
-                    placeholder="Add any relevant notes..."
-                    className={`${TEXTAREA} pl-9 pr-3 py-2.5`}
-                  />
-                </div>
-              </FieldWrap>
-            </div>
-          </div>
-        </SectionCard>
-
-        {/* ── Reminders ────────────────────────────────────────────────── */}
-        <SectionCard>
-          {/* Toggle header */}
-          <div className="flex items-center justify-between px-4 py-3 bg-[var(--bg)]">
-            <div className="flex items-center gap-2">
-              <div className={`flex items-center justify-center w-7 h-7 rounded-lg transition-colors ${
-                form.remindersEnabled
-                  ? 'bg-[var(--accent)]/15 text-[var(--accent)]'
-                  : 'bg-[var(--border)]/60 text-txt-sub'
-              }`}>
-                <Bell className="w-3.5 h-3.5" />
-              </div>
-              <div>
-                <p className="text-[11px] font-extrabold uppercase tracking-widest text-[var(--accent)]">
-                  Reminders
-                </p>
-                <p className="text-[11px] text-txt-sub leading-none mt-0.5">
-                  {form.remindersEnabled ? 'Enabled — send before due date' : 'Disabled'}
-                </p>
-              </div>
-            </div>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <span className={`text-[11px] font-bold ${form.remindersEnabled ? 'text-[var(--accent)]' : 'text-txt-sub'}`}>
-                {form.remindersEnabled ? 'ON' : 'OFF'}
-              </span>
-              <input
-                type="checkbox"
-                checked={form.remindersEnabled}
-                onChange={(e) => set('remindersEnabled', e.target.checked)}
-                className="toggle toggle-sm toggle-warning"
-              />
-            </label>
-          </div>
-
-          {/* Expanded fields */}
-          {form.remindersEnabled && (
-            <div className="border-t border-[var(--border)] px-4 py-4 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <FieldWrap label="Delivery Channel" helper="One channel per task" icon={Mail}>
-                  <SelectWithIcon
-                    value={form.reminder.deliveryChannel}
-                    onChange={(val) => setReminder('deliveryChannel', val as never)}
-                    options={DELIVERY_CHANNELS}
-                    icon={Mail}
-                  />
-                </FieldWrap>
-
-                <FieldWrap
-                  label="Days Before Due"
-                  helper={form.dueDate ? 'Days ahead to send' : 'Pick a due date first'}
-                  icon={Calendar}
-                >
-                  <SelectWithIcon
-                    value={form.reminder.daysBeforeDueDate}
-                    onChange={(val) => setReminder('daysBeforeDueDate', Number(val))}
-                    options={validDaysBeforeOptions}
-                    disabled={!form.dueDate}
-                    icon={Calendar}
-                  />
-                </FieldWrap>
-              </div>
-
-              {/* Template */}
-              <FieldWrap
-                label="Message Template"
-                required
-                helper="Matched to your task type & channel"
-              >
-                <SearchableSelect
-                  options={templates}
-                  value={selectedTemplate}
-                  onChange={(template) => {
-                    setSelectedTemplate(template);
-                    set('templateId', template?.id ?? '');
-                  }}
-                  getOptionLabel={(t) => t.name}
-                  getOptionKey={(t) => t.id}
-                  loading={templatesLoading}
-                  placeholder="Search and select template..."
-                  emptyMessage={
-                    templates.length === 0
-                      ? 'No templates found. Create a template first.'
-                      : 'No matching templates'
-                  }
-                  renderOption={(t) => (
-                    <div>
-                      <p className="font-semibold text-txt-main">{t.name}</p>
-                      <p className="text-xs text-txt-sub">
-                        {t.businessCategory}
-                        {t.channels?.length ? ` · ${t.channels.join(', ')}` : ''}
-                      </p>
-                    </div>
-                  )}
-                />
-
-                {/* Template preview card */}
-                {selectedTemplate && (
-                  <div className="mt-3 rounded-xl border border-[var(--accent)]/20 bg-[var(--accent)]/8 overflow-hidden">
-                    <div className="px-3 py-2 border-b border-[var(--accent)]/15 flex items-center gap-2">
-                      <Sparkles className="w-3 h-3 text-[var(--accent)]" />
-                      <p className="text-[10px] font-extrabold uppercase tracking-widest text-[var(--accent)]">
-                        Template Preview
-                      </p>
-                    </div>
-                    <div className="px-3 py-2.5">
-                      {form.reminder.deliveryChannel === 'EMAIL' &&
-                        selectedTemplate.templates?.email ? (
-                        <div className="space-y-1">
-                          <p className="text-xs font-semibold text-txt-main">
-                            {replaceTemplatePlaceholders(selectedTemplate.templates.email.subject)}
-                          </p>
-                          <p className="whitespace-pre-line text-xs text-txt-sub leading-relaxed">
-                            {replaceTemplatePlaceholders(selectedTemplate.templates.email.body)}
-                          </p>
-                        </div>
-                      ) : form.reminder.deliveryChannel === 'EMAIL' ? (
-                        <p className="text-xs text-txt-sub/60 italic">No Email content in this template</p>
-                      ) : null}
-
-                      {form.reminder.deliveryChannel === 'WHATSAPP' &&
-                        selectedTemplate.templates?.whatsapp ? (
-                        <p className="whitespace-pre-line text-xs text-txt-sub leading-relaxed">
-                          💬 {replaceTemplatePlaceholders(selectedTemplate.templates.whatsapp.body)}
-                        </p>
-                      ) : form.reminder.deliveryChannel === 'WHATSAPP' ? (
-                        <p className="text-xs text-txt-sub/60 italic">No WhatsApp content in this template</p>
-                      ) : null}
-
-                      {form.reminder.deliveryChannel !== 'EMAIL' &&
-                        form.reminder.deliveryChannel !== 'WHATSAPP' && (
-                          <p className="text-xs text-txt-sub/60 italic">
-                            No preview for {form.reminder.deliveryChannel}
-                          </p>
-                        )}
-                    </div>
-                  </div>
-                )}
-              </FieldWrap>
-            </div>
-          )}
-        </SectionCard>
+        <FormWrapper
+          key={formKey}
+          formId={TASK_FORM_ID}
+          schema={taskFormSchema}
+          defaultValues={currentDefaultValues}
+          onSubmit={handleSubmit}
+          className="space-y-4"
+        >
+          <TaskFormContent
+            clients={clients}
+            clientsLoading={clientsLoading}
+            selectedClient={selectedClient}
+            setSelectedClient={setSelectedClient}
+            staff={staff}
+            staffLoading={staffLoading}
+            selectedStaff={selectedStaff}
+            setSelectedStaff={setSelectedStaff}
+            templates={templates}
+            templatesLoading={templatesLoading}
+            selectedTemplate={selectedTemplate}
+            setSelectedTemplate={setSelectedTemplate}
+            taskDefinitions={taskDefinitions}
+            business={business}
+            onTitleCalculated={setHeaderTitle}
+          />
+        </FormWrapper>
       </div>
     </Drawer>
   );
 }
-
-// getTaskById is imported from '@/services/taskService' — no stub needed.

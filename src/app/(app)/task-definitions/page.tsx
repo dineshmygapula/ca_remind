@@ -1,323 +1,181 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
-import { useAuth } from "@/context/AuthContext";
-import { TaskDefinitionListItem } from "../../../types/taskDefinition.types";
-import {
-  getTaskDefinitions,
-  deleteTaskDefinition,
-} from "@/services/taskDefinitionService";
+import { useMemo } from "react";
+import { AlertTriangle } from "lucide-react";
 import TaskDefinitionsTable from "@/components/task-definitions/TaskDefinitionsTable";
 import TaskDefinitionsFilter from "@/components/task-definitions/TaskDefinitionsFilter";
 import TaskDefinitionDetailsDrawer from "@/components/task-definitions/TaskDefinitionDetailsDrawer";
-import EditTaskDefinitionDialog from "@/components/task-definitions/EditTaskDefinitionDialog";
+import TaskDefinitionFormDrawer from "@/components/task-definitions/TaskDefinitionFormDrawer";
+import ConfirmDialog from "@/components/tasks/ConfirmDialog";
+import ResourcePageLayout from "@/components/common/ResourcePageLayout";
 import { useWorkspace } from "@/context/WorkspaceContext";
+import { useResourcePageState } from "@/hooks/useResourcePageState";
+import { useTaskDefinitionFilters } from "@/hooks/task-definitions/useTaskDefinitions";
+import { getTaskDefinitionStats } from "@/lib/task-definitons/taskDefinitionStat";
+import StatCard from "@/components/task-definitions/StatCard";
+import PageSkeleton from "@/components/common/PageSkeleton";
+import { useTaskDefinitionList } from "@/hooks/task-definitions/useDefintion";
 
 export default function TaskDefinitionsPage() {
   const { businessId } = useWorkspace();
+  const page = useResourcePageState();
 
-  // Data state
-  const [definitions, setDefinitions] = useState<TaskDefinitionListItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  const [selectedDefinitionId, setSelectedDefinitionId] = useState<string | null>(
-    null,
-  );
-  const [drawerRefreshKey, setDrawerRefreshKey] = useState(0);
-
-  // Drawer and dialog state
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<{
-    id: string;
-    name: string;
-  } | null>(null);
-  const [deleteLoading, setDeleteLoading] = useState(false);
-
-  // Filter state
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"ALL" | "ACTIVE" | "INACTIVE">(
-    "ALL",
-  );
-  const [scheduleFilter, setScheduleFilter] = useState("");
-  const [autoCreateFilter, setAutoCreateFilter] = useState<"ALL" | "ON" | "OFF">(
-    "ALL",
-  );
-  const [openEditDialog, setOpenEditDialog] = useState(false);
-  const [editingDefinitionId, setEditingDefinitionId] = useState<string | null>(
-    null,
-  );
-
-  const fetchDefinitions = useCallback(async () => {
-    if (!businessId) return;
-
-    try {
-      setLoading(true);
-      setError("");
-      const data = await getTaskDefinitions(businessId);
-      setDefinitions(data);
-      setDrawerRefreshKey((prev) => prev + 1);
-    } catch (err: unknown) {
-      setError(
-        err instanceof Error ? err.message : "Failed to load task definitions",
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [businessId]);
-
-  useEffect(() => {
-    if (businessId) fetchDefinitions();
-  }, [businessId, fetchDefinitions]);
-
-  const filteredDefinitions = useMemo(() => {
-    let result = [...definitions];
-
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      result = result.filter(
-        (def) =>
-          def.name?.toLowerCase().includes(q) ||
-          def.taskType?.toLowerCase().includes(q),
-      );
-    }
-
-    if (statusFilter === "ACTIVE") {
-      result = result.filter((def) => def.isActive);
-    }
-    if (statusFilter === "INACTIVE") {
-      result = result.filter((def) => !def.isActive);
-    }
-
-    if (scheduleFilter) {
-      result = result.filter((def) => def.schedulePattern === scheduleFilter);
-    }
-
-    if (autoCreateFilter === "ON") {
-      result = result.filter((def) => def.autoCreateTasks === true);
-    }
-    if (autoCreateFilter === "OFF") {
-      result = result.filter((def) => !def.autoCreateTasks);
-    }
-
-    return result;
-  }, [
+  const {
     definitions,
-    searchQuery,
-    statusFilter,
-    scheduleFilter,
-    autoCreateFilter,
-  ]);
+    loading,
+    error,
+    clearError,
+    refetch,
+    refreshKey,
+    removeDefinition,
+    deleteLoading,
+  } = useTaskDefinitionList(businessId);
 
-  const handleDeleteRequest = (definitionId: string, name: string) => {
-    setDeleteTarget({ id: definitionId, name });
-  };
+  const filters = useTaskDefinitionFilters(definitions);
+  const stats = useMemo(
+    () => getTaskDefinitionStats(definitions),
+    [definitions],
+  );
 
   const handleDeleteConfirm = async () => {
-    if (!businessId || !deleteTarget) return;
-
-    try {
-      setDeleteLoading(true);
-      setError("");
-      await deleteTaskDefinition(businessId, deleteTarget.id);
-      setDeleteTarget(null);
-      await fetchDefinitions();
-    } catch (err: unknown) {
-      setError(
-        err instanceof Error ? err.message : "Failed to delete task definition",
-      );
-    } finally {
-      setDeleteLoading(false);
-    }
+    const target = page.deleteTarget;
+    if (!target) return;
+    const ok = await removeDefinition(target.id, target.label);
+    if (ok) page.cancelDelete();
   };
 
-  const handleView = (definitionId: string) => {
-    setSelectedDefinitionId(definitionId);
-    setDrawerOpen(true);
-  };
-
-  const handleDrawerClose = () => {
-    setDrawerOpen(false);
-    setSelectedDefinitionId(null);
-  };
-
-  const handleEdit = (definitionId: string) => {
-    setEditingDefinitionId(definitionId);
-    setOpenEditDialog(true);
-    setDrawerOpen(false);
-  };
-
-  if (!businessId) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center bg-base-200">
-        <span className="loading loading-spinner loading-lg text-primary" />
-      </div>
-    );
+  if (!businessId || (loading && definitions.length === 0)) {
+    return <PageSkeleton hasStats={true} />;
   }
 
   return (
-    <main className="min-h-screen bg-base-200 py-8">
-      <div className="mx-auto w-full max-w-screen-2xl px-4 sm:px-6 lg:px-8">
-        <div className="space-y-6">
-          {/* Header */}
-          <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h1 className="text-2xl font-semibold tracking-tight text-base-content">
-                Automatic Task &amp; Reminders
-              </h1>
-              <p className="mt-1 text-sm text-base-content/70">
-                Configure rules to automatically create recurring tasks and reminders.
-              </p>
-            </div>
-          </header>
-
-          {/* Error */}
-          {error && (
-            <div role="alert" className="alert alert-error">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5 shrink-0"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M12 9v3m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"
-                />
-              </svg>
-              <span>{error}</span>
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                aria-label="Dismiss error"
-                onClick={() => setError("")}
-              >
-                ✕
-              </button>
-            </div>
-          )}
-
-          {/* Filters */}
-          <TaskDefinitionsFilter
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-            statusFilter={statusFilter}
-            onStatusChange={setStatusFilter}
-            scheduleFilter={scheduleFilter}
-            onScheduleChange={setScheduleFilter}
-            autoCreateFilter={autoCreateFilter}
-            onAutoCreateChange={setAutoCreateFilter}
+    <ResourcePageLayout
+      title="Automatic tasks & reminders"
+      description="Rules that create recurring tasks and reminders for you, on schedule."
+      actionLabel="New rule"
+      actionVariant="amber"
+      onAction={page.openCreate}
+      error={error}
+      onDismissError={clearError}
+      stats={
+        <>
+          <StatCard
+            label="Total rules"
+            value={stats.total}
+            hint={
+              stats.allActive ? "All active" : `${stats.activeCount} active`
+            }
           />
-
-          {/* Results count */}
-          {!loading && (
-            <p className="text-sm text-base-content/70">
-              Showing {filteredDefinitions.length} of {definitions.length} definitions
-            </p>
-          )}
-
-          {/* Table */}
-          <TaskDefinitionsTable
-            definitions={filteredDefinitions}
-            loading={loading}
-            businessId={businessId}
-            onView={handleView}
-            onEdit={handleEdit}
-            onDelete={handleDeleteRequest}
-            onRefresh={fetchDefinitions}
+          <StatCard
+            label="Past due"
+            value={stats.pastDueCount}
+            hint="Need your attention"
+            valueClassName={
+              stats.pastDueCount > 0 ? "text-[#dc2626]" : "text-txt-main"
+            }
           />
-
-          {/* Existing details drawer */}
+          <StatCard
+            label="Due this week"
+            value={stats.dueThisWeekCount}
+            hint={stats.nextDueName}
+            truncateHint
+          />
+          <StatCard
+            label="Fully automated"
+            value={`${stats.fullyAutomatedCount} of ${stats.total}`}
+            hint="Task and reminder both on"
+            valueClassName="text-[#059669] dark:text-emerald-400"
+          />
+        </>
+      }
+      banner={
+        stats.pastDueCount > 0 && (
+          <div className="flex items-center justify-between rounded-2xl border border-red-200 bg-red-50/60 px-5 py-3.5 dark:border-rose-900/40 dark:bg-rose-950/20">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="h-5 w-5 shrink-0 text-red-600 dark:text-rose-400" />
+              <span className="text-sm font-semibold text-red-900 dark:text-rose-200">
+                {stats.pastDueCount} rules are past their next due date.
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={filters.togglePastDueOnly}
+              className="cursor-pointer rounded-xl border border-red-300 bg-surface px-3.5 py-1.5 text-xs font-semibold text-red-700 shadow-xs transition-colors hover:bg-red-50 dark:border-rose-800 dark:text-rose-300 dark:hover:bg-rose-950/40"
+            >
+              {filters.showPastDueOnly ? "Show all rules" : "Show past due"}
+            </button>
+          </div>
+        )
+      }
+      filters={
+        <TaskDefinitionsFilter
+          searchQuery={filters.searchQuery}
+          onSearchChange={filters.setSearchQuery}
+          statusFilter={filters.statusFilter}
+          onStatusChange={filters.setStatusFilter}
+          scheduleFilter={filters.scheduleFilter}
+          onScheduleChange={filters.setScheduleFilter}
+          autoCreateFilter={filters.autoCreateFilter}
+          onAutoCreateChange={filters.setAutoCreateFilter}
+          onReset={filters.reset}
+        />
+      }
+      summary={
+        !loading && (
+          <p className="text-sm text-txt-sub">
+            Showing {filters.filtered.length} of {definitions.length} rules
+          </p>
+        )
+      }
+      overlays={
+        <>
           <TaskDefinitionDetailsDrawer
-            open={drawerOpen}
-            onClose={handleDrawerClose}
-            definitionId={selectedDefinitionId}
+            open={page.viewOpen}
+            onClose={page.close}
+            definitionId={page.viewId}
             businessId={businessId}
-            onEdit={handleEdit}
-            onRefresh={fetchDefinitions}
-            refreshKey={drawerRefreshKey}
+            onEdit={page.openEdit}
+            onRefresh={refetch}
+            refreshKey={refreshKey}
           />
-
-          {/* Existing edit flow */}
-          <EditTaskDefinitionDialog
-            open={openEditDialog}
-            onClose={() => setOpenEditDialog(false)}
-            definitionId={editingDefinitionId}
+          <TaskDefinitionFormDrawer
+            open={page.formOpen}
+            onClose={page.close}
+            definitionId={page.formId}
             businessId={businessId}
             onSuccess={() => {
-              fetchDefinitions();
-              setOpenEditDialog(false);
+              refetch();
+              page.close();
             }}
           />
-
-          {/* DaisyUI delete confirmation modal */}
-          {deleteTarget && (
-            <div
-              className="modal modal-open"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="delete-definition-title"
-            >
-              <button
-                type="button"
-                className="modal-backdrop"
-                aria-label="Close delete confirmation"
-                disabled={deleteLoading}
-                onClick={() => !deleteLoading && setDeleteTarget(null)}
-              >
-                Close
-              </button>
-
-              <div className="modal-box max-w-md rounded-2xl border border-base-300 p-0 shadow-2xl">
-                <div className="border-b border-base-300 px-6 py-5">
-                  <h2
-                    id="delete-definition-title"
-                    className="text-lg font-bold text-base-content"
-                  >
-                    Delete Task Definition
-                  </h2>
-                  <p className="mt-1 text-sm text-base-content/60">
-                    This action cannot be undone.
-                  </p>
-                </div>
-
-                <div className="px-6 py-5 text-sm leading-6 text-base-content/80">
-                  Are you sure you want to delete{" "}
-                  <strong className="font-semibold text-base-content">
-                    {deleteTarget.name}
-                  </strong>
-                  ?
-                </div>
-
-                <div className="flex flex-col-reverse gap-3 border-t border-base-300 bg-base-200/50 px-6 py-4 sm:flex-row sm:justify-end">
-                  <button
-                    type="button"
-                    className="btn btn-outline"
-                    onClick={() => setDeleteTarget(null)}
-                    disabled={deleteLoading}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-error text-white"
-                    onClick={handleDeleteConfirm}
-                    disabled={deleteLoading}
-                  >
-                    {deleteLoading && (
-                      <span className="loading loading-spinner loading-sm" />
-                    )}
-                    {deleteLoading ? "Deleting..." : "Delete"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </main>
+          <ConfirmDialog
+            open={!!page.deleteTarget}
+            title="Delete Task Definition"
+            description={
+              <>
+                Are you sure you want to delete{" "}
+                <strong>{page.deleteTarget?.label}</strong>? This action cannot
+                be undone.
+              </>
+            }
+            confirmLabel="Delete"
+            variant="danger"
+            loading={deleteLoading}
+            onConfirm={handleDeleteConfirm}
+            onCancel={page.cancelDelete}
+          />
+        </>
+      }
+    >
+      <TaskDefinitionsTable
+        definitions={filters.filtered}
+        loading={loading}
+        businessId={businessId}
+        onView={page.openView}
+        onEdit={page.openEdit}
+        onDelete={page.requestDelete}
+        onRefresh={refetch}
+      />
+    </ResourcePageLayout>
   );
 }

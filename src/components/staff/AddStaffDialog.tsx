@@ -1,26 +1,17 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Button,
-  TextField,
-  Grid,
-  IconButton,
-  Alert,
-  CircularProgress,
-  FormControlLabel,
-  Checkbox,
-  MenuItem,
-} from "@mui/material";
-import { Close as CloseIcon } from "@mui/icons-material";
-import { CreateStaffDto } from "@/types/staff.types";
-import { createStaff } from "@/services/staffService";
-import PhoneInputField from "../common/PhoneInputField";
-import "react-phone-input-2/lib/plain.css";
+import React from 'react';
+import { UserPlus, AlertCircle, Loader2, X } from 'lucide-react';
+import { useFormContext } from 'react-hook-form';
+import Drawer from '@/components/common/Drawer';
+import { FormWrapper } from '@/components/wrappers/FormWrapper';
+import { InputField } from '@/components/ui/InputField';
+import PhoneInputField from '@/components/common/PhoneInputField';
+import Dropdown from '@/components/common/Dropdown';
+import { createStaff } from '@/services/staffService';
+import { CreateStaffDto } from '@/types/staff.types';
+import { staffFormSchema, StaffFormValues } from '@/utils/schema';
+import { useAsyncAction } from '@/hooks/useAnyAction';
 
 interface AddStaffDialogProps {
   open: boolean;
@@ -29,18 +20,156 @@ interface AddStaffDialogProps {
   onSuccess: () => void;
 }
 
-const ROLES = ["Accountant", "Owner", "Admin"];
+const ROLES = [
+  { value: 'Accountant', label: 'Accountant (Compliance & Bookkeeping)' },
+  { value: 'Manager', label: 'Manager (Practice & Task Supervisor)' },
+  { value: 'Admin', label: 'Admin (Full Workspace Control)' },
+] as const;
 
-const DEFAULT_FORM: CreateStaffDto = {
-  userName: "",
-  firstName: "",
-  lastName: "",
-  email: "",
-  phone: "",
-  department: "",
-  roles: [],
+const DEPARTMENTS = [
+  { value: '', label: 'Select practice department (optional)' },
+  { value: 'Taxation (GST & ITR)', label: 'Taxation (GST & ITR)' },
+  { value: 'Audit & Assurance', label: 'Audit & Assurance' },
+  { value: 'ROC & Corporate Law', label: 'ROC & Corporate Law' },
+  { value: 'Bookkeeping & Accounting', label: 'Bookkeeping & Accounting' },
+  { value: 'General Practice', label: 'General Practice' },
+] as const;
+
+const DEFAULT_FORM: StaffFormValues = {
+  firstName: '',
+  lastName: '',
+  userName: '',
+  email: '',
+  phone: '',
+  role: 'Accountant',
+  department: '',
   sendInvite: true,
 };
+
+const STAFF_FORM_ID = 'add-staff-form';
+
+function StaffFormFields() {
+  const {
+    register,
+    watch,
+    setValue,
+    formState: { errors },
+  } = useFormContext<StaffFormValues>();
+
+  const watchedRole = watch('role');
+  const watchedDepartment = watch('department');
+  const watchedPhone = watch('phone');
+
+  return (
+    <div className="space-y-4 p-6">
+      {/* First & Last Name */}
+      <div className="grid grid-cols-2 gap-3">
+        <InputField
+          name="firstName"
+          label="First Name"
+          required
+          placeholder="e.g. Rahul"
+        />
+        <InputField
+          name="lastName"
+          label="Last Name"
+          required
+          placeholder="e.g. Sharma"
+        />
+      </div>
+
+      {/* Username */}
+      <InputField
+        name="userName"
+        label="Username / Handle (Optional)"
+        placeholder="e.g. rahul.sharma"
+      />
+
+      {/* Email */}
+      <InputField
+        name="email"
+        type="email"
+        label="Email Address"
+        required
+        placeholder="rahul@example.com"
+      />
+
+      {/* Phone */}
+      <div>
+        <PhoneInputField
+          label="Mobile Number (for WhatsApp & SMS)"
+          required
+          value={watchedPhone || ''}
+          onChange={(val) =>
+            setValue('phone', val, { shouldValidate: true, shouldDirty: true })
+          }
+          error={Boolean(errors.phone)}
+          helperText={errors.phone?.message}
+        />
+      </div>
+
+      {/* Role Selection */}
+      <div className="flex flex-col gap-1.5 w-full">
+        <label className="text-[13px] font-bold text-[var(--text-primary)]">
+          Assigned Role <span className="text-red-500">*</span>
+        </label>
+        <Dropdown
+          fullWidth
+          value={watchedRole || 'Accountant'}
+          onChange={(val) =>
+            setValue('role', val, { shouldValidate: true, shouldDirty: true })
+          }
+          options={ROLES}
+        />
+        {errors.role && (
+          <p className="mt-1 text-xs font-medium leading-4 text-red-500">
+            {errors.role.message}
+          </p>
+        )}
+      </div>
+
+      {/* Department */}
+      <div className="flex flex-col gap-1.5 w-full">
+        <label className="text-[13px] font-bold text-[var(--text-primary)]">
+          Practice Department
+        </label>
+        <Dropdown
+          fullWidth
+          value={watchedDepartment || ''}
+          onChange={(val) =>
+            setValue('department', val, { shouldValidate: true, shouldDirty: true })
+          }
+          options={DEPARTMENTS}
+          placeholder="Select practice department (optional)"
+        />
+        {errors.department && (
+          <p className="mt-1 text-xs font-medium leading-4 text-red-500">
+            {errors.department.message}
+          </p>
+        )}
+      </div>
+
+      {/* Send Invitation Checkbox */}
+      <div className="pt-2">
+        <label className="flex items-start gap-2.5 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            {...register('sendInvite')}
+            className="checkbox checkbox-sm checkbox-primary mt-0.5 rounded"
+          />
+          <div className="text-xs">
+            <span className="font-bold text-[var(--heading)]">
+              Send login invitation
+            </span>
+            <p className="text-[11px] text-[var(--text-secondary)]">
+              Email setup instructions and temporary login access to this staff member.
+            </p>
+          </div>
+        </label>
+      </div>
+    </div>
+  );
+}
 
 export default function AddStaffDialog({
   open,
@@ -48,272 +177,116 @@ export default function AddStaffDialog({
   businessId,
   onSuccess,
 }: AddStaffDialogProps) {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [formData, setFormData] = useState<CreateStaffDto>(DEFAULT_FORM);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const saveAction = useAsyncAction();
 
-  // ✅ For text fields
-  const handleChange =
-    (field: keyof CreateStaffDto) =>
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      setFormData((prev) => ({ ...prev, [field]: e.target.value }));
-      if (errors[field]) setErrors((prev) => ({ ...prev, [field]: "" }));
-    };
+  const handleSubmit = async (data: StaffFormValues) => {
+    if (!businessId) return;
 
-  // ✅ For role dropdown (single select → stored as array)
-  const handleRoleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData((prev) => ({ ...prev, roles: [e.target.value] }));
-    if (errors.roles) setErrors((prev) => ({ ...prev, roles: "" }));
-  };
+    await saveAction.run(
+      async () => {
+        const payload: CreateStaffDto = {
+          userName:
+            data.userName?.trim() ||
+            `${data.firstName.toLowerCase()}.${data.lastName.toLowerCase()}`,
+          firstName: data.firstName.trim(),
+          lastName: data.lastName.trim(),
+          email: data.email.trim().toLowerCase(),
+          phone: data.phone.trim(),
+          department: data.department?.trim() || undefined,
+          roles: [data.role],
+          sendInvite: data.sendInvite,
+        };
 
-  // ✅ For phone
-  const handlePhoneChange = (value: string) => {
-    setFormData((prev) => ({ ...prev, phone: value }));
-    if (errors.phone) setErrors((prev) => ({ ...prev, phone: "" }));
-  };
-
-  // ✅ For checkbox
-  const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData((prev) => ({ ...prev, sendInvite: e.target.checked }));
-  };
-
-  const validateForm = (): boolean => {
-    const e: Record<string, string> = {};
-
-    if (!formData.firstName.trim()) e.firstName = "First name is required";
-    if (!formData.lastName.trim()) e.lastName = "Last name is required";
-    if (!formData.email.trim()) e.email = "Email is required";
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email))
-      e.email = "Invalid email format";
-    if (!formData.phone.trim()) e.phone = "Phone is required";
-    else if (formData.phone.length < 10 || formData.phone.length > 15)
-      e.phone = "Please enter a valid phone number";
-    if (!formData.roles.length) e.roles = "Please select a role";
-
-    setErrors(e);
-    return Object.keys(e).length === 0;
-  };
-
-  const handleSubmit = async () => {
-    if (!validateForm()) return;
-    try {
-      setLoading(true);
-      setError("");
-
-      console.log("📤 Staff payload:", JSON.stringify(formData, null, 2));
-      const result = await createStaff(businessId, formData);
-      console.log("✅ Staff created:", result);
-
-      alert(`Staff member "${formData.firstName} ${formData.lastName}" added successfully!`);
-      onSuccess();
-      handleClose();
-    } catch (err: unknown) {
-      console.error("❌ Create staff error:", err);
-      if (err instanceof Error) {
-        if (err.message.includes("E11000") || err.message.includes("duplicate key")) {
-          if (err.message.includes("phone"))
-            setError("A staff member with this phone number already exists");
-          else if (err.message.includes("email"))
-            setError("A staff member with this email already exists");
-          else setError("This staff member already exists");
-        } else {
-          setError(err.message);
-        }
-      } else {
-        setError("Failed to create staff member");
+        await createStaff(businessId, payload);
+      },
+      {
+        successMessage: `Staff member "${data.firstName} ${data.lastName}" added successfully`,
+        errorMessage: 'Failed to add staff member. Please try again.',
+        showSuccessToast: true,
+        showErrorToast: true,
+        onSuccess: () => {
+          onSuccess();
+          onClose();
+        },
       }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleClose = () => {
-    setFormData(DEFAULT_FORM);
-    setErrors({});
-    setError("");
-    onClose();
-  };
-
-  // ✅ Reusable static label style
-  const staticLabelSx = {
-    "& .MuiInputLabel-root": {
-      position: "static",
-      transform: "none",
-      fontSize: "0.875rem",
-      fontWeight: 500,
-      color: "text.primary",
-      mb: 0.5,
-    },
-    "& .MuiInputLabel-asterisk": { color: "error.main" },
-    "& .MuiInputBase-root": { mt: 0 },
+    );
   };
 
   return (
-    <Dialog
+    <Drawer
       open={open}
-      onClose={handleClose}
-      maxWidth="sm"
-      fullWidth
-      PaperProps={{ sx: { borderRadius: 2 } }}
+      onClose={() => !saveAction.loading && onClose()}
+      title="Add Staff Member"
+      width="md"
+      customHeader={
+        <div className="bg-[#0B1528] px-6 py-5 flex items-center justify-between text-white shrink-0">
+          <div className="flex items-center gap-3.5 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-[#F59E0B] flex items-center justify-center text-slate-900 shadow-sm shrink-0">
+              <UserPlus className="h-5 w-5 text-slate-900" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-[#F59E0B] uppercase tracking-wider mb-0.5">
+                Team Management
+              </p>
+              <h2 className="text-lg font-bold leading-tight text-white truncate">
+                Add Staff Member
+              </h2>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={saveAction.loading}
+            aria-label="Close"
+            className="rounded-xl bg-white/10 hover:bg-white/20 p-2 text-white/80 hover:text-white transition-colors cursor-pointer"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      }
+      footer={
+        <div className="flex items-center justify-end gap-3 w-full">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={saveAction.loading}
+            className="rounded-xl border border-divider py-2.5 px-6 text-sm font-semibold text-txt-main bg-surface transition-colors hover:bg-bg cursor-pointer disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            form={STAFF_FORM_ID}
+            disabled={saveAction.loading}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#F59E0B] hover:bg-[#D97706] text-slate-900 py-2.5 px-6 text-sm font-semibold shadow-xs transition-colors cursor-pointer disabled:opacity-60"
+          >
+            {saveAction.loading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin text-slate-900" />
+                <span>Adding Member...</span>
+              </>
+            ) : (
+              <span>Add Staff Member</span>
+            )}
+          </button>
+        </div>
+      }
     >
-      <DialogTitle
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          py: 2,
-        }}
+      {saveAction.error && (
+        <div className="mx-6 mt-4 flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50 p-3.5 text-xs text-red-800 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-300">
+          <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+          <span>{saveAction.error}</span>
+        </div>
+      )}
+
+      <FormWrapper<typeof staffFormSchema>
+        schema={staffFormSchema}
+        defaultValues={DEFAULT_FORM}
+        onSubmit={handleSubmit}
+        formId={STAFF_FORM_ID}
       >
-        Add Staff Member
-        <IconButton onClick={handleClose} size="small">
-          <CloseIcon />
-        </IconButton>
-      </DialogTitle>
-
-      <DialogContent dividers>
-        {error && (
-          <Alert severity="error" onClose={() => setError("")} sx={{ mb: 2 }}>
-            {error}
-          </Alert>
-        )}
-
-        <Grid container spacing={2} sx={{ pt: 1 }}>
-
-          {/* First Name + Last Name — side by side */}
-          <Grid size={{ xs: 12, sm: 6 }}>
-            <TextField
-              label="First Name"
-              fullWidth
-              required
-              size="small"
-              value={formData.firstName}
-              onChange={handleChange("firstName")}
-              error={!!errors.firstName}
-              helperText={errors.firstName}
-              placeholder="e.g., Bhavani"
-              InputLabelProps={{ shrink: true }}
-              sx={staticLabelSx}
-            />
-          </Grid>
-
-          <Grid size={{ xs: 12, sm: 6 }}>
-            <TextField
-              label="Last Name"
-              fullWidth
-              required
-              size="small"
-              value={formData.lastName}
-              onChange={handleChange("lastName")}
-              error={!!errors.lastName}
-              helperText={errors.lastName}
-              placeholder="e.g., Sharma"
-              InputLabelProps={{ shrink: true }}
-              sx={staticLabelSx}
-            />
-          </Grid>
-
-          {/* Phone */}
-          <Grid size={{ xs: 12 }}>
-            <PhoneInputField
-              value={formData.phone}
-              onChange={handlePhoneChange}
-              label="Phone"
-              required
-              error={!!errors.phone}
-              helperText={errors.phone}
-              defaultCountry="in"
-            />
-          </Grid>
-
-          {/* Email */}
-          <Grid size={{ xs: 12 }}>
-            <TextField
-              label="Email"
-              fullWidth
-              required
-              type="email"
-              size="small"
-              value={formData.email}
-              onChange={handleChange("email")}
-              error={!!errors.email}
-              helperText={errors.email}
-              placeholder="bhavani@example.com"
-              InputLabelProps={{ shrink: true }}
-              sx={staticLabelSx}
-            />
-          </Grid>
-
-          {/* Department */}
-          <Grid size={{ xs: 12 }}>
-            <TextField
-              label="Department"
-              fullWidth
-              size="small"
-              value={formData.department}
-              onChange={handleChange("department")}
-              error={!!errors.department}
-              helperText={errors.department}
-              placeholder="e.g., Finance"
-              InputLabelProps={{ shrink: true }}
-              sx={staticLabelSx}
-            />
-          </Grid>
-
-          {/* Role Dropdown */}
-          <Grid size={{ xs: 12 }}>
-            <TextField
-              label="Role"
-              fullWidth
-              required
-              select
-              size="small"
-              value={formData.roles[0] ?? ""}
-              onChange={handleRoleChange}
-              error={!!errors.roles}
-              helperText={errors.roles}
-              InputLabelProps={{ shrink: true }}
-              sx={staticLabelSx}
-            >
-              {ROLES.map((role) => (
-                <MenuItem key={role} value={role}>
-                  {role}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Grid>
-
-          {/* Send Invite */}
-          <Grid size={{ xs: 12 }}>
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={formData.sendInvite}
-                  onChange={handleCheckboxChange}
-                />
-              }
-              label="Send invitation email to this staff member"
-            />
-          </Grid>
-
-        </Grid>
-      </DialogContent>
-
-      <DialogActions sx={{ p: 2, gap: 1 }}>
-        <Button variant="outlined" onClick={handleClose} disabled={loading}>
-          Cancel
-        </Button>
-        <Button
-          variant="contained"
-          onClick={handleSubmit}
-          disabled={loading}
-          startIcon={
-            loading ? <CircularProgress size={18} color="inherit" /> : null
-          }
-        >
-          {loading ? "Adding…" : "Add Staff Member"}
-        </Button>
-      </DialogActions>
-    </Dialog>
+        <StaffFormFields />
+      </FormWrapper>
+    </Drawer>
   );
 }

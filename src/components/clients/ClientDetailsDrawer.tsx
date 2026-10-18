@@ -1,46 +1,34 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
+import { useState, useEffect } from 'react';
 import {
-  Drawer,
-  Box,
-  Typography,
-  IconButton,
-  Stack,
-  Chip,
-  Divider,
-  CircularProgress,
-  Alert,
-  Grid,
-  Avatar,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
-  Tooltip,
-} from "@mui/material";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
-import {
-  Close as CloseIcon,
-  Edit as EditIcon,
-  Person as PersonIcon,
-  LocationOn as LocationIcon,
-  Assignment as AssignmentIcon,
-  Group as GroupIcon,
-  EventNote as EventNoteIcon,
-  Phone as PhoneIcon,
-  Email as EmailIcon,
-  WhatsApp as WhatsAppIcon,
-  PersonAdd as PersonAddIcon,
-} from "@mui/icons-material";
-import { getSubjectById } from "@/services/subjectService";
-import { Subject } from "@/types/subject";
-import { ComplianceService } from "../../types/subject";
-import { getStaff } from "@/services/staffService";
-import { updateSubject } from "@/services/subjectService";
-import type { StaffMember } from "@/types/staff.types";
-import { TextField, MenuItem, Button } from "@mui/material";
-import { getTasks } from "@/services/taskService";
-import type { TaskListItem } from "../../types/task.types";
+  User,
+  Building2,
+  Phone,
+  Mail,
+  MapPin,
+  Calendar,
+  Layers,
+  Users,
+  FileText,
+  Clock,
+  Loader2,
+  AlertCircle,
+  Pencil,
+  ChevronDown,
+  ChevronUp,
+  UserPlus,
+  CheckCircle2,
+  ExternalLink,
+} from 'lucide-react';
+import Drawer from '@/components/common/Drawer';
+import { getSubjectById, updateSubject } from '@/services/subjectService';
+import { Subject, ComplianceService } from '@/types/subject';
+import { getStaff } from '@/services/staffService';
+import type { StaffMember } from '@/types/staff.types';
+import { getTasks } from '@/services/taskService';
+import type { TaskListItem } from '@/types/task.types';
+
 interface ClientDetailsDrawerProps {
   open: boolean;
   onClose: () => void;
@@ -49,15 +37,12 @@ interface ClientDetailsDrawerProps {
   onEdit: (clientId: string) => void;
 }
 
-const val = (v?: string | null) => (v && v.trim() ? v : "—");
-
-// Always-visible compliance services list
 const COMPLIANCE_KEYS = [
-  { key: "gst", label: "GST Filing", icon: "📋" },
-  { key: "tds", label: "TDS Returns", icon: "🏦" },
-  { key: "itr", label: "Income Tax (ITR)", icon: "📄" },
-  { key: "roc", label: "ROC Filings", icon: "🏢" },
-  { key: "msme", label: "MSME Filings", icon: "🏭" },
+  { key: 'gst', label: 'GST Filing', icon: '📋' },
+  { key: 'tds', label: 'TDS Returns', icon: '🏦' },
+  { key: 'itr', label: 'Income Tax (ITR)', icon: '📄' },
+  { key: 'roc', label: 'ROC Filings', icon: '🏢' },
+  { key: 'msme', label: 'MSME Filings', icon: '🏭' },
 ] as const;
 
 export default function ClientDetailsDrawer({
@@ -69,111 +54,89 @@ export default function ClientDetailsDrawer({
 }: ClientDetailsDrawerProps) {
   const [client, setClient] = useState<Subject | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState('');
 
-  // ── Assign Team states ──────────────────────────────────────────────────────
+  // Assign Team states
   const [staffList, setStaffList] = useState<StaffMember[]>([]);
   const [loadingStaff, setLoadingStaff] = useState(false);
   const [showAssignPanel, setShowAssignPanel] = useState(false);
-  const [selectedStaffId, setSelectedStaffId] = useState("");
+  const [selectedStaffId, setSelectedStaffId] = useState('');
   const [savingAssignee, setSavingAssignee] = useState(false);
-  const [assignError, setAssignError] = useState("");
+  const [assignError, setAssignError] = useState('');
 
+  // Upcoming Tasks
   const [upcomingTasks, setUpcomingTasks] = useState<TaskListItem[]>([]);
   const [loadingTasks, setLoadingTasks] = useState(false);
+
+  // Accordion open/close state for compliance services
+  const [openComplianceKey, setOpenComplianceKey] = useState<string | null>('gst');
+
   useEffect(() => {
     if (open && clientId && businessId) {
       fetchClientDetails();
       fetchStaff();
       fetchUpcomingTasks();
-      // Reset assign panel state when drawer reopens
       setShowAssignPanel(false);
-      setSelectedStaffId("");
-      setAssignError("");
+      setSelectedStaffId('');
+      setAssignError('');
     }
   }, [open, clientId, businessId]);
-
-  const fetchUpcomingTasks = async () => {
-    if (!clientId || !businessId) return;
-    try {
-      setLoadingTasks(true);
-
-      // Pass clientId so getTasks can filter server-side if API supports it
-      const allTasks = await getTasks(businessId, clientId);
-
-      const now = new Date();
-
-      const upcoming = allTasks
-        // ✅ PRIMARY FIX: only tasks belonging to this client
-        .filter((t) => t.subject?.id === clientId)
-        // not completed or cancelled
-        .filter(
-          (t) =>
-            t.status !== "COMPLETED" &&
-            t.status !== "CANCELLED" &&
-            t.status !== "CLOSED",
-        )
-        // due date strictly in the future
-        .filter((t) => t.dueDate && new Date(t.dueDate) > now)
-        // nearest due date first
-        .sort(
-          (a, b) =>
-            new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime(),
-        );
-
-      setUpcomingTasks(upcoming);
-    } catch (err) {
-      console.error("Failed to fetch upcoming tasks", err);
-      setUpcomingTasks([]);
-    } finally {
-      setLoadingTasks(false);
-    }
-  };
 
   const fetchClientDetails = async () => {
     if (!clientId || !businessId) return;
     try {
       setLoading(true);
-      setError("");
+      setError('');
       const data = await getSubjectById(businessId, clientId);
       setClient(data);
     } catch (err: unknown) {
-      setError(
-        err instanceof Error ? err.message : "Failed to load client details",
-      );
+      setError(err instanceof Error ? err.message : 'Failed to load client details');
     } finally {
       setLoading(false);
     }
   };
 
-  // Fetch staff list when drawer opens
   const fetchStaff = async () => {
     try {
       setLoadingStaff(true);
       const data = await getStaff(businessId);
       setStaffList(data);
-    } catch (err) {
-      console.error("Failed to fetch staff", err);
+    } catch {
+      // Non-critical
     } finally {
       setLoadingStaff(false);
     }
   };
 
+  const fetchUpcomingTasks = async () => {
+    if (!clientId || !businessId) return;
+    try {
+      setLoadingTasks(true);
+      const tasks = await getTasks(businessId);
+      const forClient = (tasks || []).filter(
+        (t) => t.subject?.id === clientId && t.status !== 'COMPLETED' && t.status !== 'CANCELLED'
+      );
+      setUpcomingTasks(forClient);
+    } catch {
+      // Non-critical
+    } finally {
+      setLoadingTasks(false);
+    }
+  };
+
   const handleAssignStaff = async () => {
     if (!selectedStaffId || !clientId) return;
-
     const selected = staffList.find((s) => s.id === selectedStaffId);
     if (!selected) return;
 
     const displayName =
-      `${selected.firstName ?? ""} ${selected.lastName ?? ""}`.trim() ||
+      `${selected.firstName ?? ''} ${selected.lastName ?? ''}`.trim() ||
       selected.userName ||
-      "";
+      '';
 
     try {
       setSavingAssignee(true);
-      setAssignError("");
-
+      setAssignError('');
       await updateSubject(businessId, clientId, {
         assignedTeam: {
           primaryAssignee: {
@@ -182,1044 +145,451 @@ export default function ClientDetailsDrawer({
           },
         },
       });
-
-      // Refresh client data to reflect the new assignee
       await fetchClientDetails();
       setShowAssignPanel(false);
-      setSelectedStaffId("");
+      setSelectedStaffId('');
     } catch (err: unknown) {
-      setAssignError(
-        err instanceof Error ? err.message : "Failed to assign staff",
-      );
+      setAssignError(err instanceof Error ? err.message : 'Failed to assign staff');
     } finally {
       setSavingAssignee(false);
     }
   };
 
-  // ── Sub-components (unchanged from original) ───────────────────────────────
-
-  const Section = ({
-    title,
-    icon,
-    children,
-  }: {
-    title: string;
-    icon: React.ReactNode;
-    children: React.ReactNode;
-  }) => (
-    <Box sx={{ mb: 3 }}>
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
-        <Box
-          sx={{ color: "primary.main", display: "flex", alignItems: "center" }}
-        >
-          {icon}
-        </Box>
-        <Typography
-          variant="overline"
-          sx={{
-            fontWeight: 700,
-            letterSpacing: "0.08em",
-            color: "text.secondary",
-          }}
-        >
-          {title}
-        </Typography>
-      </Box>
-      {children}
-    </Box>
-  );
+  const handleClose = () => {
+    setClient(null);
+    setError('');
+    onClose();
+  };
 
   const InfoRow = ({
     label,
     value,
-    mono = false,
+    icon: Icon,
   }: {
     label: string;
-    value?: string | null;
-    mono?: boolean;
+    value: React.ReactNode;
+    icon?: React.ComponentType<{ className?: string }>;
   }) => (
-    <Box sx={{ mb: 1.5 }}>
-      <Typography
-        variant="caption"
-        color="text.secondary"
-        sx={{ display: "block", mb: 0.5 }}
-      >
-        {label}
-      </Typography>
-      <Typography
-        variant="body2"
-        sx={{
-          fontWeight: 500,
-          fontFamily: mono ? "monospace" : "inherit",
-          color: value && value.trim() ? "text.primary" : "text.disabled",
-        }}
-      >
-        {val(value)}
-      </Typography>
-    </Box>
+    <div className="flex items-start gap-3 py-2 border-b border-[var(--border)]/60 last:border-b-0">
+      {Icon && (
+        <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--surface-subtle)] text-[var(--accent)]">
+          <Icon className="h-4 w-4" />
+        </div>
+      )}
+      <div className="min-w-0 flex-1">
+        <p className="text-[11px] font-bold uppercase tracking-wider text-txt-sub">
+          {label}
+        </p>
+        <div className="text-sm font-medium text-txt-main mt-0.5 break-words">
+          {value || '—'}
+        </div>
+      </div>
+    </div>
   );
-
-  const Card = ({ children }: { children: React.ReactNode }) => (
-    <Box
-      sx={{
-        bgcolor: "background.paper",
-        borderRadius: 2,
-        p: 2.5,
-        border: "1px solid",
-        borderColor: "divider",
-      }}
-    >
-      {children}
-    </Box>
-  );
-
-  function isComplianceService(
-    item: ComplianceService,
-  ): item is ComplianceService {
-    return "internalTargetOffsetDays" in item;
-  }
 
   return (
     <Drawer
-      anchor="right"
       open={open}
-      onClose={onClose}
-      PaperProps={{
-        sx: { width: { xs: "100%", sm: 520 }, borderRadius: 0 },
-      }}
-    >
-      {/* ── Header (unchanged) ───────────────────────────────────────────────── */}
-      <Box
-        sx={{
-          px: 3,
-          pt: 2.5,
-          pb: 2,
-          borderBottom: "1px solid #F0F0F0",
-          backgroundColor: "#fff",
-          flexShrink: 0,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-        }}
-      >
-        <Stack direction="row" alignItems="center" spacing={1.5}>
-          <Box
-            sx={{
-              width: 36,
-              height: 36,
-              borderRadius: "10px",
-              backgroundColor: "#EFF6FF",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
+      onClose={handleClose}
+      eyebrow="Client Overview"
+      title={client?.profile?.displayName || (loading ? 'Loading...' : 'Client Details')}
+      width="lg"
+      badge={
+        client ? (
+          <span
+            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold border ${
+              client.isActive
+                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400/40'
+                : 'bg-white/10 text-white/70 border-white/20'
+            }`}
           >
-            <PersonIcon sx={{ fontSize: 20, color: "#2563EB" }} />
-          </Box>
-          <Box>
-            <Typography
-              variant="h6"
-              fontWeight={700}
-              fontSize="1.05rem"
-              lineHeight={1.2}
-              color="#0F172A"
-            >
-              {loading
-                ? "Loading..."
-                : client?.profile?.displayName || "Client Details"}
-            </Typography>
-            {client?.profile?.businessName && (
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                lineHeight={1.2}
-              >
-                {client.profile.businessName}
-              </Typography>
-            )}
-          </Box>
-        </Stack>
-
-        <Stack direction="row" spacing={1}>
-          {clientId && (
-            <IconButton
-              onClick={() => onEdit(clientId)}
-              size="small"
-              sx={{
-                backgroundColor: "#F8FAFC",
-                border: "1px solid #E2E8F0",
-                borderRadius: "8px",
-                "&:hover": { backgroundColor: "#EEEEEE" },
+            {client.isActive ? 'Active' : 'Inactive'}
+          </span>
+        ) : undefined
+      }
+      icon={<User className="h-4 w-4 text-[var(--accent)]" />}
+      headerActions={
+        clientId && (
+          <button
+            type="button"
+            onClick={() => {
+              handleClose();
+              onEdit(clientId);
+            }}
+            aria-label="Edit client"
+            className="rounded-xl bg-white/10 border border-white/20 p-1.5 transition-all hover:bg-white/25 hover:scale-105 text-white"
+            title="Edit Client"
+          >
+            <Pencil className="h-4 w-4" />
+          </button>
+        )
+      }
+      footer={
+        client ? (
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                handleClose();
+                onEdit(client.id);
               }}
+              className="btn btn-primary btn-sm flex-1 font-bold"
             >
-              <EditIcon fontSize="small" />
-            </IconButton>
-          )}
-          <IconButton
-            onClick={onClose}
-            size="small"
-            sx={{
-              backgroundColor: "#F8FAFC",
-              border: "1px solid #E2E8F0",
-              borderRadius: "8px",
-              "&:hover": { backgroundColor: "#EEEEEE" },
-            }}
-          >
-            <CloseIcon fontSize="small" />
-          </IconButton>
-        </Stack>
-      </Box>
+              <Pencil className="h-3.5 w-3.5" />
+              Edit Client
+            </button>
+            <button
+              type="button"
+              onClick={handleClose}
+              className="btn btn-outline btn-sm text-txt-sub"
+            >
+              Close
+            </button>
+          </div>
+        ) : undefined
+      }
+    >
+      {loading && (
+        <div className="flex flex-col items-center justify-center py-20 text-txt-sub">
+          <Loader2 className="h-8 w-8 animate-spin text-[var(--accent)] mb-2" />
+          <span className="text-sm">Loading client details...</span>
+        </div>
+      )}
 
-      {/* ── Scrollable Content ────────────────────────────────────────────────── */}
-      <Box
-        sx={{ p: 3, overflowY: "auto", flex: 1, bgcolor: "background.default" }}
-      >
-        {loading && (
-          <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
-            <CircularProgress />
-          </Box>
-        )}
+      {error && (
+        <div className="alert alert-error mb-4 flex items-center gap-2 text-sm">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
 
-        {error && (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            {error}
-          </Alert>
-        )}
+      {!loading && client && (
+        <div className="space-y-4">
+          {/* ── 1. Profile Details Card ── */}
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-sm space-y-3">
+            <div className="flex items-center gap-2 pb-2 border-b border-[var(--border)]/70">
+              <Building2 className="h-4 w-4 text-[var(--accent)]" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-txt-main">
+                Business &amp; Profile Details
+              </h3>
+            </div>
 
-        {client && !loading && (
-          <Stack spacing={3}>
-            {/* Status + Tags (unchanged) */}
-            <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-              <Chip
-                label={client.isActive ? "Active" : "Inactive"}
-                color={client.isActive ? "success" : "default"}
-                size="small"
-                sx={{ fontWeight: 600 }}
+            <div className="divide-y divide-[var(--border)]/40">
+              <InfoRow label="Display Name" value={client.profile?.displayName} />
+              <InfoRow label="Business Name" value={client.profile?.businessName} />
+              <InfoRow label="Legal Name" value={client.profile?.legalName} />
+              <InfoRow label="Constitution" value={client.profile?.constitution} />
+              <InfoRow label="Industry" value={client.profile?.industry} />
+              {client.identifiers?.pan && (
+                <InfoRow
+                  label="PAN"
+                  value={<span className="font-mono text-xs font-bold">{client.identifiers.pan}</span>}
+                />
+              )}
+              {client.identifiers?.tan && (
+                <InfoRow
+                  label="TAN"
+                  value={<span className="font-mono text-xs font-bold">{client.identifiers.tan}</span>}
+                />
+              )}
+              {client.identifiers?.cin && (
+                <InfoRow
+                  label="CIN"
+                  value={<span className="font-mono text-xs font-bold">{client.identifiers.cin}</span>}
+                />
+              )}
+              {client.identifiers?.udyam && (
+                <InfoRow
+                  label="UDYAM"
+                  value={<span className="font-mono text-xs font-bold">{client.identifiers.udyam}</span>}
+                />
+              )}
+            </div>
+          </div>
+
+          {/* ── 2. Contact & Address Card ── */}
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-sm space-y-3">
+            <div className="flex items-center gap-2 pb-2 border-b border-[var(--border)]/70">
+              <Phone className="h-4 w-4 text-[var(--accent)]" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-txt-main">
+                Contact &amp; Location
+              </h3>
+            </div>
+
+            <div className="divide-y divide-[var(--border)]/40">
+              <InfoRow
+                label="Primary Phone"
+                value={client.primaryContact?.phone || (client as any).phone}
+                icon={Phone}
               />
-              {client.metadata?.tags?.map((tag) => (
-                <Chip
-                  key={tag}
-                  label={tag}
-                  size="small"
-                  variant="outlined"
-                  sx={{ bgcolor: "action.selected", fontSize: "0.7rem" }}
-                />
-              ))}
-            </Box>
-
-            <Divider />
-
-            {/* ── 1. Business Profile (unchanged) ─────────────────────────── */}
-            {/* <Section
-              title="Business Profile"
-              icon={<BusinessIcon fontSize="small" />}
-            >
-              <Card>
-                <InfoRow
-                  label="Display Name"
-                  value={client.profile?.displayName}
-                />
-                <InfoRow label="Legal Name" value={client.profile?.legalName} />
-                <InfoRow
-                  label="Business Name"
-                  value={client.profile?.businessName}
-                />
-                <InfoRow
-                  label="Constitution"
-                  value={client.profile?.constitution}
-                />
-                <InfoRow label="Industry" value={client.profile?.industry} />
-                {client.profile?.businessNature &&
-                  client.profile.businessNature.length > 0 && (
-                    <Box sx={{ mt: 1.5 }}>
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        sx={{ display: "block", mb: 1 }}
+              <InfoRow
+                label="Primary Email"
+                value={client.primaryContact?.email || (client as any).email}
+                icon={Mail}
+              />
+              {client.addresses && client.addresses.length > 0 && (
+                <div className="py-2">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-txt-sub mb-1.5">
+                    Addresses ({client.addresses.length})
+                  </p>
+                  <div className="space-y-2">
+                    {client.addresses.map((addr, i) => (
+                      <div
+                        key={i}
+                        className="rounded-xl bg-[var(--surface-subtle)] border border-[var(--border)] p-2.5 text-xs text-txt-main"
                       >
-                        Business Nature
-                      </Typography>
-                      <Stack
-                        direction="row"
-                        spacing={0.5}
-                        flexWrap="wrap"
-                        useFlexGap
-                      >
-                        {client.profile.businessNature.map((nature, idx) => (
-                          <Chip
-                            key={idx}
-                            label={nature}
-                            size="small"
-                            variant="outlined"
-                          />
-                        ))}
-                      </Stack>
-                    </Box>
-                  )}
-              </Card>
-            </Section> */}
-
-            {/* ── 2. Primary Contact — ENHANCED: added action buttons ──────── */}
-            <Section
-              title="Primary Contact"
-              icon={<PersonIcon fontSize="small" />}
-            >
-              <Card>
-                <InfoRow label="Name" value={client.primaryContact?.name} />
-
-                {/* Phone row with action buttons — NEW */}
-                <Box sx={{ mb: 1.5 }}>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ display: "block", mb: 0.5 }}
-                  >
-                    Phone
-                  </Typography>
-                  <Box
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                    }}
-                  >
-                    <Typography
-                      variant="body2"
-                      sx={{
-                        fontWeight: 500,
-                        color: client.primaryContact?.phone
-                          ? "text.primary"
-                          : "text.disabled",
-                      }}
-                    >
-                      {val(client.primaryContact?.phone)}
-                    </Typography>
-                    {client.primaryContact?.phone && (
-                      <Box sx={{ display: "flex", gap: 0.5 }}>
-                        <Tooltip title="Call">
-                          <IconButton
-                            size="small"
-                            component="a"
-                            href={`tel:${client.primaryContact.phone}`}
-                            sx={{ color: "primary.main" }}
-                          >
-                            <PhoneIcon sx={{ fontSize: 18 }} />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="WhatsApp">
-                          <IconButton
-                            size="small"
-                            component="a"
-                            href={`https://wa.me/${client.primaryContact.phone}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            sx={{ color: "#25D366" }}
-                          >
-                            <WhatsAppIcon sx={{ fontSize: 18 }} />
-                          </IconButton>
-                        </Tooltip>
-                      </Box>
-                    )}
-                  </Box>
-                </Box>
-
-                {/* Email row with action button — NEW */}
-                <Box>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ display: "block", mb: 0.5 }}
-                  >
-                    Email
-                  </Typography>
-                  <Box
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                    }}
-                  >
-                    <Typography
-                      variant="body2"
-                      sx={{
-                        fontWeight: 500,
-                        color: client.primaryContact?.email
-                          ? "text.primary"
-                          : "text.disabled",
-                      }}
-                    >
-                      {val(client.primaryContact?.email)}
-                    </Typography>
-                    {client.primaryContact?.email && (
-                      <Tooltip title="Send Email">
-                        <IconButton
-                          size="small"
-                          component="a"
-                          href={`mailto:${client.primaryContact.email}`}
-                          sx={{ color: "primary.main" }}
-                        >
-                          <EmailIcon sx={{ fontSize: 18 }} />
-                        </IconButton>
-                      </Tooltip>
-                    )}
-                  </Box>
-                </Box>
-              </Card>
-            </Section>
-
-            {/* ── 3. Business Identifiers — ENHANCED: always visible, consolidated ── */}
-            {/* Mobile shows Company + GST No + PAN + TAN + Udyam all in one block */}
-            <Section
-              title="Business Identifiers"
-              icon={<AssignmentIcon fontSize="small" />}
-            >
-              <Card>
-                <Grid container spacing={2}>
-                  {/* Company — from profile, always shown */}
-                  <Grid size={{ xs: 6 }}>
-                    <InfoRow
-                      label="Company"
-                      value={
-                        client.profile?.businessName ||
-                        client.profile?.legalName
-                      }
-                    />
-                  </Grid>
-                  {/* GST No — from gst.gstins[0], always shown */}
-                  <Grid size={{ xs: 6 }}>
-                    <InfoRow
-                      label="GST No"
-                      value={client.gst?.gstins?.[0]?.gstin ?? null}
-                      mono
-                    />
-                  </Grid>
-                  {/* PAN — always shown */}
-                  <Grid size={{ xs: 6 }}>
-                    <InfoRow
-                      label="PAN No"
-                      value={client.identifiers?.pan ?? null}
-                      mono
-                    />
-                  </Grid>
-                  {/* TAN — always shown */}
-                  <Grid size={{ xs: 6 }}>
-                    <InfoRow
-                      label="TAN"
-                      value={client.identifiers?.tan ?? null}
-                      mono
-                    />
-                  </Grid>
-                  {/* Udyam — always shown */}
-                  <Grid size={{ xs: 6 }}>
-                    <InfoRow
-                      label="Udyam Id"
-                      value={client.identifiers?.udyam ?? null}
-                      mono
-                    />
-                  </Grid>
-                  {/* CIN + IEC — only when present */}
-                  {client.identifiers?.cin && (
-                    <Grid size={{ xs: 6 }}>
-                      <InfoRow
-                        label="CIN"
-                        value={client.identifiers.cin}
-                        mono
-                      />
-                    </Grid>
-                  )}
-                  {client.identifiers?.iec && (
-                    <Grid size={{ xs: 6 }}>
-                      <InfoRow
-                        label="IEC"
-                        value={client.identifiers.iec}
-                        mono
-                      />
-                    </Grid>
-                  )}
-                </Grid>
-              </Card>
-            </Section>
-
-            {/* ── 4. Upcoming Tasks — fetched from Tasks API, filtered + sorted ── */}
-            <Section title="Upcoming" icon={<EventNoteIcon fontSize="small" />}>
-              {loadingTasks ? (
-                <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
-                  <CircularProgress size={24} />
-                </Box>
-              ) : upcomingTasks.length > 0 ? (
-                <Stack spacing={1.5}>
-                  {upcomingTasks.map((task) => (
-                    <Card key={task.id}>
-                      <Box
-                        sx={{
-                          display: "flex",
-                          alignItems: "flex-start",
-                          justifyContent: "space-between",
-                          gap: 1,
-                        }}
-                      >
-                        <Box sx={{ flex: 1, minWidth: 0 }}>
-                          <Typography variant="body2" fontWeight={600} noWrap>
-                            {task.title || "—"}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            Due:{" "}
-                            {task.dueDate
-                              ? new Date(task.dueDate).toLocaleDateString(
-                                  "en-IN",
-                                  {
-                                    day: "2-digit",
-                                    month: "short",
-                                    year: "numeric",
-                                  },
-                                )
-                              : "—"}
-                            {task.taskType ? ` · ${task.taskType}` : ""}
-                          </Typography>
-                        </Box>
-                        <Chip
-                          label={task.status}
-                          size="small"
-                          variant="outlined"
-                          color={
-                            task.status === "COMPLETED"
-                              ? "success"
-                              : task.status === "IN_PROGRESS"
-                                ? "warning"
-                                : "default"
-                          }
-                          sx={{
-                            fontWeight: 600,
-                            fontSize: "0.68rem",
-                            flexShrink: 0,
-                          }}
-                        />
-                      </Box>
-                    </Card>
-                  ))}
-                </Stack>
-              ) : (
-                <Card>
-                  <Typography
-                    variant="body2"
-                    color="text.disabled"
-                    sx={{ textAlign: "center", py: 1 }}
-                  >
-                    No upcoming tasks
-                  </Typography>
-                </Card>
+                        <span className="badge badge-xs badge-ghost font-bold text-[10px] mb-1">
+                          {addr.type || 'Address'}
+                        </span>
+                        <p>{[addr.line1, addr.line2, addr.city, addr.state, addr.pincode].filter(Boolean).join(', ')}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
-            </Section>
-            {/* ── 5. GST Registrations (unchanged — only when multiple GSTINs) */}
-            {/*  {client.gst?.gstins && client.gst.gstins.length > 0 && (
-              <Section
-                title="GST Registrations"
-                icon={<GstIcon fontSize="small" />}
-              >
-                <Stack spacing={1.5}>
-                  {client.gst.gstins.map((g, idx) => (
-                    <Card key={idx}>
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          fontFamily: "monospace",
-                          fontWeight: 700,
-                          mb: 1.5,
-                        }}
-                      >
-                        {g.gstin}
-                      </Typography>
-                      <Grid container spacing={1}>
-                        <Grid size={{ xs: 6 }}>
-                          <Typography variant="caption" color="text.secondary">
-                            State
-                          </Typography>
-                          <Typography variant="body2" fontWeight={500}>
-                            {val(g.state)}
-                          </Typography>
-                        </Grid>
-                        <Grid size={{ xs: 6 }}>
-                          <Typography variant="caption" color="text.secondary">
-                            Type
-                          </Typography>
-                          <Typography variant="body2" fontWeight={500}>
-                            {val(g.registrationType)}
-                          </Typography>
-                        </Grid>
-                        <Grid size={{ xs: 6 }} sx={{ mt: 1 }}>
-                          <Typography
-                            variant="caption"
-                            color="text.secondary"
-                            sx={{ display: "block", mb: 0.5 }}
-                          >
-                            Status
-                          </Typography>
-                          <Chip
-                            label={g.status}
-                            size="small"
-                            color={
-                              g.status === "ACTIVE" ? "success" : "default"
-                            }
-                            variant="outlined"
-                            sx={{ fontWeight: 600, fontSize: "0.68rem" }}
-                          />
-                        </Grid>
-                      </Grid>
-                    </Card>
-                  ))}
-                </Stack>
-              </Section>
-            )} */}
+            </div>
+          </div>
 
-            {/* ── 6. Addresses — ENHANCED: always visible with empty state ─── */}
-            <Section title="Addresses" icon={<LocationIcon fontSize="small" />}>
-              {client.addresses && client.addresses.length > 0 ? (
-                <Stack spacing={1.5}>
-                  {client.addresses.map((address, idx) => (
-                    <Card key={idx}>
-                      <Chip
-                        label={address.type}
-                        size="small"
-                        variant="outlined"
-                        sx={{
-                          mb: 1.5,
-                          fontWeight: 600,
-                          fontSize: "0.68rem",
-                          borderColor: "divider",
-                        }}
-                      />
-                      <Typography variant="body2" fontWeight={500}>
-                        {val(address.line1)}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        {[address.city, address.state, address.pincode]
-                          .filter(Boolean)
-                          .join(", ") || "—"}
-                      </Typography>
-                    </Card>
-                  ))}
-                </Stack>
-              ) : (
-                // NEW: empty state matching mobile "No address on file"
-                <Card>
-                  <Typography
-                    variant="body2"
-                    color="text.disabled"
-                    sx={{ textAlign: "center", py: 1, fontStyle: "italic" }}
+          {/* ── 3. GSTINs List ── */}
+          {client.gst?.gstins && client.gst.gstins.length > 0 && (
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-sm space-y-3">
+              <div className="flex items-center justify-between pb-2 border-b border-[var(--border)]/70">
+                <div className="flex items-center gap-2">
+                  <Layers className="h-4 w-4 text-[var(--accent)]" />
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-txt-main">
+                    GST Registrations
+                  </h3>
+                </div>
+                <span className="badge badge-sm badge-ghost text-txt-sub">
+                  {client.gst.gstins.length} GSTIN{client.gst.gstins.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+
+              <div className="space-y-2">
+                {client.gst.gstins.map((g, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center justify-between p-2.5 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border)] text-xs"
                   >
-                    No address on file
-                  </Typography>
-                </Card>
-              )}
-            </Section>
+                    <div>
+                      <span className="font-mono font-bold text-txt-main">{g.gstin}</span>
+                      <p className="text-[10px] text-txt-sub">{g.state} {g.registrationType ? `· ${g.registrationType}` : ''}</p>
+                    </div>
+                    <span className="badge badge-xs badge-success text-white font-semibold">
+                      {g.status || 'Active'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
-            {/* ── 7. Additional Contacts (unchanged) ──────────────────────── */}
-            {/* {client.contacts && client.contacts.length > 0 && (
-              <Section
-                title="Additional Contacts"
-                icon={<PersonIcon fontSize="small" />}
-              >
-                <Stack spacing={1.5}>
-                  {client.contacts.map((contact, idx) => (
-                    <Card key={idx}>
-                      <Box
-                        sx={{
-                          display: "flex",
-                          alignItems: "flex-start",
-                          justifyContent: "space-between",
-                          mb: 1,
-                        }}
-                      >
-                        <Typography variant="body2" fontWeight={600}>
-                          {val(contact.name)}
-                        </Typography>
-                        <Stack direction="row" spacing={0.5}>
-                          <Chip
-                            label={contact.role}
-                            size="small"
-                            variant="outlined"
-                            sx={{ fontSize: "0.68rem", borderColor: "divider" }}
-                          />
-                          {contact.isPrimary && (
-                            <Chip
-                              label="Primary"
-                              size="small"
-                              color="primary"
-                              sx={{ fontSize: "0.68rem" }}
-                            />
-                          )}
-                        </Stack>
-                      </Box>
-                      {contact.email && (
-                        <Typography
-                          variant="caption"
-                          color="text.secondary"
-                          sx={{ display: "block" }}
-                        >
-                          {contact.email}
-                        </Typography>
-                      )}
-                      {contact.phone && (
-                        <Typography
-                          variant="caption"
-                          color="text.secondary"
-                          sx={{ display: "block" }}
-                        >
-                          {contact.phone}
-                        </Typography>
-                      )}
-                    </Card>
-                  ))}
-                </Stack>
-              </Section>
-            )} */}
+          {/* ── 4. Active Compliances ── */}
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-sm space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-[var(--border)]/70">
+              <div className="flex items-center gap-2">
+                <FileText className="h-4 w-4 text-[var(--accent)]" />
+                <h3 className="text-xs font-bold uppercase tracking-wider text-txt-main">
+                  Compliance Services
+                </h3>
+              </div>
+              <span className="badge badge-sm badge-ghost text-txt-sub">
+                {(client as any).activeCompliances?.length || 0} active
+              </span>
+            </div>
 
-            {/* ── 8. Compliance Profile — ENHANCED: always shows all 5 services ── */}
-            <Section
-              title="Compliance Profile"
-              icon={<AssignmentIcon fontSize="small" />}
-            >
-              <Stack spacing={1}>
-                {COMPLIANCE_KEYS.map(({ key, label, icon }) => {
-                  const profile = client.metadata?.complianceProfile?.[key];
-                  const isEnabled = profile?.enabled ?? false;
-                  return (
-                    <Accordion
-                      key={key}
-                      disableGutters
-                      sx={{
-                        border: "1px solid",
-                        borderColor: "divider",
-                        borderRadius: "8px !important",
-                        boxShadow: "none",
-                        "&:before": { display: "none" },
-                      }}
+            <div className="space-y-2">
+              {COMPLIANCE_KEYS.map(({ key, label, icon }) => {
+                const isEnabled = (client as any).activeCompliances?.includes(key.toLowerCase());
+                const profile = (client.metadata?.complianceProfile as any)?.[key];
+                const isOpen = openComplianceKey === key;
+
+                return (
+                  <div
+                    key={key}
+                    className="rounded-xl border border-[var(--border)] bg-[var(--surface-subtle)] overflow-hidden"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setOpenComplianceKey(isOpen ? null : key)}
+                      className="w-full flex items-center justify-between p-3 text-left hover:bg-[var(--border)]/30 transition-all text-xs"
                     >
-                      <AccordionSummary
-                        expandIcon={<ExpandMoreIcon />}
-                        sx={{ px: 2, py: 0.5 }}
-                      >
-                        <Box
-                          sx={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 1.5,
-                            flex: 1,
-                            mr: 1,
-                          }}
+                      <div className="flex items-center gap-2">
+                        <span>{icon}</span>
+                        <span className="font-bold text-txt-main">{label}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`badge badge-xs ${
+                            isEnabled
+                              ? 'bg-emerald-500 text-white border-none'
+                              : 'badge-ghost text-txt-sub opacity-60'
+                          }`}
                         >
-                          <Box
-                            sx={{
-                              width: 28,
-                              height: 28,
-                              borderRadius: 1,
-                              bgcolor: "action.hover",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              fontSize: "0.9rem",
-                            }}
-                          >
-                            {icon}
-                          </Box>
-                          <Typography
-                            variant="body2"
-                            fontWeight={600}
-                            color="text.primary"
-                          >
-                            {label}
-                          </Typography>
-                          <Typography
-                            variant="caption"
-                            color={isEnabled ? "success.main" : "text.disabled"}
-                            fontWeight={600}
-                            sx={{ ml: "auto" }}
-                          >
-                            {/* NEW: "Not configured" label for disabled services */}
-                            {isEnabled ? "Enabled" : "Not configured"}
-                          </Typography>
-                        </Box>
-                      </AccordionSummary>
+                          {isEnabled ? 'Enabled' : 'Not configured'}
+                        </span>
+                        {isOpen ? <ChevronUp className="h-3.5 w-3.5 text-txt-sub" /> : <ChevronDown className="h-3.5 w-3.5 text-txt-sub" />}
+                      </div>
+                    </button>
 
-                      <AccordionDetails sx={{ px: 2, pb: 2, pt: 0 }}>
-                        <Divider sx={{ mb: 1.5 }} />
+                    {isOpen && (
+                      <div className="p-3 border-t border-[var(--border)]/60 bg-[var(--surface)] text-xs space-y-1.5">
                         {isEnabled && profile ? (
-                          <Grid container spacing={1.5}>
-                            <Grid size={{ xs: 6 }}>
-                              <Typography
-                                variant="caption"
-                                color="text.secondary"
-                              >
-                                Frequency
-                              </Typography>
-                              <Typography variant="body2" fontWeight={500}>
-                                {profile.frequency || "—"}
-                              </Typography>
-                            </Grid>
-                            {isComplianceService(profile) &&
-                              profile.internalTargetOffsetDays != null && (
-                                <Grid size={{ xs: 6 }}>
-                                  <Typography
-                                    variant="caption"
-                                    color="text.secondary"
-                                  >
-                                    Internal Offset
-                                  </Typography>
-                                  <Typography variant="body2" fontWeight={500}>
-                                    {profile.internalTargetOffsetDays} days
-                                  </Typography>
-                                </Grid>
-                              )}
-                            {isComplianceService(profile) &&
-                              profile.customDueDay != null &&
-                              profile.customDueDay !== 0 && (
-                                <Grid size={{ xs: 6 }}>
-                                  <Typography
-                                    variant="caption"
-                                    color="text.secondary"
-                                  >
-                                    Custom Due Day
-                                  </Typography>
-                                  <Typography variant="body2" fontWeight={500}>
-                                    {profile.customDueDay}
-                                    {profile.customDueMonth
-                                      ? ` ${profile.customDueMonth}`
-                                      : ""}
-                                  </Typography>
-                                </Grid>
-                              )}
-                          </Grid>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <p className="text-[10px] uppercase font-bold text-txt-sub">Frequency</p>
+                              <p className="font-semibold text-txt-main">{profile.frequency || 'Monthly'}</p>
+                            </div>
+                            {profile.internalTargetOffsetDays != null && (
+                              <div>
+                                <p className="text-[10px] uppercase font-bold text-txt-sub">Target Offset</p>
+                                <p className="font-semibold text-txt-main">{profile.internalTargetOffsetDays} days</p>
+                              </div>
+                            )}
+                          </div>
                         ) : (
-                          // NEW: empty state inside the accordion for unconfigured services
-                          <Typography
-                            variant="body2"
-                            color="text.disabled"
-                            fontStyle="italic"
-                          >
-                            This compliance service has not been configured for
-                            this client.
-                          </Typography>
+                          <p className="text-txt-sub italic text-[11px]">
+                            This compliance service has not been configured for this client.
+                          </p>
                         )}
-                      </AccordionDetails>
-                    </Accordion>
-                  );
-                })}
-              </Stack>
-            </Section>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
 
-            {/* ── 9. Assigned Team — ENHANCED: "Assign" CTA when unassigned ── */}
-            {/* ── Assigned Team ────────────────────────────────────────────────── */}
-            <Section
-              title="Assigned Team"
-              icon={<GroupIcon fontSize="small" />}
-            >
-              {client.assignedTeam?.primaryAssignee?.name &&
-              !showAssignPanel ? (
-                // ── Assigned state ───────────────────────────────────────────────
-                <Card>
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                    <Avatar
-                      sx={{
-                        width: 38,
-                        height: 38,
-                        bgcolor: "primary.light",
-                        color: "primary.dark",
-                        fontSize: "0.9rem",
-                        fontWeight: 700,
-                      }}
-                    >
-                      {client.assignedTeam.primaryAssignee.name
-                        .charAt(0)
-                        .toUpperCase()}
-                    </Avatar>
-                    <Box sx={{ flex: 1 }}>
-                      <Typography variant="body2" fontWeight={600}>
-                        {client.assignedTeam.primaryAssignee.name}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        Primary Assignee
-                      </Typography>
-                    </Box>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                      <Chip
-                        label="Primary"
-                        size="small"
-                        color="primary"
-                        variant="outlined"
-                        sx={{ fontWeight: 600, fontSize: "0.68rem" }}
-                      />
-                      {/* Allow reassigning */}
-                      <IconButton
-                        size="small"
-                        onClick={() => {
-                          setShowAssignPanel(true);
-                          setSelectedStaffId("");
-                          setAssignError("");
-                        }}
-                        sx={{ color: "text.secondary" }}
-                      >
-                        <EditIcon fontSize="small" />
-                      </IconButton>
-                    </Box>
-                  </Box>
-                </Card>
-              ) : (
-                // ── Unassigned state OR reassign panel ───────────────────────────
-                <Card>
-                  {!showAssignPanel ? (
-                    // "Assign Employee" trigger
-                    <Box
-                      onClick={() => setShowAssignPanel(true)}
-                      sx={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 1,
-                        cursor: "pointer",
-                        color: "primary.main",
-                        py: 0.5,
-                        width: "fit-content",
-                        "&:hover": { opacity: 0.8 },
-                      }}
-                    >
-                      <PersonAddIcon fontSize="small" />
-                      <Typography
-                        variant="body2"
-                        fontWeight={600}
-                        color="primary.main"
-                      >
-                        Assign Employee
-                      </Typography>
-                    </Box>
-                  ) : (
-                    // Inline staff selection panel
-                    <Box>
-                      <Typography
-                        variant="body2"
-                        fontWeight={600}
-                        sx={{ mb: 1.5 }}
-                      >
-                        Select Staff Member
-                      </Typography>
+          {/* ── 5. Assigned Team & Reassign ── */}
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-sm space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-[var(--border)]/70">
+              <div className="flex items-center gap-2">
+                <Users className="h-4 w-4 text-[var(--accent)]" />
+                <h3 className="text-xs font-bold uppercase tracking-wider text-txt-main">
+                  Assigned Staff
+                </h3>
+              </div>
+            </div>
 
-                      {loadingStaff ? (
-                        <Box
-                          sx={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 1,
-                            py: 1,
-                          }}
-                        >
-                          <CircularProgress size={16} />
-                          <Typography variant="caption" color="text.secondary">
-                            Loading staff...
-                          </Typography>
-                        </Box>
-                      ) : (
-                        <TextField
-                          select
-                          fullWidth
-                          size="small"
-                          value={selectedStaffId}
-                          onChange={(e) => setSelectedStaffId(e.target.value)}
-                          placeholder="Select a staff member"
-                          sx={{ mb: 1.5 }}
-                        >
-                          <MenuItem value="" disabled>
-                            Select a staff member
-                          </MenuItem>
-                          {staffList.map((s) => (
-                            <MenuItem key={s.id} value={s.id}>
-                              {s.firstName && s.lastName
-                                ? `${s.firstName} ${s.lastName}`
-                                : (s.userName ?? "Unnamed")}
-                            </MenuItem>
-                          ))}
-                        </TextField>
-                      )}
-
-                      {assignError && (
-                        <Alert severity="error" sx={{ mb: 1.5, py: 0.5 }}>
-                          {assignError}
-                        </Alert>
-                      )}
-
-                      <Box sx={{ display: "flex", gap: 1 }}>
-                        <Button
-                          size="small"
-                          variant="contained"
-                          onClick={handleAssignStaff}
-                          disabled={!selectedStaffId || savingAssignee}
-                          sx={{ minWidth: 80 }}
-                        >
-                          {savingAssignee ? (
-                            <CircularProgress size={16} />
-                          ) : (
-                            "Assign"
-                          )}
-                        </Button>
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          onClick={() => {
-                            setShowAssignPanel(false);
-                            setSelectedStaffId("");
-                            setAssignError("");
-                          }}
-                          disabled={savingAssignee}
-                        >
-                          Cancel
-                        </Button>
-                      </Box>
-                    </Box>
-                  )}
-                </Card>
-              )}
-            </Section>
-
-            {/* ── 10. Notes — ENHANCED: always visible with empty state ────── */}
-            <Section title="Notes" icon={<AssignmentIcon fontSize="small" />}>
-              {client.notes && client.notes.length > 0 ? (
-                <Stack spacing={1.5}>
-                  {client.notes.map((note, idx) => (
-                    <Card key={idx}>
-                      <Typography variant="body2" sx={{ mb: 1 }}>
-                        {note.text}
-                      </Typography>
-                      {note.createdBy && (
-                        <Typography variant="caption" color="text.secondary">
-                          By {note.createdBy.name || "Unknown"}
-                          {note.createdAt
-                            ? ` · ${new Date(note.createdAt).toLocaleDateString(
-                                "en-IN",
-                                {
-                                  day: "2-digit",
-                                  month: "short",
-                                  year: "numeric",
-                                },
-                              )}`
-                            : ""}
-                        </Typography>
-                      )}
-                    </Card>
-                  ))}
-                </Stack>
-              ) : (
-                // NEW: empty state matching mobile "No notes available. Tap edit to add notes."
-                <Card>
-                  <Typography
-                    variant="body2"
-                    color="text.disabled"
-                    sx={{ textAlign: "center", py: 1, fontStyle: "italic" }}
+            {client.assignedTeam?.primaryAssignee?.name && !showAssignPanel ? (
+              <div className="flex items-center justify-between p-3 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border)] text-xs">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-navy text-white font-bold text-xs">
+                    {client.assignedTeam.primaryAssignee.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <p className="font-bold text-txt-main">{client.assignedTeam.primaryAssignee.name}</p>
+                    <p className="text-[10px] text-txt-sub">Primary Assignee</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowAssignPanel(true)}
+                  className="btn btn-ghost btn-xs text-[var(--accent)] font-bold"
+                >
+                  Change
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {!showAssignPanel ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowAssignPanel(true)}
+                    className="flex items-center gap-2 text-xs font-bold text-[var(--accent)] hover:underline"
                   >
-                    No notes available. Click edit to add notes.
-                  </Typography>
-                </Card>
-              )}
-            </Section>
-          </Stack>
-        )}
-      </Box>
+                    <UserPlus className="h-4 w-4" />
+                    <span>+ Assign Staff Member</span>
+                  </button>
+                ) : (
+                  <div className="space-y-2 p-3 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border)]">
+                    <label className="block text-xs font-bold text-txt-main">
+                      Select Staff Member
+                    </label>
+                    <select
+                      value={selectedStaffId}
+                      onChange={(e) => setSelectedStaffId(e.target.value)}
+                      className="select select-bordered select-sm w-full font-medium"
+                    >
+                      <option value="">Choose staff...</option>
+                      {staffList.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.firstName && s.lastName
+                            ? `${s.firstName} ${s.lastName}`
+                            : s.userName || 'Unnamed'}
+                        </option>
+                      ))}
+                    </select>
+
+                    {assignError && (
+                      <p className="text-xs text-red-600">{assignError}</p>
+                    )}
+
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={handleAssignStaff}
+                        disabled={!selectedStaffId || savingAssignee}
+                        className="btn btn-primary btn-xs font-bold"
+                      >
+                        {savingAssignee && <Loader2 className="h-3 w-3 animate-spin" />}
+                        Save Assignee
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowAssignPanel(false)}
+                        className="btn btn-ghost btn-xs"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* ── 6. Upcoming Tasks ── */}
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-sm space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-[var(--border)]/70">
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4 text-[var(--accent)]" />
+                <h3 className="text-xs font-bold uppercase tracking-wider text-txt-main">
+                  Upcoming Compliance Tasks
+                </h3>
+              </div>
+              <span className="badge badge-sm badge-ghost text-txt-sub">
+                {upcomingTasks.length} pending
+              </span>
+            </div>
+
+            {loadingTasks ? (
+              <p className="text-xs text-txt-sub">Loading tasks...</p>
+            ) : upcomingTasks.length === 0 ? (
+              <p className="text-xs text-txt-sub italic">No pending tasks for this client.</p>
+            ) : (
+              <div className="space-y-2">
+                {upcomingTasks.slice(0, 5).map((t) => (
+                  <div
+                    key={t.id}
+                    className="flex items-center justify-between p-2.5 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border)] text-xs"
+                  >
+                    <div className="min-w-0 pr-2">
+                      <p className="font-semibold text-txt-main truncate">{t.title}</p>
+                      <p className="text-[10px] text-txt-sub font-mono">
+                        Due: {t.dueDate ? new Date(t.dueDate).toLocaleDateString('en-IN') : '—'}
+                      </p>
+                    </div>
+                    <span className="badge badge-xs badge-info text-white font-bold">
+                      {t.status}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </Drawer>
   );
 }

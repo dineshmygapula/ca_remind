@@ -1,9 +1,11 @@
 @import "tailwindcss";
+@import "react-day-picker/style.css";
 @plugin "daisyui";
 
 @theme {
   --color-bg: var(--bg);
   --color-surface: var(--surface);
+  --color-surface-subtle: var(--surface-subtle);
   --color-navy: var(--primary);
   --color-navy-hover: var(--primary-hover);
   --color-gold: var(--accent);
@@ -11,46 +13,63 @@
   --color-txt-main: var(--text-primary);
   --color-txt-sub: var(--text-secondary);
   --color-divider: var(--border);
+  --font-sans: var(--font-manrope), "Manrope", system-ui, sans-serif;
 }
+@custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  --bg: #F8F6F1;
-  --surface: #FFFFFF;
-  --primary: #1B2A4A;
-  --primary-hover: #0F2440;
-  --accent: #C9A227;
-  --accent-hover: #B8860B;
-  --text-primary: #1C1C1E;
-  --text-secondary: #5A5A5A;
-  --border: #E2DFD6;
-  --heading: #1B2A4A;
-  --code-bg: #EAE6DF;
-  --code-text: #1B2A4A;
-  --nav-text: #1B2A4A;
+  --bg: #f8f6f1;
+  --surface: #ffffff;
+  --surface-subtle: #f2efe9;
+  --primary: #14224d;
+  --primary-hover: #0f2440;
+  --accent: #c9a227;
+  --accent-hover: #b8860b;
+  --text-primary: #1c1c1e;
+  --text-secondary: #5a5a5a;
+  --border: #e2dfd6;
+  --heading: #1b2a4a;
+  --code-bg: #eae6df;
+  --code-text: #1b2a4a;
+  --nav-text: #1b2a4a;
 }
 
 .dark {
-  --bg: #0B1220;
-  --surface: #141F35;
-  --primary: #1B2A4A;
-  --primary-hover: #2A3D63;
-  --accent: #E0B93A;
-  --accent-hover: #F0CC4D;
-  --text-primary: #F8FAFC;
-  --text-secondary: #94A3B8;
+  --bg: #0b1220;
+  --surface: #141f35;
+  --surface-subtle: #0f182b;
+  --primary: #1b2a4a;
+  --primary-hover: #2a3d63;
+  --accent: #e0b93a;
+  --accent-hover: #f0cc4d;
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
   --border: #243047;
-  --heading: #FFFFFF;
-  --code-bg: #1E293B;
-  --code-text: #F8FAFC;
-  --nav-text: #F8FAFC;
+  --heading: #ffffff;
+  --code-bg: #1e293b;
+  --code-text: #f8fafc;
+  --nav-text: #f8fafc;
 }
 
 body {
   background-color: var(--bg);
   color: var(--text-primary);
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  font-family:
+    var(--font-manrope),
+    "Manrope",
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    Oxygen,
+    Ubuntu,
+    Cantarell,
+    sans-serif;
   -webkit-font-smoothing: antialiased;
-  transition: background-color 0.3s ease, color 0.3s ease;
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease;
   min-height: 100vh;
 }
 
@@ -83,14 +102,14 @@ body {
 }
 
 #nprogress .bar {
-  background: #3b82f6 !important;
-  height: 5px !important;
+  background: var(--accent) !important;
+  height: 3px !important;
 }
 
 #nprogress .peg {
   box-shadow:
-    0 0 10px #3b82f6,
-    0 0 5px #3b82f6 !important;
+    0 0 10px var(--accent),
+    0 0 5px var(--accent) !important;
 }
 
 /* Keep your global hide as-is */
@@ -136,39 +155,51 @@ body {
   background: transparent;
 }
 
-/* ── RemindCA AG Grid theme overrides ──────────────────────────────────
-   Purely cosmetic: restyles the existing ag-theme-alpine(-dark) grid to
-   match the RemindCA design tokens (bg / surface / navy / gold / divider).
-   Does not touch grid behavior, data, sorting, filtering, or pagination logic.
-────────────────────────────────────────────────────────────────────── */
-
 .rc-grid-theme {
   --ag-font-family: inherit;
   --ag-borders: none;
   --ag-row-border-color: var(--border);
-  --ag-header-background-color: var(--bg);
+  --ag-header-background-color: var(--surface);
   --ag-header-foreground-color: var(--text-secondary);
   --ag-background-color: var(--surface);
   --ag-odd-row-background-color: var(--surface);
-  --ag-row-hover-color: color-mix(in srgb, var(--primary) 5%, var(--surface));
+  --ag-row-hover-color: color-mix(in srgb, var(--primary) 4%, var(--surface));
   --ag-foreground-color: var(--text-primary);
   --ag-secondary-foreground-color: var(--text-secondary);
   --ag-border-color: var(--border);
   --ag-cell-horizontal-padding: 20px;
   --ag-font-size: 14px;
   --ag-header-height: 48px;
-  --ag-row-height: 64px;
+  --ag-row-height: 56px;
 }
 
-/* Header row: uppercase-ish label styling + subtle bottom border */
+.dark .rc-grid-theme {
+  --ag-row-border-color: var(--border);
+  --ag-header-background-color: var(--surface);
+  --ag-header-foreground-color: var(--text-secondary);
+  --ag-background-color: var(--surface);
+  --ag-odd-row-background-color: var(--surface);
+  --ag-row-hover-color: color-mix(in srgb, var(--primary) 8%, var(--surface));
+  --ag-border-color: var(--border);
+}
+
+/* Header row: subtle label styling + clean bottom border */
 .rc-grid-theme .ag-header {
   border-bottom: 1px solid var(--border);
-  font-weight: 600;
+  font-weight: 500;
+}
+
+.dark .rc-grid-theme .ag-header {
+  border-bottom: 1px solid var(--border);
 }
 
 .rc-grid-theme .ag-header-cell-label {
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.dark .rc-grid-theme .ag-header-cell-label {
   color: var(--text-secondary);
 }
 
@@ -180,6 +211,10 @@ body {
 }
 
 .rc-grid-theme .ag-row {
+  border-bottom: 1px solid var(--border);
+}
+
+.dark .rc-grid-theme .ag-row {
   border-bottom: 1px solid var(--border);
 }
 
@@ -195,6 +230,11 @@ body {
   font-size: 13px;
 }
 
+.dark .rc-grid-theme .ag-paging-panel {
+  border-top: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+
 .rc-grid-theme .ag-paging-button {
   border-radius: 9999px;
   min-width: 28px;
@@ -205,6 +245,10 @@ body {
 }
 
 .rc-grid-theme .ag-paging-description {
+  color: var(--text-secondary);
+}
+
+.dark .rc-grid-theme .ag-paging-description {
   color: var(--text-secondary);
 }
 
@@ -219,7 +263,7 @@ body {
   border-radius: 8px;
   border: none;
   cursor: pointer;
-  transition: background-color 0.15s ease, opacity 0.15s ease;
+  transition: all 0.15s ease;
 }
 
 .rc-action-btn:disabled {
@@ -228,28 +272,233 @@ body {
 }
 
 .rc-action-btn--primary {
-  background-color: color-mix(in srgb, var(--primary) 10%, transparent);
-  color: var(--primary);
+  background-color: #eff6ff;
+  color: #2563eb;
 }
 
 .rc-action-btn--primary:hover:not(:disabled) {
-  background-color: color-mix(in srgb, var(--primary) 18%, transparent);
+  background-color: #dbeafe;
 }
 
 .rc-action-btn--secondary {
-  background-color: color-mix(in srgb, var(--accent) 12%, transparent);
-  color: var(--accent-hover);
+  background-color: #fffbeb;
+  color: #d97706;
 }
 
 .rc-action-btn--secondary:hover:not(:disabled) {
-  background-color: color-mix(in srgb, var(--accent) 20%, transparent);
+  background-color: #fef3c7;
 }
 
 .rc-action-btn--danger {
-  background-color: rgba(220, 38, 38, 0.1);
-  color: #dc2626;
+  background-color: #fef2f2;
+  color: #ef4444;
 }
 
 .rc-action-btn--danger:hover:not(:disabled) {
-  background-color: rgba(220, 38, 38, 0.18);
+  background-color: #fee2e2;
+}
+
+.dark .rc-action-btn--primary {
+  background-color: rgba(37, 99, 235, 0.15);
+  color: #60a5fa;
+}
+
+.dark .rc-action-btn--primary:hover:not(:disabled) {
+  background-color: rgba(37, 99, 235, 0.25);
+}
+
+.dark .rc-action-btn--secondary {
+  background-color: rgba(217, 119, 6, 0.15);
+  color: #fbbf24;
+}
+
+.dark .rc-action-btn--secondary:hover:not(:disabled) {
+  background-color: rgba(217, 119, 6, 0.25);
+}
+
+.dark .rc-action-btn--danger {
+  background-color: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+}
+
+.dark .rc-action-btn--danger:hover:not(:disabled) {
+  background-color: rgba(239, 68, 68, 0.25);
+}
+
+/* ─── AG Grid Popup Editor & DatePicker Floating Layer ─────────── */
+.ag-popup-editor {
+  z-index: 9999 !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.ag-popup {
+  z-index: 9999 !important;
+}
+
+/* ─── DayPicker Theme Customization ────────────────────────────── */
+.rdp-root {
+  --rdp-accent-color: var(--primary) !important;
+  --rdp-accent-background-color: color-mix(
+    in srgb,
+    var(--primary) 12%,
+    transparent
+  ) !important;
+  --rdp-day-height: 38px !important;
+  --rdp-day-width: 38px !important;
+  --rdp-day_button-height: 36px !important;
+  --rdp-day_button-width: 36px !important;
+  font-family: inherit !important;
+  margin: 0 !important;
+}
+
+.dark .rdp-root {
+  --rdp-accent-color: var(--accent) !important;
+  --rdp-accent-background-color: color-mix(
+    in srgb,
+    var(--accent) 15%,
+    transparent
+  ) !important;
+  color: var(--text-primary) !important;
+}
+/* ---------- Toast ---------- */
+.app-toast {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: min(92vw, 400px);
+  padding: 14px 14px 16px 14px;
+  overflow: hidden;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  box-shadow:
+    0 18px 40px -14px rgba(20, 34, 77, 0.35),
+    0 2px 6px rgba(20, 34, 77, 0.08);
+  pointer-events: auto;
+}
+
+.app-toast-icon {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  color: var(--toast-color);
+  background: color-mix(in srgb, var(--toast-color) 16%, transparent);
+}
+
+.app-toast-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.app-toast-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--heading);
+}
+
+.app-toast-message {
+  margin: 2px 0 0;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.app-toast-close {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 0;
+  cursor: pointer;
+  color: var(--text-secondary);
+  background: transparent;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
+}
+.app-toast-close:hover {
+  background: color-mix(in srgb, var(--text-secondary) 14%, transparent);
+  color: var(--text-primary);
+}
+
+/* countdown bar */
+.app-toast-bar {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  width: 100%;
+  background: var(--toast-color);
+  transform-origin: left;
+  animation-name: toast-countdown;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+.app-toast:hover .app-toast-bar {
+  animation-play-state: paused;
+}
+
+.app-toast-enter {
+  animation: toast-in 0.4s cubic-bezier(0.21, 1.02, 0.73, 1) forwards;
+}
+.app-toast-leave {
+  animation: toast-out 0.25s ease-in forwards;
+}
+.app-toast-spin {
+  animation: toast-spin 0.8s linear infinite;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-24px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes toast-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-16px) scale(0.95);
+  }
+}
+@keyframes toast-countdown {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+@keyframes toast-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-toast-enter,
+  .app-toast-leave {
+    animation-duration: 0.01ms;
+  }
 }

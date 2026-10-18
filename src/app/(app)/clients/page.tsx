@@ -1,82 +1,72 @@
-"use client";
+'use client';
 
-import { useState, useEffect, useMemo } from "react";
-import { useWorkspace } from "@/context/WorkspaceContext";
-import ClientsTable from "@/components/clients/ClientsTable";
-import ClientsFilter from "@/components/clients/ClientsFilter";
-import { getSubjects, deleteSubject } from "@/services/subjectService";
-import { SubjectListItem, type ComplianceFilter } from "../../../types/subject";
-import ClientDetailsDrawer from "@/components/clients/ClientDetailsDrawer";
-import EditClientDialog from "@/components/clients/EditClientDialog";
-import CreateSubjectDialog from "@/components/clients/CreateSubjectDialog";
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { Plus, X } from 'lucide-react';
+import { useWorkspace } from '@/context/WorkspaceContext';
+import ClientsTable from '@/components/clients/ClientsTable';
+import ClientsFilter from '@/components/clients/ClientsFilter';
+import { getSubjects, deleteSubject, updateSubject } from '@/services/subjectService';
+import { SubjectListItem, Subject, type ComplianceFilter } from '@/types/subject';
+import ClientDetailsDrawer from '@/components/clients/ClientDetailsDrawer';
+import CreateClientDialog from '@/components/clients/CreateClientDialog';
+import ConfirmDialog from '@/components/tasks/ConfirmDialog';
+import PageSkeleton from '@/components/common/PageSkeleton';
+import { useAsyncAction } from '@/hooks/useAnyAction';
 
 export default function ClientsPage() {
   const { businessId } = useWorkspace();
 
   // Data state
   const [clients, setClients] = useState<SubjectListItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const fetchAction = useAsyncAction(true);
+  const deleteAction = useAsyncAction();
+  const updateAction = useAsyncAction();
+
+  const { run: runFetch } = fetchAction;
+  const { run: runDelete } = deleteAction;
+  const { run: runUpdate } = updateAction;
 
   // Dialog / drawer state
-  const [openCreateDialog, setOpenCreateDialog] = useState(false);
-  const [openEditDialog, setOpenEditDialog] = useState(false);
+  const [formOpen, setFormOpen] = useState(false);
   const [editingClientId, setEditingClientId] = useState<string | null>(null);
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   // Filter state
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"ALL" | "ACTIVE" | "INACTIVE">(
-    "ALL",
-  );
-  const [gstinFilter, setGstinFilter] = useState<
-    "ALL" | "WITH_GST" | "WITHOUT_GST"
-  >("ALL");
-  const [complianceFilter, setComplianceFilter] = useState<ComplianceFilter>("ALL");
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
+  const [gstinFilter, setGstinFilter] = useState<'ALL' | 'WITH_GST' | 'WITHOUT_GST'>('ALL');
+  const [complianceFilter, setComplianceFilter] = useState<ComplianceFilter>('ALL');
 
-  // Pagination
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  // Delete target state
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
 
-  // Delete confirmation and feedback
-  const [deleteDialog, setDeleteDialog] = useState<{
-    open: boolean;
-    clientId: string;
-    clientName: string;
-  }>({ open: false, clientId: "", clientName: "" });
-  const [deleteLoading, setDeleteLoading] = useState(false);
-  const [snackbar, setSnackbar] = useState<{
-    open: boolean;
-    message: string;
-    severity: "success" | "error";
-  }>({ open: false, message: "", severity: "success" });
-
-  // Reset pagination when filters change.
-  useEffect(() => {
-    setPage(0);
-  }, [searchQuery, statusFilter, gstinFilter, complianceFilter]);
-
-  const fetchClients = async () => {
+  const fetchClients = useCallback(async () => {
     if (!businessId) return;
 
-    try {
-      setLoading(true);
-      setError("");
-      const data = await getSubjects(businessId);
-      setClients(data.filter((subject) => subject.subjectType === "CLIENT"));
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to load clients");
-    } finally {
-      setLoading(false);
-    }
-  };
+    await runFetch(() => getSubjects(businessId), {
+      errorMessage: 'Failed to load clients',
+      showErrorToast: false,
+      onSuccess: (data) => {
+        setClients(data.filter((subject) => subject.subjectType === 'CLIENT'));
+      },
+    });
+  }, [businessId, runFetch]);
+
+  // Which business we've already started loading. Refs survive Strict Mode's
+  // dev-only unmount/remount, so the second effect run is skipped.
+  const loadedFor = useRef<string | null>(null);
 
   useEffect(() => {
-    if (businessId) fetchClients();
-    // fetchClients is intentionally invoked when the workspace business changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [businessId]);
+    if (!businessId) return;
+    if (loadedFor.current === businessId) return;
+    loadedFor.current = businessId;
+    setClients([]);
+    fetchClients();
+  }, [businessId, fetchClients]);
 
   const filteredClients = useMemo(() => {
     let result = [...clients];
@@ -86,316 +76,292 @@ export default function ClientsPage() {
       result = result.filter(
         (client) =>
           client.displayName?.toLowerCase().includes(q) ||
+          client.businessName?.toLowerCase().includes(q) ||
           client.email?.toLowerCase().includes(q) ||
-          client.phone?.includes(q),
+          client.phone?.includes(q)
       );
     }
 
-    if (statusFilter === "ACTIVE") {
+    if (statusFilter === 'ACTIVE') {
       result = result.filter((client) => client.isActive);
     }
-    if (statusFilter === "INACTIVE") {
+    if (statusFilter === 'INACTIVE') {
       result = result.filter((client) => !client.isActive);
     }
 
-    if (gstinFilter === "WITH_GST") {
+    if (gstinFilter === 'WITH_GST') {
       result = result.filter((client) => !!client.gstin);
     }
-    if (gstinFilter === "WITHOUT_GST") {
+    if (gstinFilter === 'WITHOUT_GST') {
       result = result.filter((client) => !client.gstin);
     }
 
-    if (complianceFilter !== "ALL") {
+    if (complianceFilter !== 'ALL') {
       result = result.filter((client) =>
-        client.activeCompliances?.includes(complianceFilter.toLowerCase()),
+        client.activeCompliances?.includes(complianceFilter.toLowerCase())
       );
     }
 
     return result;
   }, [clients, searchQuery, statusFilter, gstinFilter, complianceFilter]);
 
-  const paginatedClients = useMemo(() => {
-    const start = page * rowsPerPage;
-    return filteredClients.slice(start, start + rowsPerPage);
-  }, [filteredClients, page, rowsPerPage]);
-
+  // Handlers
   const handleView = (clientId: string) => {
+    setFormOpen(false);
+    setEditingClientId(null);
     setSelectedClientId(clientId);
     setDrawerOpen(true);
   };
 
-  const handleEdit = (clientId: string) => {
-    setEditingClientId(clientId);
-    setOpenEditDialog(true);
+  const handleCreate = () => {
+    setSelectedClientId(null);
     setDrawerOpen(false);
+    setEditingClientId(null);
+    setFormOpen(true);
   };
 
-  const handleEditSuccess = () => fetchClients();
+  const handleEdit = (clientId: string) => {
+    setSelectedClientId(null);
+    setDrawerOpen(false);
+    setEditingClientId(clientId);
+    setFormOpen(true);
+  };
+
   const handleDrawerClose = () => {
     setDrawerOpen(false);
     setSelectedClientId(null);
   };
-  const handleCreateSuccess = () => fetchClients();
 
-  const handleDelete = (clientId: string, clientName: string) => {
-    setDeleteDialog({ open: true, clientId, clientName });
+  const handleDeleteRequest = (clientId: string, clientName: string) => {
+    setDeleteTarget({ id: clientId, name: clientName });
   };
 
   const handleDeleteConfirm = async () => {
-    if (!businessId) return;
+    if (!businessId || !deleteTarget) return;
 
-    try {
-      setDeleteLoading(true);
-      setError("");
-      await deleteSubject(businessId, deleteDialog.clientId);
-      setDeleteDialog({ open: false, clientId: "", clientName: "" });
-      setSnackbar({
-        open: true,
-        message: "Client deleted successfully",
-        severity: "success",
-      });
-      await fetchClients();
-    } catch (err: unknown) {
-      setSnackbar({
-        open: true,
-        message: err instanceof Error ? err.message : "Failed to delete client",
-        severity: "error",
-      });
-    } finally {
-      setDeleteLoading(false);
-    }
+    const targetId = deleteTarget.id;
+    const targetName = deleteTarget.name;
+
+    await runDelete(() => deleteSubject(businessId, targetId), {
+      successMessage: `Client "${targetName}" deleted successfully`,
+      errorMessage: 'Failed to delete client',
+      showSuccessToast: true,
+      showErrorToast: true,
+      onSuccess: () => {
+        setDeleteTarget(null);
+        setClients((prev) => prev.filter((client) => client.id !== targetId));
+      },
+    });
   };
 
-  if (!businessId) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center bg-base-200">
-        <span className="loading loading-spinner loading-lg text-primary" />
-      </div>
-    );
+  const handleUpdateCell = useCallback(
+    async ({
+      row,
+      field,
+      newValue,
+    }: {
+      row: SubjectListItem;
+      field: string;
+      newValue: unknown;
+    }) => {
+      if (!businessId) return;
+
+      const valToSave = field === 'isActive' ? newValue === 'Active' : newValue;
+      const boolVal = field === 'isActive' ? newValue === 'Active' : Boolean(newValue);
+
+      await runUpdate(
+        () => updateSubject(businessId, row.id, { [field]: valToSave }),
+        {
+          successMessage: 'Client updated successfully',
+          errorMessage: 'Failed to update client',
+          showSuccessToast: true,
+          showErrorToast: true,
+          onSuccess: () => {
+            setClients((prev) =>
+              prev.map((c) =>
+                c.id === row.id
+                  ? { ...c, [field]: field === 'isActive' ? boolVal : newValue }
+                  : c
+              )
+            );
+          },
+        }
+      );
+    },
+    [businessId, runUpdate]
+  );
+
+  const handleClientSaved = (saved?: Subject) => {
+    setFormOpen(false);
+    setEditingClientId(null);
+    if (!saved) {
+      fetchClients();
+      return;
+    }
+
+    const activeCompliances: string[] = [];
+    const cp = saved.metadata?.complianceProfile;
+    if (cp?.gst?.enabled) activeCompliances.push('GST');
+    if (cp?.tds?.enabled) activeCompliances.push('TDS');
+    if (cp?.itr?.enabled) activeCompliances.push('ITR');
+    if (cp?.roc?.enabled) activeCompliances.push('ROC');
+    if (cp?.msme?.enabled) activeCompliances.push('MSME');
+
+    const displayName = saved.profile?.displayName || saved.primaryContact?.name || 'Client';
+    const businessName = saved.profile?.businessName || saved.profile?.legalName || '';
+
+    const listItem: SubjectListItem = {
+      id: saved.id,
+      subjectType: saved.subjectType || 'CLIENT',
+      displayName,
+      businessName,
+      phone: saved.primaryContact?.phone || '',
+      email: saved.primaryContact?.email || '',
+      gstin: saved.gst?.gstins?.[0]?.gstin || null,
+      assignedTeam: saved.assignedTeam
+        ? {
+            primaryAssignee: {
+              userId: saved.assignedTeam.primaryAssignee?.userId || '',
+              name: saved.assignedTeam.primaryAssignee?.name || '',
+            },
+          }
+        : null,
+      isActive: saved.isActive,
+      activeCompliances,
+    };
+
+    setClients((prev) => {
+      const exists = prev.some((c) => c.id === listItem.id);
+      if (exists) {
+        return prev.map((c) => (c.id === listItem.id ? { ...c, ...listItem } : c));
+      }
+      return [listItem, ...prev];
+    });
+  };
+
+  const handleResetFilters = () => {
+    setSearchQuery('');
+    setStatusFilter('ALL');
+    setGstinFilter('ALL');
+    setComplianceFilter('ALL');
+  };
+
+  const pageError = fetchAction.error || deleteAction.error;
+
+  if (!businessId || (fetchAction.loading && clients.length === 0)) {
+    return <PageSkeleton filterCount={4} />;
   }
 
   return (
-    <main className="min-h-screen bg-base-200 py-6">
-      <div className="mx-auto w-full max-w-screen-2xl px-4 sm:px-6 lg:px-8">
-        <div className="space-y-6">
-          {/* Header */}
-          <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h1 className="text-2xl font-semibold tracking-tight text-base-content">
-                Clients
-              </h1>
-              <p className="mt-1 text-sm text-base-content/70">
-                Manage your client information and compliance details
-              </p>
-            </div>
-            <button
-              type="button"
-              className="btn btn-primary gap-2 font-semibold normal-case"
-              onClick={() => setOpenCreateDialog(true)}
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M12 5v14M5 12h14" />
-              </svg>
-              Add Client
-            </button>
-          </header>
-
-          {/* Error banner */}
-          {error && (
-            <div role="alert" className="alert alert-error">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5 shrink-0"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                aria-hidden="true"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M12 9v3m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"
-                />
-              </svg>
-              <span>{error}</span>
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                aria-label="Dismiss error"
-                onClick={() => setError("")}
-              >
-                ✕
-              </button>
-            </div>
-          )}
-
-          {/* Filters */}
-          <ClientsFilter
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-            statusFilter={statusFilter}
-            onStatusChange={setStatusFilter}
-            gstinFilter={gstinFilter}
-            onGstinChange={setGstinFilter}
-            complianceFilter={complianceFilter}
-            onComplianceChange={setComplianceFilter}
-          />
-
-          {/* Results count */}
-          {!loading && (
-            <p className="text-sm text-base-content/70">
-              Showing {filteredClients.length} of {clients.length} clients
+    <div className="min-h-screen bg-bg py-8">
+      <div className="mx-auto max-w-7xl space-y-6 px-4">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-semibold text-txt-main">Clients</h1>
+            <p className="mt-1 text-sm text-txt-sub">
+              Manage your client information and compliance details
             </p>
-          )}
+          </div>
 
-          {/* Table */}
-          <ClientsTable
-            clients={paginatedClients}
-            loading={loading}
-            onView={handleView}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-            totalCount={filteredClients.length}
-            page={page}
-            rowsPerPage={rowsPerPage}
-            onPageChange={(_, newPage) => setPage(newPage)}
-            onRowsPerPageChange={(event) => {
-              setRowsPerPage(parseInt(event.target.value, 10));
-              setPage(0);
-            }}
-          />
-        </div>
-      </div>
-
-      {/* Existing create/edit/details components remain wired as before */}
-      <CreateSubjectDialog
-        open={openCreateDialog}
-        onClose={() => setOpenCreateDialog(false)}
-        businessId={businessId}
-        onSuccess={handleCreateSuccess}
-      />
-
-      <ClientDetailsDrawer
-        open={drawerOpen}
-        onClose={handleDrawerClose}
-        clientId={selectedClientId}
-        businessId={businessId}
-        onEdit={handleEdit}
-      />
-
-      <EditClientDialog
-        open={openEditDialog}
-        onClose={() => setOpenEditDialog(false)}
-        clientId={editingClientId}
-        businessId={businessId}
-        onSuccess={handleEditSuccess}
-      />
-
-      {/* DaisyUI delete confirmation modal */}
-      {deleteDialog.open && (
-        <div
-          className="modal modal-open"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="delete-client-title"
-        >
           <button
             type="button"
-            className="modal-backdrop"
-            aria-label="Close delete confirmation"
-            disabled={deleteLoading}
-            onClick={() =>
-              !deleteLoading &&
-              setDeleteDialog({ open: false, clientId: "", clientName: "" })
-            }
+            className="btn gap-2 border-none bg-navy text-white hover:bg-navy-hover"
+            onClick={handleCreate}
           >
-            Close
+            <Plus className="h-4 w-4" />
+            Add Client
           </button>
-
-          <div className="modal-box max-w-md rounded-2xl border border-base-300 p-0 shadow-2xl">
-            <div className="border-b border-base-300 px-6 py-5">
-              <h2
-                id="delete-client-title"
-                className="text-lg font-bold text-base-content"
-              >
-                Delete Client
-              </h2>
-              <p className="mt-1 text-sm text-base-content/60">
-                This action cannot be undone.
-              </p>
-            </div>
-
-            <div className="px-6 py-5 text-sm leading-6 text-base-content/80">
-              Are you sure you want to delete{" "}
-              <strong className="font-semibold text-base-content">
-                {deleteDialog.clientName}
-              </strong>
-              ?
-            </div>
-
-            <div className="flex flex-col-reverse gap-3 border-t border-base-300 bg-base-200/50 px-6 py-4 sm:flex-row sm:justify-end">
-              <button
-                type="button"
-                className="btn btn-outline"
-                onClick={() =>
-                  setDeleteDialog({
-                    open: false,
-                    clientId: "",
-                    clientName: "",
-                  })
-                }
-                disabled={deleteLoading}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="btn btn-error text-white"
-                onClick={handleDeleteConfirm}
-                disabled={deleteLoading}
-              >
-                {deleteLoading && (
-                  <span className="loading loading-spinner loading-sm" />
-                )}
-                {deleteLoading ? "Deleting..." : "Delete"}
-              </button>
-            </div>
-          </div>
         </div>
-      )}
 
-      {/* DaisyUI snackbar replacement */}
-      {snackbar.open && (
-        <div className="toast toast-bottom toast-center z-[100]">
-          <div
-            role="status"
-            className={`alert ${
-              snackbar.severity === "success" ? "alert-success" : "alert-error"
-            } shadow-lg`}
-          >
-            <span>{snackbar.message}</span>
+        {/* Error Alert */}
+        {pageError && (
+          <div role="alert" className="alert alert-error flex items-center justify-between text-sm">
+            <span>{pageError}</span>
             <button
               type="button"
-              className="btn btn-ghost btn-xs"
-              aria-label="Dismiss notification"
-              onClick={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+              className="btn btn-ghost btn-xs btn-circle"
+              aria-label="Dismiss error"
+              onClick={() => {
+                fetchAction.clearError();
+                deleteAction.clearError();
+              }}
             >
-              ✕
+              <X className="h-4 w-4" />
             </button>
           </div>
-        </div>
-      )}
-    </main>
+        )}
+
+        {/* Filters */}
+        <ClientsFilter
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          statusFilter={statusFilter}
+          onStatusChange={setStatusFilter}
+          gstinFilter={gstinFilter}
+          onGstinChange={setGstinFilter}
+          complianceFilter={complianceFilter}
+          onComplianceChange={setComplianceFilter}
+          onReset={handleResetFilters}
+        />
+
+        {/* Results count */}
+        {!fetchAction.loading && (
+          <p className="text-sm text-txt-sub">
+            Showing {filteredClients.length} of {clients.length} clients
+          </p>
+        )}
+
+        {/* Table using CommonDataGrid */}
+        <ClientsTable
+          clients={filteredClients}
+          loading={fetchAction.loading}
+          businessId={businessId}
+          onView={handleView}
+          onEdit={handleEdit}
+          onDelete={handleDeleteRequest}
+          onUpdateCell={handleUpdateCell}
+          onRefresh={fetchClients}
+        />
+
+        {/* View Details Drawer */}
+        <ClientDetailsDrawer
+          open={drawerOpen}
+          onClose={handleDrawerClose}
+          clientId={selectedClientId}
+          businessId={businessId}
+          onEdit={handleEdit}
+        />
+
+        {/* Client Form Drawer (Create & Edit) */}
+        <CreateClientDialog
+          open={formOpen}
+          clientId={editingClientId}
+          businessId={businessId}
+          onClose={() => {
+            setFormOpen(false);
+            setEditingClientId(null);
+          }}
+          onSuccess={handleClientSaved}
+        />
+
+        {/* Delete Confirmation Dialog */}
+        <ConfirmDialog
+          open={!!deleteTarget}
+          title="Delete Client"
+          description={
+            <>
+              Are you sure you want to delete{' '}
+              <strong>{deleteTarget?.name}</strong>? This action cannot be undone.
+            </>
+          }
+          confirmLabel="Delete"
+          variant="danger"
+          loading={deleteAction.loading}
+          onConfirm={handleDeleteConfirm}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      </div>
+    </div>
   );
 }

@@ -19,27 +19,27 @@ export function PasswordField({
 
     return (
         <div className="w-full">
-            <label htmlFor={name} className="block text-[13px] font-semibold text-[var(--text-primary)] mb-1.5">
+            <label htmlFor={name} className="block text-[13px] font-bold text-[var(--text-primary)] mb-1.5">
                 {label}
             </label>
 
             <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-secondary)] pointer-events-none" />
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-secondary)] pointer-events-none" />
                 <input
                     id={name}
                     type={visible ? "text" : "password"}
                     placeholder={placeholder}
                     onKeyDown={(e) => e.key === "Enter" && onEnter?.()}
                     {...register(name)}
-                    className={`w-full h-10 rounded-lg border bg-[var(--surface)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] outline-none pl-9 pr-10 transition-colors ${error
-                            ? "border-red-400 focus:border-red-400"
-                            : "border-[var(--border)] hover:border-[var(--primary)]/40 focus:border-[var(--primary)]"
+                    className={`w-full h-11 rounded-xl border bg-[var(--surface)] text-sm font-medium text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/60 outline-none pl-10 pr-10 transition-all ${error
+                            ? "border-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-400/20"
+                            : "border-[var(--border)] hover:border-[var(--primary)]/40 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/15"
                         }`}
                 />
                 <button
                     type="button"
                     onClick={() => setVisible((v) => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-[var(--heading)]"
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-[var(--heading)] cursor-pointer"
                     aria-label={visible ? "Hide password" : "Show password"}
                 >
                     {visible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}

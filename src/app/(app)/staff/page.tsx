@@ -1,68 +1,204 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { Header } from "@/components/layout/Header";
-import { SubHeader } from "@/components/layout/SubHeader";
-import { RemindersView } from "@/components/modules/RemindersView";
-import { TasksView } from "@/components/modules/TasksView";
-import { GenericModuleView } from "@/components/modules/GenericModuleView";
-import { NavTab, ModuleTabMeta } from "@/types";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useWorkspace } from '@/context/WorkspaceContext';
+import ResourcePageLayout from '@/components/common/ResourcePageLayout';
+import StatCard from '@/components/task-definitions/StatCard';
+import PageSkeleton from '@/components/common/PageSkeleton';
+import ConfirmDialog from '@/components/tasks/ConfirmDialog';
 
-const TAB_META: Record<NavTab, ModuleTabMeta> = {
-  Dashboard: {
-    subtitle: "Overview of compliance deadlines, pending filings, and system activity",
-    action: "New Overview",
-  },
-  Tasks: {
-    subtitle: "View, assign, and track client CA audit & GST tax tasks",
-    action: "Create Task",
-  },
-  Taskrules: {
-    subtitle: "Automated recurrence rules, statutory trigger dates, and schedules",
-    action: "Add Rule",
-  },
-  Reminders: {
-    subtitle: "Manage and monitor all automated reminder notifications and SMS/Email alerts",
-    action: "Create Reminder",
-  },
-  Clients: {
-    subtitle: "Client master directory, PAN/GSTIN profiles, and contact details",
-    action: "Add Client",
-  },
-  Staff: {
-    subtitle: "Staff team members, audit roles, and module access permissions",
-    action: "Invite Staff",
-  },
-};
+import AddStaffDialog from '@/components/staff/AddStaffDialog';
+import StaffDetailsDrawer from '@/components/staff/StaffDetailsDrawer';
+import StaffFilter from '@/components/staff/StaffFilter';
+import StaffTable from '@/components/staff/StaffTable';
 
-export default function Home() {
-  const [activeTab, setActiveTab] = useState<NavTab>("Reminders");
-  const [searchQuery, setSearchQuery] = useState<string>("");
+import { getStaff, deleteStaff } from '@/services/staffService';
+import { StaffMember } from '@/types/staff.types';
+import { useResourcePageState } from '@/hooks/useResourcePageState';
+import { useAsyncAction } from '@/hooks/useAnyAction';
+import { useStaffFilters } from '@/hooks/staff/useStaffFilters';
 
-  const activeMeta = TAB_META[activeTab];
+export default function StaffPage() {
+  const { businessId } = useWorkspace();
+
+  const [staff, setStaff] = useState<StaffMember[]>([]);
+
+  const fetchAction = useAsyncAction(true);
+  const deleteAction = useAsyncAction();
+  const page = useResourcePageState();
+  const filters = useStaffFilters(staff);
+
+  const { run: runFetch } = fetchAction;
+  const { run: runDelete } = deleteAction;
+
+  const fetchStaff = useCallback(async () => {
+    if (!businessId) return;
+    await runFetch(() => getStaff(businessId), {
+      errorMessage: 'Failed to load staff members',
+      showErrorToast: false,
+      onSuccess: (data) => {
+        setStaff(Array.isArray(data) ? data : []);
+      },
+    });
+  }, [businessId, runFetch]);
+
+  // Which business we've already started loading. Refs survive Strict Mode's
+  // dev-only unmount/remount, so the second effect run is skipped.
+  const loadedFor = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!businessId) return;
+    if (loadedFor.current === businessId) return;
+    loadedFor.current = businessId;
+    setStaff([]);
+    fetchStaff();
+  }, [businessId, fetchStaff]);
+
+
+  // ─── Delete Staff Confirmation ───────────────────────────────
+  const handleDeleteConfirm = async () => {
+    const target = page.deleteTarget;
+    if (!businessId || !target) return;
+
+    await runDelete(() => deleteStaff(businessId, target.id), {
+      successMessage: `"${target.label}" removed from firm`,
+      errorMessage: 'Failed to remove staff member',
+      onSuccess: async () => {
+        page.cancelDelete();
+        await fetchStaff();
+      },
+    });
+  };
+
+  const stats = useMemo(() => {
+    let active = 0;
+    let inactive = 0;
+    let admins = 0;
+
+    for (const member of staff) {
+      if (member.status === 'ACTIVE') active++;
+      else if (member.status === 'INACTIVE') inactive++;
+
+      const r = (member.roles?.[0] || member.role || '').toUpperCase();
+      if (r === 'ADMIN' || r === 'OWNER') admins++;
+    }
+
+    return {
+      total: staff.length,
+      active,
+      inactive,
+      admins,
+    };
+  }, [staff]);
+
+  if (!businessId || (fetchAction.loading && staff.length === 0)) {
+    return <PageSkeleton hasStats={true} filterCount={2} />;
+  }
 
   return (
-    <div className="min-h-screen bg-[var(--bg)] transition-colors duration-300">
-      {/* Main Layout Header Component */}
-      {/* <Header activeTab={activeTab} onSelectTab={setActiveTab} /> */}
+    <ResourcePageLayout
+      title="Staff directory"
+      description="Manage your firm's team, assign compliance responsibilities, and monitor member workloads."
+      actionLabel="Add Staff"
+      onAction={page.openCreate}
+      error={fetchAction.error || deleteAction.error}
+      onDismissError={() => {
+        fetchAction.clearError();
+        deleteAction.clearError();
+      }}
+      stats={
+        <>
+          <StatCard
+            label="Total team"
+            value={stats.total}
+            hint="Registered firm members"
+          />
+          <StatCard
+            label="Active members"
+            value={stats.active}
+            hint="Ready for task assignment"
+            valueClassName="text-[#059669] dark:text-emerald-400"
+          />
+          <StatCard
+            label="Inactive members"
+            value={stats.inactive}
+            hint="Access suspended"
+            valueClassName={stats.inactive > 0 ? 'text-slate-500' : 'text-txt-main'}
+          />
+          <StatCard
+            label="Admins & Owners"
+            value={stats.admins}
+            hint="Full administrative access"
+            valueClassName="text-purple-600 dark:text-purple-400"
+          />
+        </>
+      }
+      filters={
+        <StaffFilter
+          searchQuery={filters.searchQuery}
+          onSearchChange={filters.setSearchQuery}
+          statusFilter={filters.statusFilter}
+          onStatusChange={filters.setStatusFilter}
+          roleFilter={filters.roleFilter}
+          onRoleChange={filters.setRoleFilter}
+          onReset={filters.reset}
+        />
+      }
+      summary={
+        !fetchAction.loading && (
+          <p className="text-sm text-txt-sub">
+            Showing <strong>{filters.filtered.length}</strong> of <strong>{staff.length}</strong> staff members
+          </p>
+        )
+      }
+      overlays={
+        <>
+          <AddStaffDialog
+            open={page.formOpen}
+            onClose={page.close}
+            businessId={businessId}
+            onSuccess={() => {
+              fetchStaff();
+              page.close();
+            }}
+          />
 
-      {/* SubHeader Action Toolbar Component */}
-      <SubHeader
-        activeTab={activeTab}
-        subtitle={activeMeta.subtitle}
-        actionText={activeMeta.action}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
+          {/* View Details Drawer */}
+          <StaffDetailsDrawer
+            open={page.viewOpen}
+            onClose={page.close}
+            membershipId={page.viewId}
+            businessId={businessId}
+          />
+
+          {/* Remove Staff Confirm Dialog */}
+          <ConfirmDialog
+            open={Boolean(page.deleteTarget)}
+            title="Remove Staff Member"
+            description={
+              page.deleteTarget ? (
+                <>
+                  Are you sure you want to remove <strong>{page.deleteTarget.label}</strong> from your firm? This member will immediately lose access to workspace tasks, clients, and reminder schedules.
+                </>
+              ) : ''
+            }
+            confirmLabel="Remove Member"
+            variant="danger"
+            loading={deleteAction.loading}
+            onConfirm={handleDeleteConfirm}
+            onCancel={page.cancelDelete}
+          />
+        </>
+      }
+    >
+      <StaffTable
+        staff={filters.filtered}
+        loading={fetchAction.loading}
+        businessId={businessId}
+        onView={page.openView}
+        onDelete={(id, name) => page.requestDelete(id, name)}
+        onRefresh={fetchStaff}
       />
-
-      {/* Main Active Module View */}
-      <main className="max-w-6xl mx-auto px-4 sm:px-8 py-10">
-        {activeTab === "Reminders" && <RemindersView />}
-        {activeTab === "Tasks" && <TasksView />}
-        {activeTab !== "Reminders" && activeTab !== "Tasks" && (
-          <GenericModuleView activeTab={activeTab} subtitle={activeMeta.subtitle} />
-        )}
-      </main>
-    </div>
+    </ResourcePageLayout>
   );
 }

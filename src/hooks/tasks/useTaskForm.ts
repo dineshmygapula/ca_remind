@@ -32,7 +32,7 @@ export const DEFAULT_TASK_FORM: TaskFormData = {
     taskDefinitionId: '',
     taskType: '',
     taskPriority: 'MEDIUM',
-    frequency: 'ONETIME',
+    frequency: 'one_time',
     dueDate: '',
     assignedStaffId: '',
     templateId: '',

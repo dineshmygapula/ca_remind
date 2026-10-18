@@ -1,443 +1,403 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
-import { usePagination } from "@/hooks/usePagination";
+import { useMemo } from "react";
 import { useWorkspace } from "@/context/WorkspaceContext";
-import { Reminder } from "../../../types/reminders.types";
-import { getReminders, deleteReminder } from "../../../services/reminderService";
-import CreateReminderDialog from "@/components/reminders/CreateReminderDialog";
-import RemindersTable from "@/components/reminders/RemindersTable";
-import RemindersFilter from "@/components/reminders/RemindersFilter";
-import EditReminderDialog from "@/components/reminders/EditReminderDialog";
+import { ReminderDetail } from "@/types/reminders.types";
+import CommonDataGrid, {
+  GridAction,
+  GridColumn,
+  createTableActions,
+} from "@/components/common/CommonTable";
+import PageFilterBar from "@/components/common/PageFilter";
+import ResourcePageLayout from "@/components/common/ResourcePageLayout";
+import ReminderFormDrawer from "@/components/reminders/ReminderFormDrawer";
 import ReminderDetailsDrawer from "@/components/reminders/ReminderDetailsDrawer";
+import ConfirmDialog from "@/components/tasks/ConfirmDialog";
+import { useReminders } from "@/hooks/reminders/useReminders";
+import { useReminderFilters } from "@/hooks/reminders/useReminderFilters";
+import { updateReminder } from "@/services/reminderService";
 import {
-  ReminderStatusFilter,
-  ReminderChannelFilter,
-  ReminderTimeFilter,
-} from "@/constants/reminderConstants";
+  compareDates,
+  compareStrings,
+  SortOption,
+  useSortedItems,
+} from "@/hooks/useSortedItems";
+import { useResourcePageState } from "@/hooks/useResourcePageState";
+import { useAsyncAction } from "@/hooks/useAnyAction";
+import PageSkeleton from "@/components/common/PageSkeleton";
+import { DueDate } from "@/components/common/DueDate";
+import { DateCellEditor } from "@/components/grid/DateCellEditor";
+import ChannelBadge from "@/components/common/ChannelBadge";
+
+const STATUS_VALUES = ["SCHEDULED", "SENT", "FAILED", "CANCELLED"];
+
+const SORT_OPTIONS: SortOption<ReminderDetail>[] = [
+  {
+    key: "scheduled_asc",
+    label: "Sort by scheduled date",
+    compare: compareDates((r) => r.scheduledAt, "asc"),
+  },
+  {
+    key: "scheduled_desc",
+    label: "Sort by scheduled date (Latest)",
+    compare: compareDates((r) => r.scheduledAt, "desc"),
+  },
+  {
+    key: "title_asc",
+    label: "Sort by task title (A-Z)",
+    compare: compareStrings((r) => r.task?.title),
+  },
+  {
+    key: "client_asc",
+    label: "Sort by client (A-Z)",
+    compare: compareStrings((r) => r.subject?.name),
+  },
+];
+
+function getTaskTypePrefix(val?: string | null) {
+  if (!val) return "TASK";
+  const upper = val.toUpperCase();
+  if (upper.includes("GST")) return "GST";
+  if (upper.includes("TDS")) return "TDS";
+  if (upper.includes("ITR")) return "ITR";
+  if (upper.includes("ROC")) return "ROC";
+  if (upper.includes("MSME")) return "MSME";
+  return val.split("_")[0] || "TASK";
+}
+
+function getTaskTypeBadgeClass(val?: string | null) {
+  const prefix = getTaskTypePrefix(val);
+  if (prefix === "TDS")
+    return "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300";
+  if (prefix === "ITR")
+    return "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300";
+  if (prefix === "GST")
+    return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300";
+  if (prefix === "ROC")
+    return "bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300";
+  return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300";
+}
+
+function StatusBadge({ status }: { status?: string }) {
+  const s = (status || "").toUpperCase();
+  if (s === "SENT") {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#ecfdf5] text-[#047857] dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200/60">
+        <span className="w-1.5 h-1.5 rounded-full bg-[#10b981]" />
+        <span>Sent</span>
+      </span>
+    );
+  }
+  if (s === "SCHEDULED") {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#fffbeb] text-[#b45309] dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200/60">
+        <span className="w-1.5 h-1.5 rounded-full bg-[#f59e0b]" />
+        <span>Scheduled</span>
+      </span>
+    );
+  }
+  if (s === "FAILED") {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#fef2f2] text-[#dc2626] dark:bg-rose-950/40 dark:text-rose-400 border border-rose-200/60">
+        <span className="w-1.5 h-1.5 rounded-full bg-[#ef4444]" />
+        <span>Failed</span>
+      </span>
+    );
+  }
+  if (s === "CANCELLED") {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border border-slate-200/60">
+        <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+        <span>Cancelled</span>
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border border-slate-200/60">
+      <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+      <span>{status || "—"}</span>
+    </span>
+  );
+}
+
+const columns: GridColumn<ReminderDetail>[] = [
+  {
+    headerName: "Task",
+    field: "task",
+    minWidth: 260,
+    flex: 2.5,
+    cellRenderer: (p) => {
+      const row = p.data;
+      if (!row) return null;
+      const taskTitle = row.task?.title || "Reminder Notification";
+      const clientName = row.subject?.name;
+      const taskType = row.taskType || row.task?.title || "";
+      const prefix = getTaskTypePrefix(taskType);
+      const badgeClass = getTaskTypeBadgeClass(taskType);
+
+      return (
+        <div className="flex items-center gap-3 py-1">
+          <span
+            className={`w-11 h-9 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 ${badgeClass}`}
+          >
+            {prefix}
+          </span>
+          <div className="flex flex-col min-w-0">
+            <span className="font-bold text-sm text-[var(--primary)] dark:text-slate-100 truncate">
+              {taskTitle}
+            </span>
+            <span className="text-xs text-slate-500 dark:text-slate-400 truncate">
+              {clientName ? `Client: ${clientName}` : "General reminder"}
+            </span>
+          </div>
+        </div>
+      );
+    },
+  },
+  {
+    headerName: "Client",
+    colId: "client",
+    valueGetter: (p) => p.data?.subject?.name ?? "—",
+    minWidth: 160,
+    flex: 1.2,
+    cellRenderer: (p) => {
+      const name = p.data?.subject?.name;
+      if (!name) return <span className="text-xs text-slate-400">—</span>;
+      const initial = name.charAt(0).toUpperCase();
+
+      return (
+        <div className="flex items-center gap-2">
+          <span className="w-6 h-6 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-[10px] font-bold text-slate-600 dark:text-slate-300 shrink-0">
+            {initial}
+          </span>
+          <span className="font-semibold text-xs sm:text-sm text-slate-800 dark:text-slate-200 truncate">
+            {name}
+          </span>
+        </div>
+      );
+    },
+  },
+  {
+    headerName: "Channel",
+    field: "channel",
+    minWidth: 140,
+    flex: 1.1,
+    cellRenderer: (p) => <ChannelBadge channel={p.data?.channel} />,
+  },
+  {
+    headerName: "Task Type",
+    field: "taskType",
+    minWidth: 130,
+    flex: 1,
+    cellRenderer: (p) => {
+      const val = p.value || p.data?.task?.title;
+      const prefix = getTaskTypePrefix(val);
+      return (
+        <span className="inline-block px-3 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+          {prefix}
+        </span>
+      );
+    },
+  },
+  {
+    headerName: "Status",
+    field: "status",
+    minWidth: 145,
+    flex: 1.1,
+    editable: true,
+    cellEditor: "agSelectCellEditor",
+    cellEditorParams: { values: STATUS_VALUES },
+    cellRenderer: (p) => <StatusBadge status={p.value} />,
+  },
+  {
+    headerName: "Due Date",
+    field: "scheduledAt",
+    minWidth: 180,
+    flex: 1.4,
+    editable: false,
+
+    cellRenderer: (p) => (
+      <DueDate
+        value={p.value}
+        showTime={true}
+        badgeMode="scheduled"
+        completed={p.data?.status === "SENT" || p.data?.status === "CANCELLED"}
+      />
+    ),
+  },
+];
 
 export default function RemindersPage() {
   const { businessId, orgId } = useWorkspace();
+  const id = businessId!;
 
-  // Data state
-  const [reminders, setReminders] = useState<Reminder[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  // Dialog / drawer state
-  const [openCreateDialog, setOpenCreateDialog] = useState(false);
-  const [openEditDialog, setOpenEditDialog] = useState(false);
-  const [editingReminderId, setEditingReminderId] = useState<string | null>(null);
-  const [selectedReminderId, setSelectedReminderId] = useState<string | null>(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-
-  const [deleteTarget, setDeleteTarget] = useState<{
-    id: string;
-    title: string;
-  } | null>(null);
-  const [deleteLoading, setDeleteLoading] = useState(false);
-
-  // Filter state
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<ReminderStatusFilter>("ALL");
-  const [channelFilter, setChannelFilter] = useState<ReminderChannelFilter>("ALL");
-  const [timeFilter, setTimeFilter] = useState<ReminderTimeFilter>("ALL");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-
-  // Fetch all reminder pages for client-side filtering and pagination.
-  const fetchReminders = useCallback(async () => {
-    if (!businessId) return;
-
-    try {
-      setLoading(true);
-      setError("");
-
-      let allItems: Reminder[] = [];
-      let cursor: string | null = null;
-
-      do {
-        const data = await getReminders(businessId, cursor ?? undefined);
-        allItems = [...allItems, ...(data.items || [])];
-        cursor = data.next_cursor;
-      } while (cursor);
-
-      setReminders(allItems);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to fetch reminders");
-    } finally {
-      setLoading(false);
-    }
-  }, [businessId]);
-
-  useEffect(() => {
-    if (businessId) fetchReminders();
-  }, [businessId, fetchReminders]);
-
-  // Client-side filters
-  const filteredReminders = useMemo(() => {
-    let result = [...reminders];
-
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      result = result.filter(
-        (r) =>
-          r.task?.title?.toLowerCase().includes(q) ||
-          r.subject?.name?.toLowerCase().includes(q),
-      );
-    }
-
-    if (statusFilter !== "ALL") {
-      result = result.filter((r) => r.status === statusFilter);
-    }
-
-    if (channelFilter !== "ALL") {
-      result = result.filter((r) => r.channel === channelFilter);
-    }
-
-    // Overdue / today / upcoming filter
-    if (timeFilter !== "ALL") {
-      const now = new Date();
-      const todayStart = new Date(
-        now.getFullYear(),
-        now.getMonth(),
-        now.getDate(),
-      );
-      const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
-
-      result = result.filter((r) => {
-        if (!r.scheduledAt) return false;
-        const scheduled = new Date(r.scheduledAt);
-
-        if (timeFilter === "OVERDUE") {
-          return scheduled < todayStart && r.status === "SCHEDULED";
-        }
-        if (timeFilter === "TODAY") {
-          return scheduled >= todayStart && scheduled < todayEnd;
-        }
-        if (timeFilter === "UPCOMING") {
-          return scheduled >= todayEnd;
-        }
-        return true;
-      });
-    }
-
-    // UTC-safe date range boundaries
-    if (dateFrom) {
-      const fromBoundary = new Date(`${dateFrom}T00:00:00.000Z`);
-      result = result.filter(
-        (r) =>
-          r.scheduledAt &&
-          new Date(r.scheduledAt).getTime() >= fromBoundary.getTime(),
-      );
-    }
-
-    if (dateTo) {
-      const toBoundary = new Date(`${dateTo}T23:59:59.999Z`);
-      result = result.filter(
-        (r) =>
-          r.scheduledAt &&
-          new Date(r.scheduledAt).getTime() <= toBoundary.getTime(),
-      );
-    }
-
-    return result;
-  }, [
-    reminders,
-    searchQuery,
-    statusFilter,
-    channelFilter,
-    timeFilter,
-    dateFrom,
-    dateTo,
-  ]);
-
-  // Client-side pagination
   const {
-    page,
-    rowsPerPage,
-    paginatedData: paginatedReminders,
-    totalCount,
-    handlePageChange,
-    handleRowsPerPageChange,
-  } = usePagination({
-    data: filteredReminders,
-    defaultRowsPerPage: 10,
-    resetDeps: [
-      searchQuery,
-      statusFilter,
-      channelFilter,
-      timeFilter,
-      dateFrom,
-      dateTo,
-    ],
-  });
+    reminders,
+    loading,
+    error,
+    clearError,
+    refetch,
+    removeReminder,
+    patchReminder,
+    deleteLoading,
+  } = useReminders(id);
+  const filters = useReminderFilters(reminders);
+  const { sorted, sortProps } = useSortedItems(
+    filters.filteredReminders,
+    SORT_OPTIONS,
+  );
 
-  // Handlers
-  const handleView = (reminderId: string) => {
-    setSelectedReminderId(reminderId);
-    setDrawerOpen(true);
-  };
-
-  const handleEdit = (reminderId: string) => {
-    setEditingReminderId(reminderId);
-    setOpenEditDialog(true);
-    setDrawerOpen(false);
-  };
-
-  const handleDeleteRequest = (reminderId: string, taskTitle: string) => {
-    setDeleteTarget({ id: reminderId, title: taskTitle });
-  };
-
+  const page = useResourcePageState();
+  const { run } = useAsyncAction();
+  const action = useAsyncAction();
+  // const { run: runUpdate } = updateAction;
   const handleDeleteConfirm = async () => {
-    if (!businessId || !deleteTarget) return;
+    const target = page.deleteTarget;
+    if (!target) return;
+    const ok = await removeReminder(target.id, target.label);
+    if (ok) page.cancelDelete();
+  };
 
-    try {
-      setDeleteLoading(true);
-      setError("");
-      await deleteReminder(businessId, deleteTarget.id);
-      setDeleteTarget(null);
-      await fetchReminders();
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to delete reminder");
-    } finally {
-      setDeleteLoading(false);
+  const handleUpdateCell = async ({
+    row,
+    field,
+    newValue,
+  }: {
+    row: ReminderDetail;
+    field: string;
+    newValue: unknown;
+  }) => {
+    let value = newValue;
+    if (
+      field === "scheduledAt" &&
+      typeof newValue === "string" &&
+      newValue.trim()
+    ) {
+      const origDate = row.scheduledAt ? new Date(row.scheduledAt) : null;
+      const parts = newValue.split("-");
+      if (parts.length === 3) {
+        const year = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1;
+        const day = parseInt(parts[2], 10);
+        const hours =
+          origDate && !isNaN(origDate.getTime()) ? origDate.getHours() : 9;
+        const minutes =
+          origDate && !isNaN(origDate.getTime()) ? origDate.getMinutes() : 0;
+        const d = new Date(year, month, day, hours, minutes, 0, 0);
+        value = d.toISOString();
+      } else {
+        const d = new Date(newValue);
+        if (!isNaN(d.getTime())) {
+          value = d.toISOString();
+        }
+      }
     }
+    await run(() => updateReminder(id, row.id, { [field]: value }), {
+      successMessage: "Reminder updated successfully",
+      errorMessage: "Reminder updation failed",
+    });
+    (row as any)[field] = value;
   };
 
-  const handleDrawerClose = () => {
-    setDrawerOpen(false);
-    setSelectedReminderId(null);
-  };
+  // Status and date only editable inline; pencil/edit action icon removed per requirements
+  const actions = useMemo<GridAction<ReminderDetail>[]>(
+    () =>
+      createTableActions<ReminderDetail>({
+        onView: (r) => page.openView(r.id),
+        onDelete: (r) => page.requestDelete(r.id, r.task?.title || "Reminder"),
+      }),
+    [page.openView, page.requestDelete],
+  );
 
-  const handleResetFilters = () => {
-    setSearchQuery("");
-    setStatusFilter("ALL");
-    setChannelFilter("ALL");
-    setTimeFilter("ALL");
-    setDateFrom("");
-    setDateTo("");
-  };
-
-  // Loading guard
-  if (!businessId) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center bg-base-200">
-        <span className="loading loading-spinner loading-lg text-primary" />
-      </div>
-    );
+  if (!businessId || loading) {
+    return <PageSkeleton />;
   }
 
   return (
-    <main className="min-h-screen bg-base-200 py-8">
-      <div className="mx-auto w-full max-w-screen-2xl px-4 sm:px-6 lg:px-8">
-        <div className="space-y-6">
-          {/* Header */}
-          <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h1 className="text-2xl font-semibold tracking-tight text-base-content">
-                Reminders
-              </h1>
-              <p className="mt-1 text-sm text-base-content/70">
-                Manage and monitor all reminder notifications
-              </p>
-            </div>
-
-            <button
-              type="button"
-              className="btn btn-primary gap-2 font-semibold normal-case"
-              onClick={() => setOpenCreateDialog(true)}
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M12 5v14M5 12h14" />
-              </svg>
-              Create Reminder
-            </button>
-          </header>
-
-          {/* Error banner */}
-          {error && (
-            <div role="alert" className="alert alert-error">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5 shrink-0"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                aria-hidden="true"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M12 9v3m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"
-                />
-              </svg>
-              <span>{error}</span>
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                aria-label="Dismiss error"
-                onClick={() => setError("")}
-              >
-                ✕
-              </button>
-            </div>
-          )}
-
-          {/* Filters */}
-          <RemindersFilter
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-            statusFilter={statusFilter}
-            onStatusChange={setStatusFilter}
-            channelFilter={channelFilter}
-            onChannelChange={setChannelFilter}
-            timeFilter={timeFilter}
-            onTimeChange={setTimeFilter}
-            dateFrom={dateFrom}
-            onDateFromChange={(value) => {
-              setDateFrom(value);
-              // Clear To Date if it is now before From Date.
-              if (dateTo && value && new Date(value) > new Date(dateTo)) {
-                setDateTo("");
-              }
+    <ResourcePageLayout
+      title="Reminders"
+      description="Manage and monitor all reminder notifications"
+      actionLabel="Create reminder"
+      onAction={page.openCreate}
+      error={error}
+      // onDismissError={() => setError("")}
+      onDismissError={() => {
+        clearError();
+        action.clearError();
+      }}
+      filters={
+        <PageFilterBar
+          type="reminders"
+          search={filters.searchQuery}
+          onSearchChange={filters.setSearchQuery}
+          values={filters.values}
+          onChange={filters.onChange}
+          dateRange={{
+            fromValue: filters.dateFrom,
+            toValue: filters.dateTo,
+            onFromChange: filters.setDateFrom,
+            onToChange: filters.setDateTo,
+          }}
+          onReset={filters.reset}
+        />
+      }
+      summary={
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-xl font-bold text-txt-main">
+            {sorted.length}
+          </span>
+          <span className="text-base font-normal text-txt-sub">reminders</span>
+        </div>
+      }
+      sort={sortProps}
+      overlays={
+        <>
+          <ReminderDetailsDrawer
+            open={page.viewOpen}
+            reminderId={page.viewId}
+            businessId={id}
+            onClose={page.close}
+            onEdit={page.openEdit}
+          />
+          <ReminderFormDrawer
+            open={page.formOpen}
+            reminderId={page.formId ?? undefined}
+            businessId={id}
+            organizationId={orgId ?? ""}
+            onClose={page.close}
+            onSuccess={() => {
+              refetch();
+              page.close();
             }}
-            dateTo={dateTo}
-            onDateToChange={setDateTo}
-            onReset={handleResetFilters}
           />
-
-          {/* Results count */}
-          {!loading && (
-            <p className="text-sm text-base-content/70">
-              Showing {filteredReminders.length} of {reminders.length} reminders
-            </p>
-          )}
-
-          {/* Table */}
-          <RemindersTable
-            reminders={paginatedReminders}
-            loading={loading}
-            onView={handleView}
-            onEdit={handleEdit}
-            onDelete={handleDeleteRequest}
-            totalCount={totalCount}
-            page={page}
-            rowsPerPage={rowsPerPage}
-            onPageChange={handlePageChange}
-            onRowsPerPageChange={handleRowsPerPageChange}
+          <ConfirmDialog
+            open={!!page.deleteTarget}
+            title="Delete Reminder"
+            description={
+              <>
+                Are you sure you want to delete{" "}
+                <strong>{page.deleteTarget?.label}</strong>? This action cannot
+                be undone.
+              </>
+            }
+            confirmLabel="Delete"
+            variant="danger"
+            loading={action.loading}
+            onConfirm={handleDeleteConfirm}
+            onCancel={page.cancelDelete}
           />
-        </div>
-      </div>
-
-      {/* Dialogs and drawer remain connected to the existing components */}
-      <CreateReminderDialog
-        open={openCreateDialog}
-        onClose={() => setOpenCreateDialog(false)}
-        businessId={businessId}
-        organizationId={orgId ?? ""}
-        onSuccess={() => {
-          fetchReminders();
-          setOpenCreateDialog(false);
-        }}
+        </>
+      }
+    >
+      <CommonDataGrid<ReminderDetail>
+        rowData={sorted}
+        columns={columns}
+        actions={actions}
+        isLoading={loading}
+        rowHeight={64}
+        onUpdateCell={handleUpdateCell}
+        emptyMessage="No reminders found"
       />
-
-      <EditReminderDialog
-        open={openEditDialog}
-        onClose={() => {
-          setOpenEditDialog(false);
-          setEditingReminderId(null);
-        }}
-        reminderId={editingReminderId}
-        businessId={businessId}
-        onSuccess={() => {
-          fetchReminders();
-          setOpenEditDialog(false);
-        }}
-      />
-
-      <ReminderDetailsDrawer
-        open={drawerOpen}
-        onClose={handleDrawerClose}
-        reminderId={selectedReminderId}
-        businessId={businessId}
-        onEdit={handleEdit}
-      />
-
-      {/* DaisyUI delete confirmation modal */}
-      {deleteTarget && (
-        <div
-          className="modal modal-open"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="delete-reminder-title"
-        >
-          <button
-            type="button"
-            className="modal-backdrop"
-            aria-label="Close delete confirmation"
-            disabled={deleteLoading}
-            onClick={() => !deleteLoading && setDeleteTarget(null)}
-          >
-            Close
-          </button>
-
-          <div className="modal-box max-w-md rounded-2xl border border-base-300 p-0 shadow-2xl">
-            <div className="border-b border-base-300 px-6 py-5">
-              <h2
-                id="delete-reminder-title"
-                className="text-lg font-bold text-base-content"
-              >
-                Delete Reminder
-              </h2>
-              <p className="mt-1 text-sm text-base-content/60">
-                This action cannot be undone.
-              </p>
-            </div>
-
-            <div className="px-6 py-5 text-sm leading-6 text-base-content/80">
-              Are you sure you want to delete the reminder for{" "}
-              <strong className="font-semibold text-base-content">
-                {deleteTarget.title}
-              </strong>
-              ?
-            </div>
-
-            <div className="flex flex-col-reverse gap-3 border-t border-base-300 bg-base-200/50 px-6 py-4 sm:flex-row sm:justify-end">
-              <button
-                type="button"
-                className="btn btn-outline"
-                onClick={() => setDeleteTarget(null)}
-                disabled={deleteLoading}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="btn btn-error text-white"
-                onClick={handleDeleteConfirm}
-                disabled={deleteLoading}
-              >
-                {deleteLoading && (
-                  <span className="loading loading-spinner loading-sm" />
-                )}
-                {deleteLoading ? "Deleting..." : "Delete"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </main>
+    </ResourcePageLayout>
   );
 }

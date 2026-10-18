@@ -13,13 +13,25 @@ export interface DrawerProps {
   eyebrow?: string;
   title: string;
 
+  /** Badge displayed beside title (e.g. status) */
+  badge?: ReactNode;
+
   /** Icon rendered in the coloured icon badge in the header */
   icon?: ReactNode;
+
+  /** Extra action buttons rendered in header beside close button (e.g. edit button) */
+  headerActions?: ReactNode;
 
   /** Width of the drawer panel. Defaults to 'md'. */
   width?: 'sm' | 'md' | 'lg' | 'xl';
 
   children: ReactNode;
+
+  /** Custom header node. If provided, replaces default top banner header. */
+  customHeader?: ReactNode;
+
+  /** Custom footer node. If provided, replaces default onCancel/onSubmit footer buttons. */
+  footer?: ReactNode;
 
   // ── Footer (omit both to skip footer entirely) ──────────────────────────────
   onCancel?: () => void;
@@ -27,7 +39,7 @@ export interface DrawerProps {
   cancelLabel?: string;
   submitLabel?: string;
   submitting?: boolean;
-  submitVariant?: 'primary' | 'success' | 'danger';
+  submitVariant?: 'primary' | 'success' | 'danger' | 'gold';
 }
 
 // ─── Width map ────────────────────────────────────────────────────────────────
@@ -43,6 +55,7 @@ const WIDTH_CLASS: Record<NonNullable<DrawerProps['width']>, string> = {
 
 const SUBMIT_VARIANT_CLASS: Record<NonNullable<DrawerProps['submitVariant']>, string> = {
   primary: 'bg-navy hover:bg-navy-hover',
+  gold: 'bg-[#F59E0B] hover:bg-[#D97706] text-slate-950 font-bold',
   success: 'bg-emerald-600 hover:bg-emerald-700',
   danger: 'bg-red-600 hover:bg-red-700',
 };
@@ -54,9 +67,13 @@ export default function Drawer({
   onClose,
   eyebrow,
   title,
+  badge,
   icon,
+  headerActions,
   width = 'md',
   children,
+  customHeader,
+  footer,
   onCancel,
   onSubmit,
   cancelLabel = 'Cancel',
@@ -75,7 +92,7 @@ export default function Drawer({
   }, [open]);
 
   const handleCancel = onCancel ?? onClose;
-  const showFooter = Boolean(onSubmit || onCancel);
+  const showFooter = Boolean(footer || onSubmit || onCancel);
 
   return (
     <>
@@ -100,38 +117,48 @@ export default function Drawer({
           ${open ? 'translate-x-0' : 'translate-x-full'}`}
       >
         {/* ── Header ──────────────────────────────────────────────────────── */}
-        <div className="relative flex items-center justify-between bg-gradient-to-r from-[var(--primary)] to-[#2a3f6f] px-6 py-5 text-white overflow-hidden shrink-0">
-          {/* decorative glow */}
-          <div className="absolute -top-6 -right-6 w-32 h-32 rounded-full bg-[var(--accent)]/20 blur-2xl pointer-events-none" />
+        {customHeader ? (
+          <div className="shrink-0">{customHeader}</div>
+        ) : (
+          <div className="relative flex items-center justify-between bg-gradient-to-r from-[var(--primary)] to-[#2a3f6f] px-6 py-5 text-white overflow-hidden shrink-0">
+            {/* decorative glow */}
+            <div className="absolute -top-6 -right-6 w-32 h-32 rounded-full bg-[var(--accent)]/20 blur-2xl pointer-events-none" />
 
-          <div className="flex items-center gap-3 z-10 min-w-0">
-            {icon && (
-              <div className="flex shrink-0 items-center justify-center w-9 h-9 rounded-xl bg-white/15 backdrop-blur-sm border border-white/20">
-                {icon}
-              </div>
-            )}
-            <div className="min-w-0">
-              {eyebrow && (
-                <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[var(--accent)] mb-0.5">
-                  {eyebrow}
-                </p>
+            <div className="flex items-center gap-3 z-10 min-w-0">
+              {icon && (
+                <div className="flex shrink-0 items-center justify-center w-9 h-9 rounded-xl bg-white/15 backdrop-blur-sm border border-white/20">
+                  {icon}
+                </div>
               )}
-              <h2 className="text-base font-extrabold leading-tight tracking-tight truncate">
-                {title}
-              </h2>
+              <div className="min-w-0">
+                {eyebrow && (
+                  <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[var(--accent)] mb-0.5">
+                    {eyebrow}
+                  </p>
+                )}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="text-base font-extrabold leading-tight tracking-tight truncate">
+                    {title}
+                  </h2>
+                  {badge}
+                </div>
+              </div>
+            </div>
+
+            <div className="z-10 ml-4 flex items-center gap-1.5 shrink-0">
+              {headerActions}
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={submitting}
+                aria-label="Close drawer"
+                className="rounded-xl bg-white/10 border border-white/20 p-1.5 transition-all hover:bg-white/25 hover:scale-105 disabled:opacity-40"
+              >
+                <X className="h-4 w-4" />
+              </button>
             </div>
           </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={submitting}
-            aria-label="Close drawer"
-            className="z-10 ml-4 shrink-0 rounded-xl bg-white/10 border border-white/20 p-1.5 transition-all hover:bg-white/25 hover:scale-105 disabled:opacity-40"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
+        )}
 
         {/* ── Body ────────────────────────────────────────────────────────── */}
         <div className="flex-1 overflow-y-auto px-6 py-5">
@@ -139,7 +166,11 @@ export default function Drawer({
         </div>
 
         {/* ── Footer ──────────────────────────────────────────────────────── */}
-        {showFooter && (
+        {footer ? (
+          <div className="shrink-0 border-t border-[var(--border)] bg-[var(--surface)] px-6 py-4">
+            {footer}
+          </div>
+        ) : showFooter ? (
           <div className="shrink-0 flex gap-3 border-t border-[var(--border)] bg-[var(--surface)] px-6 py-4">
             <button
               type="button"
@@ -161,7 +192,7 @@ export default function Drawer({
               </button>
             )}
           </div>
-        )}
+        ) : null}
       </div>
     </>
   );

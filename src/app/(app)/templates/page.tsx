@@ -1,251 +1,215 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useMemo } from 'react';
-import {
-  Box,
-  Container,
-  Typography,
-  Button,
-  Stack,
-  Alert,
-  CircularProgress,
-} from '@mui/material';
-import { Add as AddIcon } from '@mui/icons-material';
-import { useAuth } from '@/context/AuthContext';
-import { MessageTemplateListItem } from '@/types/messageTemplate.types';
-import { getMessageTemplates, deleteMessageTemplate } from '@/services/messageTemplateService';
-import AddTemplateDialog from '@/components/templates/CreateTemplateDialog';
-import TemplatesTable from '@/components/templates/TemplatesTable';
-import TemplatesFilter from '@/components/templates/TemplatesFilter';
+import { useState, useMemo } from "react";
+import TemplatesTable from "@/components/templates/TemplatesTable";
+import TemplatesFilter from "@/components/templates/TemplatesFilter";
+import TemplateFormDrawer from "@/components/templates/TemplateFormDrawer";
+import TemplateDetailsDrawer from "@/components/templates/TemplateDetailsDrawer";
+import ConfirmDialog from "@/components/tasks/ConfirmDialog";
+import ResourcePageLayout from "@/components/common/ResourcePageLayout";
+import { useWorkspace } from "@/context/WorkspaceContext";
+import { useResourcePageState } from "@/hooks/useResourcePageState";
+import StatCard from "@/components/task-definitions/StatCard";
+import PageSkeleton from "@/components/common/PageSkeleton";
 import {
   StatusFilter,
   ChannelFilter,
   ReminderTypeFilter,
-} from '@/constants/messageTemplateConstants';
-import EditTemplateDialog from '@/components/templates/EditTemplateDialog';
-import TemplateDetailsDrawer from '@/components/templates/TemplateDetailsDrawer';
+} from "@/constants/messageTemplateConstants";
+import { useTemplates } from "@/hooks/templates/useTemplate";
 
 export default function TemplatesPage() {
-  const { businessId } = useAuth();
+  const { businessId } = useWorkspace();
+  const page = useResourcePageState();
 
-  // ─── Data State ──────────────────────────────────────────────────────────
-  const [templates, setTemplates] = useState<MessageTemplateListItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const {
+    templates,
+    loading,
+    error,
+    clearError,
+    refetch,
+    removeTemplate,
+    deleteLoading,
+  } = useTemplates(businessId);
 
-  // ─── Dialog/Drawer State ─────────────────────────────────────────────────
-  const [openCreateDialog, setOpenCreateDialog] = useState(false);
-  const [openEditDialog, setOpenEditDialog] = useState(false);
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  // Filter state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
+  const [channelFilter, setChannelFilter] = useState<ChannelFilter>("ALL");
+  const [reminderTypeFilter, setReminderTypeFilter] =
+    useState<ReminderTypeFilter>("ALL");
 
-  // ─── Filter State ────────────────────────────────────────────────────────
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
-  const [channelFilter, setChannelFilter] = useState<ChannelFilter>('ALL');
-  const [reminderTypeFilter, setReminderTypeFilter] = useState<ReminderTypeFilter>('ALL');
-
-  // ─── Fetch Templates ─────────────────────────────────────────────────────
-  useEffect(() => {
-    if (businessId) fetchTemplates();
-  }, [businessId]);
-
-  const fetchTemplates = async () => {
-    if (!businessId) return;
-    try {
-      setLoading(true);
-      setError('');
-      const data = await getMessageTemplates(businessId);
-      setTemplates(data);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch templates');
-    } finally {
-      setLoading(false);
-    }
+  const handleDeleteConfirm = async () => {
+    const target = page.deleteTarget;
+    if (!target) return;
+    const ok = await removeTemplate(target.id, target.label);
+    if (ok) page.cancelDelete();
   };
 
-  // ─── Filtered Templates ──────────────────────────────────────────────────
+  // Filter templates
   const filteredTemplates = useMemo(() => {
     let result = [...templates];
 
-    // Search filter
     if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      result = result.filter((t) => t.name.toLowerCase().includes(q));
+      const query = searchQuery.toLowerCase();
+      result = result.filter(
+        (t) =>
+          t.name.toLowerCase().includes(query) ||
+          t.key?.toLowerCase().includes(query) ||
+          t.reminder_type?.toLowerCase().includes(query),
+      );
     }
 
-    // Status filter
-    if (statusFilter === 'ACTIVE') {
+    if (statusFilter === "ACTIVE") {
       result = result.filter((t) => t.isActive === true);
-    } else if (statusFilter === 'INACTIVE') {
+    } else if (statusFilter === "INACTIVE") {
       result = result.filter((t) => t.isActive === false);
     }
 
-    // Channel filter
-    if (channelFilter !== 'ALL') {
-      result = result.filter((t) => t.channels.includes(channelFilter));
+    if (channelFilter !== "ALL") {
+      result = result.filter((t) => t.channels?.includes(channelFilter));
     }
 
-    // Reminder type filter
-    if (reminderTypeFilter !== 'ALL') {
+    if (reminderTypeFilter !== "ALL") {
       result = result.filter((t) => t.reminder_type === reminderTypeFilter);
     }
 
     return result;
   }, [templates, searchQuery, statusFilter, channelFilter, reminderTypeFilter]);
 
-  // ─── Handlers ────────────────────────────────────────────────────────────
-  const handleView = (templateId: string) => {
-    setSelectedTemplateId(templateId);
-    setDrawerOpen(true);
-  };
+  // Derived stats
+  const stats = useMemo(() => {
+    const activeCount = templates.filter((t) => t.isActive).length;
+    const whatsappCount = templates.filter((t) =>
+      t.channels?.includes("whatsapp"),
+    ).length;
+    const emailCount = templates.filter((t) =>
+      t.channels?.includes("email"),
+    ).length;
+    return {
+      total: templates.length,
+      activeCount,
+      whatsappCount,
+      emailCount,
+    };
+  }, [templates]);
 
-  const handleEdit = (templateId: string) => {
-    setSelectedTemplateId(templateId);
-    setOpenEditDialog(true);
-    setDrawerOpen(false);
-  };
-
-  const handleDelete = async (templateId: string, templateName: string) => {
-    if (!businessId) return;
-    const confirmed = window.confirm(
-      `Are you sure you want to delete the template "${templateName}"?\n\nThis action cannot be undone.`
-    );
-    if (!confirmed) return;
-
-    try {
-      setError('');
-      await deleteMessageTemplate(businessId, templateId);
-      await fetchTemplates();
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to delete template');
-    }
-  };
-
-  const handleCreateSuccess = () => {
-    fetchTemplates();
-    setOpenCreateDialog(false);
-  };
-
-  const handleEditSuccess = () => {
-    fetchTemplates();
-    setOpenEditDialog(false);
-  };
-
-  const handleDrawerClose = () => {
-    setDrawerOpen(false);
-    setSelectedTemplateId(null);
-  };
-
-  // ─── Loading Guard ───────────────────────────────────────────────────────
-  if (!businessId) {
-    return (
-      <Box
-        sx={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          minHeight: '60vh',
-          bgcolor: 'background.default',
-        }}
-      >
-        <CircularProgress color="primary" />
-      </Box>
-    );
+  if (!businessId || (loading && templates.length === 0)) {
+    return <PageSkeleton hasStats={true} />;
   }
 
   return (
-    <Box sx={{ bgcolor: 'background.default', minHeight: '100vh', py: 4 }}>
-      <Container maxWidth="xl">
-        <Stack spacing={3}>
-          {/* Header */}
-          <Stack direction="row" justifyContent="space-between" alignItems="center">
-            <Box>
-              <Typography variant="h5" fontWeight={600}>
-                Message Templates
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                Create and manage notification templates for reminders
-              </Typography>
-            </Box>
-            <Button
-              variant="contained"
-              color="primary"
-              startIcon={<AddIcon />}
-              onClick={() => setOpenCreateDialog(true)}
-              sx={{ textTransform: 'none', fontWeight: 600 }}
-            >
-              Create Template
-            </Button>
-          </Stack>
-
-          {/* Error */}
-          {error && (
-            <Alert severity="error" onClose={() => setError('')}>
-              {error}
-            </Alert>
-          )}
-
-          {/* Filters */}
-          <TemplatesFilter
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-            statusFilter={statusFilter}
-            onStatusChange={setStatusFilter}
-            channelFilter={channelFilter}
-            onChannelChange={setChannelFilter}
-            reminderTypeFilter={reminderTypeFilter}
-            onReminderTypeChange={setReminderTypeFilter}
+    <ResourcePageLayout
+      title="Message templates"
+      description="Create and manage notification templates for compliance reminders."
+      actionLabel="New template"
+      actionVariant="amber"
+      onAction={page.openCreate}
+      error={error}
+      onDismissError={clearError}
+      stats={
+        <>
+          <StatCard
+            label="Total templates"
+            value={stats.total}
+            hint={
+              stats.total > 0 && stats.activeCount === stats.total
+                ? "All active"
+                : `${stats.activeCount} active`
+            }
           />
-
-          {/* Results Count */}
-          {!loading && (
-            <Typography variant="body2" color="text.secondary">
-              Showing {filteredTemplates.length} of {templates.length} templates
-            </Typography>
-          )}
-
-          {/* Table */}
-          <TemplatesTable
-            templates={filteredTemplates}
-            loading={loading}
-            onView={handleView}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
+          <StatCard
+            label="WhatsApp enabled"
+            value={stats.whatsappCount}
+            hint="Instant messaging ready"
+            valueClassName="text-[#15803d] dark:text-emerald-400"
           />
-
-          {/* Create Dialog */}
-          <AddTemplateDialog
-            open={openCreateDialog}
-            onClose={() => setOpenCreateDialog(false)}
+          <StatCard
+            label="Email enabled"
+            value={stats.emailCount}
+            hint="Email delivery ready"
+            valueClassName="text-blue-600 dark:text-blue-400"
+          />
+          <StatCard
+            label="Active templates"
+            value={`${stats.activeCount} of ${stats.total}`}
+            hint="Ready for automated alerts"
+            valueClassName="text-[#059669] dark:text-emerald-400"
+          />
+        </>
+      }
+      filters={
+        <TemplatesFilter
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          statusFilter={statusFilter}
+          onStatusChange={setStatusFilter}
+          channelFilter={channelFilter}
+          onChannelChange={setChannelFilter}
+          reminderTypeFilter={reminderTypeFilter}
+          onReminderTypeChange={setReminderTypeFilter}
+          onReset={() => {
+            setSearchQuery("");
+            setStatusFilter("ALL");
+            setChannelFilter("ALL");
+            setReminderTypeFilter("ALL");
+          }}
+        />
+      }
+      summary={
+        !loading && (
+          <p className="text-sm text-txt-sub">
+            Showing {filteredTemplates.length} of {templates.length} templates
+          </p>
+        )
+      }
+      overlays={
+        <>
+          <TemplateDetailsDrawer
+            open={page.viewOpen}
+            onClose={page.close}
+            templateId={page.viewId}
             businessId={businessId}
-            onSuccess={handleCreateSuccess}
+            onEdit={page.openEdit}
           />
-
-         
-         
-{/* Edit Dialog */}
-<EditTemplateDialog
-  open={openEditDialog}
-  onClose={() => {
-    setOpenEditDialog(false);
-    setSelectedTemplateId(null);
-  }}
-  templateId={selectedTemplateId}
-  businessId={businessId}
-  onSuccess={handleEditSuccess}
-/>
-
-{/* Details Drawer */}
-<TemplateDetailsDrawer
-  open={drawerOpen}
-  onClose={handleDrawerClose}
-  templateId={selectedTemplateId}
-  businessId={businessId}
-  onEdit={handleEdit}
-/>
-        </Stack>
-      </Container>
-    </Box>
+          <TemplateFormDrawer
+            open={page.formOpen}
+            onClose={page.close}
+            templateId={page.formId}
+            businessId={businessId}
+            onSuccess={() => {
+              refetch();
+              page.close();
+            }}
+          />
+          <ConfirmDialog
+            open={!!page.deleteTarget}
+            title="Delete Template"
+            description={
+              <>
+                Are you sure you want to delete{" "}
+                <strong>{page.deleteTarget?.label}</strong>? This action cannot
+                be undone.
+              </>
+            }
+            confirmLabel="Delete"
+            variant="danger"
+            loading={deleteLoading}
+            onConfirm={handleDeleteConfirm}
+            onCancel={page.cancelDelete}
+          />
+        </>
+      }
+    >
+      <TemplatesTable
+        templates={filteredTemplates}
+        loading={loading}
+        businessId={businessId}
+        onView={page.openView}
+        onEdit={page.openEdit}
+        onDelete={(id, name) => page.requestDelete(id, name)}
+        onRefresh={refetch}
+      />
+    </ResourcePageLayout>
   );
 }

@@ -1,297 +1,340 @@
-'use client';
+"use client";
 
+import { useState, useMemo } from "react";
+import { Mail, Smartphone, Bell, Loader2 } from "lucide-react";
+import CommonDataGrid, {
+  GridAction,
+  GridColumn,
+  createTableActions,
+} from "@/components/common/CommonTable";
 import {
-  Paper,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  IconButton,
-  Chip,
-  Tooltip,
-  Typography,
-  Box,
-  CircularProgress,
-  Stack,
-} from '@mui/material';
-import {
-  Visibility as ViewIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-  } from '@mui/icons-material';
-import { MessageTemplateListItem } from '@/types/messageTemplate.types';
-import { Email as EmailIcon, WhatsApp as WhatsAppIcon } from '@mui/icons-material';
+  MessageTemplateListItem,
+  ChannelType,
+} from "@/types/messageTemplate.types";
+import { updateMessageTemplate } from "@/services/messageTemplateService";
+import { useToast } from "@/context/ToastContext";
+import WhatsAppIcon from "@/components/common/WhatsAppIcon";
+import { useAsyncAction } from "@/hooks/useAnyAction";
 
 interface TemplatesTableProps {
   templates: MessageTemplateListItem[];
   loading: boolean;
+  businessId?: string;
   onView: (templateId: string) => void;
   onEdit: (templateId: string) => void;
   onDelete: (templateId: string, templateName: string) => void;
+  onRefresh?: () => void;
 }
 
+// ─── Rule / Type Styling Helpers (Matching Task Definitions) ───────────────
+function getTemplatePrefix(val?: string) {
+  if (!val) return "TMPL";
+  const upper = val.toUpperCase();
+  if (upper.includes("GST")) return "GST";
+  if (upper.includes("TDS")) return "TDS";
+  if (upper.includes("ITR")) return "ITR";
+  if (upper.includes("ROC")) return "ROC";
+  if (upper.includes("MSME")) return "MSME";
+  return val.split("_")[0] || "TMPL";
+}
+
+function getTemplateBadgeClass(val?: string) {
+  const prefix = getTemplatePrefix(val);
+  if (prefix === "TDS")
+    return "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300";
+  if (prefix === "ITR")
+    return "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300";
+  if (prefix === "GST")
+    return "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300";
+  if (prefix === "ROC")
+    return "bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300";
+  if (prefix === "MSME")
+    return "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300";
+  return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300";
+}
+
+function getTemplateDescription(type?: string, name?: string) {
+  const key = (type || name || "").toUpperCase();
+  if (key.includes("GST")) return "Goods & Services Tax";
+  if (key.includes("TDS")) return "Tax Deducted at Source";
+  if (key.includes("ITR")) return "Income Tax Return";
+  if (key.includes("ROC")) return "Registrar of Companies";
+  if (key.includes("MSME")) return "Ministry of MSME";
+  return type || "Compliance Template";
+}
+
+// ─── Channel Badge Renderer with authentic WhatsApp Icon ───────────────────
+function ChannelBadge({ channel }: { channel: ChannelType | string }) {
+  const c = String(channel).toLowerCase();
+
+  if (c === "whatsapp") {
+    return (
+      <span
+        title="WhatsApp Channel"
+        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#ecfdf5] text-[#047857] dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/40 shadow-2xs shrink-0"
+      >
+        <WhatsAppIcon
+          size={13}
+          className="fill-current text-[#047857] dark:text-emerald-300 shrink-0"
+        />
+        <span>WhatsApp</span>
+      </span>
+    );
+  }
+
+  if (c === "email") {
+    return (
+      <span
+        title="Email Channel"
+        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#eff6ff] text-[#1d4ed8] dark:bg-blue-950/50 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800/40 shadow-2xs shrink-0"
+      >
+        <Mail className="h-3.5 w-3.5 text-[#1d4ed8] dark:text-blue-300 shrink-0" />
+        <span>Email</span>
+      </span>
+    );
+  }
+
+  if (c === "sms") {
+    return (
+      <span
+        title="SMS Channel"
+        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#eef2ff] text-[#4338ca] dark:bg-indigo-950/50 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/40 shadow-2xs shrink-0"
+      >
+        <Smartphone className="h-3.5 w-3.5 text-[#4338ca] dark:text-indigo-300 shrink-0" />
+        <span>SMS</span>
+      </span>
+    );
+  }
+
+  return (
+    <span
+      title="In-App Notification"
+      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200/60 shadow-2xs shrink-0"
+    >
+      <Bell className="h-3.5 w-3.5 text-slate-600 dark:text-slate-400 shrink-0" />
+      <span>In-App</span>
+    </span>
+  );
+}
+
+// ─── Category Badge Renderer (Matching Task Definitions ScheduleBadge) ──────
+function CategoryBadge({ category }: { category?: string }) {
+  const cat = (category || "").toUpperCase();
+  let badgeStyle =
+    "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300";
+  if (cat.includes("ACCOUNT")) {
+    badgeStyle =
+      "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300";
+  } else if (cat.includes("TAX")) {
+    badgeStyle =
+      "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300";
+  } else if (cat.includes("COMPLIANCE")) {
+    badgeStyle =
+      "bg-[#e0f2fe] text-[#0369a1] dark:bg-blue-950/40 dark:text-blue-300";
+  } else if (cat.includes("AUDIT")) {
+    badgeStyle =
+      "bg-[#f3e8ff] text-[#7e22ce] dark:bg-purple-950/40 dark:text-purple-300";
+  } else if (cat.includes("GENERAL")) {
+    badgeStyle =
+      "bg-[#fef3c7] text-[#b45309] dark:bg-amber-950/40 dark:text-amber-300";
+  }
+
+  return (
+    <span
+      className={`inline-block px-3 py-0.5 rounded-full text-xs font-semibold capitalize ${badgeStyle}`}
+    >
+      {category ? category.toLowerCase() : "General"}
+    </span>
+  );
+}
+
+// ─── Templates Table Component ──────────────────────────────────────────────
 export default function TemplatesTable({
   templates,
   loading,
+  businessId,
   onView,
   onEdit,
   onDelete,
+  onRefresh,
 }: TemplatesTableProps) {
-  // ─── Loading State ────────────────────────────────────────────────────────
-  if (loading) {
-    return (
-      <Paper sx={{ p: 8, textAlign: 'center' }}>
-        <CircularProgress />
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-          Loading templates...
-        </Typography>
-      </Paper>
-    );
-  }
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+  const { run } = useAsyncAction();
 
-  // ─── Empty State ──────────────────────────────────────────────────────────
-  if (templates.length === 0) {
-    return (
-      <Paper sx={{ p: 8, textAlign: 'center' }}>
-        <Typography variant="h6" color="text.secondary">
-          No templates found
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-          Create your first message template to get started
-        </Typography>
-      </Paper>
-    );
-  }
+  const columns = useMemo<GridColumn<MessageTemplateListItem>[]>(
+    () => [
+      {
+        headerName: "Template name",
+        field: "name",
+        minWidth: 260,
+        flex: 2.2,
+        editable: true,
+        cellRenderer: (p) => {
+          const row = p.data;
+          if (!row) return null;
+          const name = p.value || row.name;
+          const prefixKey = row.reminder_type || row.key || name;
+          return (
+            <div className="flex items-center gap-3 py-1">
+              <span
+                className={`w-11 h-9 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 ${getTemplateBadgeClass(
+                  prefixKey,
+                )}`}
+              >
+                {getTemplatePrefix(prefixKey)}
+              </span>
+              <div className="flex flex-col min-w-0">
+                <span className="font-bold text-sm text-[var(--primary)] dark:text-slate-100 truncate">
+                  {name}
+                </span>
+                <span className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                  {row.key
+                    ? `Key: ${row.key}`
+                    : getTemplateDescription(row.reminder_type, name)}
+                </span>
+              </div>
+            </div>
+          );
+        },
+      },
+      {
+        headerName: "Channels",
+        colId: "channels",
+        minWidth: 190,
+        flex: 1.3,
+        cellRenderer: (p) => {
+          const channels = p.data?.channels || [];
+          if (channels.length === 0) {
+            return (
+              <span className="text-xs text-slate-400 dark:text-slate-500 italic">
+                No channels
+              </span>
+            );
+          }
+          return (
+            <div className="flex items-center gap-1.5 py-1 overflow-hidden">
+              {channels.map((ch) => (
+                <ChannelBadge key={ch} channel={ch} />
+              ))}
+            </div>
+          );
+        },
+      },
+      {
+        headerName: "Category",
+        field: "businessCategory",
+        minWidth: 130,
+        flex: 1,
+        editable: true,
+        cellEditor: "agSelectCellEditor",
+        cellEditorParams: {
+          values: ["ACCOUNTS", "TAX", "COMPLIANCE", "AUDIT", "GENERAL"],
+        },
+        cellRenderer: (p) => (
+          <CategoryBadge category={p.value || p.data?.businessCategory} />
+        ),
+      },
+      {
+        headerName: "Placeholders",
+        colId: "placeholders",
+        minWidth: 200,
+        flex: 1.5,
+        cellRenderer: (p) => {
+          const list = p.data?.placeholders || [];
+          if (list.length === 0) {
+            return (
+              <span className="text-xs text-slate-400 dark:text-slate-500 italic">
+                None
+              </span>
+            );
+          }
+          const visible = list.slice(0, 2);
+          const remaining = list.length - visible.length;
 
-  // ─── Get Channel Icon ─────────────────────────────────────────────────────
-  const getChannelIcon = (channel: string) => {
-    switch (channel) {
-      case 'email':
-        return <EmailIcon fontSize="small" sx={{ color: '#10b981' }} />;
-      case 'whatsapp':
-        return <WhatsAppIcon fontSize="small" sx={{ color: '#25D366' }} />;
-      
-      default:
-        return null;
-    }
-  };
+          return (
+            <div
+              className="flex items-center gap-1.5 py-1 whitespace-nowrap overflow-hidden"
+              title={`Available Placeholders:\n${list.map((ph) => `[${ph}]`).join(", ")}`}
+            >
+              {visible.map((ph) => (
+                <span
+                  key={ph}
+                  className="inline-flex items-center font-mono text-[11px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700 text-slate-600 dark:text-slate-300 shrink-0 shadow-2xs"
+                >
+                  [{ph}]
+                </span>
+              ))}
+              {remaining > 0 && (
+                <span className="inline-flex items-center font-mono text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-slate-200/80 dark:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-300/80 dark:border-slate-600 shrink-0 cursor-help">
+                  +{remaining}
+                </span>
+              )}
+            </div>
+          );
+        },
+      },
+      {
+        headerName: "Status",
+        field: "isActive",
+        cellDataType: false, // stop AG Grid inferring "boolean" for this column
+        minWidth: 110,
+        flex: 0.9,
+        editable: true,
+        cellEditor: "agSelectCellEditor",
+        cellEditorParams: { values: [true, false] },
+        // also used by the dropdown to label its options
+        valueFormatter: (p) => (p.value ? "Active" : "Inactive"),
+        cellRenderer: (p) => {
+          const active = Boolean(p.value);
+          return active ? (
+            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#059669] dark:text-emerald-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#10b981]" />
+              Active
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+              Inactive
+            </span>
+          );
+        },
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [togglingId, businessId],
+  );
 
-  // ─── Get Reminder Type Color ──────────────────────────────────────────────
-  const getReminderTypeColor = (type: string) => {
-    switch (type) {
-      case 'GST':
-        return '#16a34a';
-      case 'TDS':
-        return '#374151';
-      case 'ITR':
-        return '#2563eb';
-      case 'ROC':
-        return '#7c3aed';
-      case 'MSME': return '#ea580c';
-      default:
-        return '#64748b';
-    }
-  };
+  const actions: GridAction<MessageTemplateListItem>[] = useMemo(
+    () =>
+      createTableActions<MessageTemplateListItem>({
+        onView: (row) => onView(row.id),
+        onEdit: (row) => onEdit(row.id),
+        onDelete: (row) => onDelete(row.id, row.name),
+      }),
+    [onView, onEdit, onDelete],
+  );
 
-  // ─── Table ────────────────────────────────────────────────────────────────
   return (
-    <TableContainer component={Paper}>
-      <Table>
-        <TableHead>
-          <TableRow sx={{ bgcolor: '#f8fafc' }}>
-            <TableCell
-              sx={{
-                fontWeight: 700,
-                color: '#0b1f3a',
-                fontSize: '0.8rem',
-                textTransform: 'uppercase',
-                letterSpacing: '0.04em',
-              }}
-            >
-              Template Name
-            </TableCell>
-            <TableCell sx={{ fontWeight: 600 }}>Channels</TableCell>
-            <TableCell sx={{ fontWeight: 600 }}>Reminder Type</TableCell>
-            <TableCell sx={{ fontWeight: 600 }}>Category</TableCell>
-            <TableCell sx={{ fontWeight: 600 }}>Placeholders</TableCell>
-            <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
-            <TableCell align="right" sx={{ fontWeight: 600 }}>
-              Actions
-            </TableCell>
-          </TableRow>
-        </TableHead>
-
-        <TableBody>
-          {templates.map((template) => (
-            <TableRow
-              key={template.id}
-              hover
-              sx={{
-                cursor: 'pointer',
-                '&:hover': { bgcolor: 'action.hover' },
-              }}
-              onClick={() => onView(template.id)}
-            >
-              {/* Template Name */}
-              <TableCell>
-                <Typography variant="body2" fontWeight={600}>
-                  {template.name}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  ID: {template.id.slice(0, 8)}...
-                </Typography>
-              </TableCell>
-
-              {/* Channels */}
-              <TableCell>
-                <Stack direction="row" spacing={0.5} alignItems="center">
-                  {template.channels.map((channel) => (
-                    <Tooltip
-                      key={channel}
-                      title={channel === 'email' ? 'Email' : channel === 'whatsapp' ? 'WhatsApp' : channel === 'sms' ? 'SMS' : 'In-App'}
-                    >
-                      <Box
-                        sx={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          p: 0.5,
-                          borderRadius: 1,
-                          bgcolor: 'action.hover',
-                        }}
-                      >
-                        {getChannelIcon(channel)}
-                      </Box>
-                    </Tooltip>
-                  ))}
-                  {template.channels.length === 0 && (
-                    <Typography variant="caption" color="text.disabled">
-                      No channels
-                    </Typography>
-                  )}
-                </Stack>
-              </TableCell>
-
-              {/* Reminder Type */}
-              <TableCell>
-                <Chip
-                  label={template.reminder_type}
-                  size="small"
-                  sx={{
-                    bgcolor: getReminderTypeColor(template.reminder_type),
-                    color: '#fff',
-                    fontWeight: 600,
-                    fontSize: '0.75rem',
-                  }}
-                />
-              </TableCell>
-
-              {/* Category */}
-              <TableCell>
-                <Typography variant="body2">{template.businessCategory}</Typography>
-              </TableCell>
-
-              {/* Placeholders */}
-              <TableCell>
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                  {template.placeholders.slice(0, 3).map((placeholder) => (
-                    <Chip
-                      key={placeholder}
-                      label={`[${placeholder}]`}
-                      size="small"
-                      variant="outlined"
-                      sx={{
-                        fontSize: '0.65rem',
-                        height: '20px',
-                        fontFamily: 'monospace',
-                      }}
-                    />
-                  ))}
-                  {template.placeholders.length > 3 && (
-                    <Chip
-                      label={`+${template.placeholders.length - 3}`}
-                      size="small"
-                      sx={{
-                        fontSize: '0.65rem',
-                        height: '20px',
-                        bgcolor: '#e5e7eb',
-                        fontWeight: 600,
-                      }}
-                    />
-                  )}
-                  {template.placeholders.length === 0 && (
-                    <Typography variant="caption" color="text.disabled">
-                      None
-                    </Typography>
-                  )}
-                </Box>
-              </TableCell>
-
-              {/* Status */}
-              <TableCell>
-                <Chip
-                  label={template.isActive ? 'Active' : 'Inactive'}
-                  size="small"
-                  color={template.isActive ? 'success' : 'default'}
-                  sx={{ fontWeight: 600 }}
-                />
-              </TableCell>
-
-              {/* Actions */}
-              <TableCell align="right" onClick={(e) => e.stopPropagation()}>
-                <Tooltip title="View Details">
-                  <IconButton
-                    size="small"
-                    onClick={() => onView(template.id)}
-                    sx={{
-                      color: '#5A6380',
-                      '&:hover': {
-                        color: '#1A1F36',
-                        backgroundColor: 'rgba(90,99,128,0.08)',
-                      },
-                    }}
-                  >
-                    <ViewIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-
-                <Tooltip title="Edit Template">
-                  <IconButton
-                    size="small"
-                    onClick={() => onEdit(template.id)}
-                    sx={{
-                      color: '#5A6380',
-                      '&:hover': {
-                        color: '#1A1F36',
-                        backgroundColor: 'rgba(90,99,128,0.08)',
-                      },
-                    }}
-                  >
-                    <EditIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-
-                <Tooltip title="Delete Template">
-                  <IconButton
-                    size="small"
-                    onClick={() => onDelete(template.id, template.name)}
-                    sx={{
-                      color: '#5A6380',
-                      '&:hover': {
-                        color: '#C0392B',
-                        backgroundColor: 'rgba(192,57,43,0.08)',
-                      },
-                    }}
-                  >
-                    <DeleteIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </TableContainer>
+    <CommonDataGrid<MessageTemplateListItem>
+      rowData={templates}
+      columns={columns}
+      actions={actions}
+      isLoading={loading}
+      // actionStyle="ghost"
+      rowHeight={64}
+      onUpdateCell={async ({ row, field, newValue }) => {
+        if (!businessId) return;
+        await run(
+          () =>
+            updateMessageTemplate(businessId, row.id, { [field]: newValue }),
+          {
+            successMessage: `${field} updated successfully`,
+            errorMessage: "Failed to update template",
+            // onSuccess: () => onRefresh?.(),
+          },
+        );
+      }}
+      emptyMessage="No message templates found"
+    />
   );
 }

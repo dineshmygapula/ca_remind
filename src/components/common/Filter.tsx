@@ -1,175 +1,207 @@
-'use client';
+"use client";
 
-import { ReactNode } from 'react';
-import { Search, RotateCcw } from 'lucide-react';
+import { ReactNode } from "react";
+import { Search, RotateCcw, ChevronDown } from "lucide-react";
+import Dropdown from "./Dropdown";
+import { DatePicker } from "./DatePicker";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface FilterOption {
-    label: string;
-    value: string;
+  label: string;
+  value: string;
 }
 
-/** One dropdown in the bar — pass as many of these as a given page needs. */
+export interface FilterTabsConfig {
+  options: readonly FilterOption[];
+  value: string;
+  onChange: (value: string) => void;
+}
+
+/** One dropdown in the filter bar */
 export interface FilterSelectConfig {
-    /** Unique key, also used as the React list key */
-    key: string;
-    /** Small label shown above the select, e.g. "Status" */
-    label: string;
-    value: string;
-    options: readonly FilterOption[];
-    onChange: (value: string) => void;
-    /** Tailwind width class override, defaults to a sensible min-width */
-    widthClass?: string;
+  /** Unique key, also used as the React list key */
+  key: string;
+  /** Small label shown in prefix, e.g. "Status" -> "Status: all" */
+  label?: string;
+  value: string;
+  options: readonly FilterOption[];
+  onChange: (value: string) => void;
+  /** Tailwind width override class */
+  widthClass?: string;
+  /** Prepend label to options (e.g. "Status: Active"). Defaults to true. */
+  prefixLabel?: boolean;
 }
 
 export interface DateRangeConfig {
-    fromLabel?: string;
-    toLabel?: string;
-    fromValue: string;
-    toValue: string;
-    onFromChange: (value: string) => void;
-    onToChange: (value: string) => void;
+  fromLabel?: string;
+  toLabel?: string;
+  fromValue: string;
+  toValue: string;
+  onFromChange: (value: string) => void;
+  onToChange: (value: string) => void;
 }
 
 export interface FilterBarProps {
-    searchValue: string;
-    onSearchChange: (value: string) => void;
-    searchPlaceholder?: string;
-    /** Hide the search box entirely for pages that don't need it */
-    showSearch?: boolean;
+  searchValue: string;
+  onSearchChange: (value: string) => void;
+  searchPlaceholder?: string;
+  /** Hide the search box entirely for pages that don't need it */
+  showSearch?: boolean;
 
-    /** Any number of select-style filters (Status, Task Type, Channel, When…) */
-    filters?: FilterSelectConfig[];
+  /** Segmented pill tabs (e.g. All | Monthly | Quarterly | Yearly) */
+  tabs?: FilterTabsConfig;
 
-    /** Optional From/To date row, only rendered when provided */
-    dateRange?: DateRangeConfig;
+  /** Any number of select-style filters (Status, Task Type, Channel, When…) */
+  filters?: FilterSelectConfig[];
 
-    /** Shown as an outlined button with a reset icon when provided */
-    onReset?: () => void;
+  /** Optional From/To date range, rendered inline */
+  dateRange?: DateRangeConfig;
 
-    /** Escape hatch for a page-specific field this component doesn't know about */
-    extra?: ReactNode;
+  /** Shown as an outlined button with a reset icon when provided */
+  onReset?: () => void;
 
-    className?: string;
+  /** Escape hatch for a page-specific field or buttons */
+  extra?: ReactNode;
+
+  className?: string;
 }
 
-// ─── Shared field wrapper (fieldset + legend = the "notched label" look) ─────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function FieldWrapper({
-    label,
-    widthClass,
-    children,
-}: {
-    label?: string;
-    widthClass?: string;
-    children: ReactNode;
-}) {
-    return (
-        <div className={`flex flex-col gap-1 ${widthClass ?? 'min-w-[160px] flex-1'}`}>
-            {label && (
-                <label className="text-xs font-semibold text-[var(--text-secondary)] tracking-wide">
-                    {label}
-                </label>
-            )}
-            {children}
-        </div>
-    );
+function formatOptionLabel(optLabel?: string): string {
+  if (!optLabel) return "";
+
+  let label = optLabel.trim();
+
+  // Strip any existing colon prefix like "Status: Scheduled" or "Status: all"
+  if (label.includes(":")) {
+    label = label.split(":").slice(1).join(":").trim();
+  }
+
+  const lower = label.toLowerCase();
+
+  // Simplify "All <Statuses/Channels/etc.>" and "all" / "any" to "All" (preserve "All Time")
+  if (
+    lower === "all" ||
+    lower === "any" ||
+    (/^all\s+/i.test(label) && lower !== "all time")
+  ) {
+    return "All";
+  }
+
+  // Capitalize first letter if it starts with a lowercase letter (e.g. "active" -> "Active", "inactive" -> "Inactive")
+  if (/^[a-z]/.test(label)) {
+    return label.charAt(0).toUpperCase() + label.slice(1);
+  }
+
+  return label;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function FilterBar({
-    searchValue,
-    onSearchChange,
-    searchPlaceholder = 'Search...',
-    showSearch = true,
-    filters = [],
-    dateRange,
-    onReset,
-    extra,
-    className = '',
+  searchValue,
+  onSearchChange,
+  searchPlaceholder = "Search...",
+  showSearch = true,
+  tabs,
+  filters = [],
+  dateRange,
+  onReset,
+  extra,
+  className = "",
 }: FilterBarProps) {
-    return (
-        <div
-            className={`rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 py-4 shadow-sm ${className}`}
-        >
-            <div className="flex flex-wrap items-end gap-4">
-                {/* Search */}
-                {showSearch && (
-                    <div className="min-w-[220px] flex-[2]">
-                        <div className="relative">
-                            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-secondary)]" />
-                            <input
-                                type="text"
-                                value={searchValue}
-                                onChange={(e) => onSearchChange(e.target.value)}
-                                placeholder={searchPlaceholder}
-                                className="h-10 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] pl-9 pr-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/15 transition-colors"
-                            />
-                        </div>
-                    </div>
-                )}
+  return (
+    <div
+      className={`rounded-2xl border border-divider bg-surface p-3.5 sm:p-4 shadow-xs ${className}`}
+    >
+      <div className="flex flex-wrap items-center gap-3">
+        {/* Search */}
+        {showSearch && (
+          <div className="min-w-[240px] flex-1 relative">
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-txt-sub/60" />
+            <input
+              type="text"
+              value={searchValue}
+              onChange={(e) => onSearchChange(e.target.value)}
+              placeholder={searchPlaceholder}
+              className="h-10 w-full rounded-xl border border-divider bg-bg/60 pl-9 pr-3 text-sm text-txt-main placeholder:text-txt-sub/60 focus:border-blue-500 focus:bg-surface focus:outline-none focus:ring-2 focus:ring-blue-500/15 transition-all"
+            />
+          </div>
+        )}
 
-                {/* Dynamic select filters */}
-                {filters.map((filter) => (
-                    <FieldWrapper key={filter.key} label={filter.label} widthClass={filter.widthClass}>
-                        <div className="relative">
-                            <select
-                                value={filter.value}
-                                onChange={(e) => filter.onChange(e.target.value)}
-                                className="h-10 w-full appearance-none rounded-xl border border-[var(--border)] bg-[var(--surface)] pl-3 pr-8 text-sm font-medium text-[var(--text-primary)] focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/15 transition-colors cursor-pointer"
-                            >
-                                {filter.options.map((opt) => (
-                                    <option key={opt.value} value={opt.value}>
-                                        {opt.label}
-                                    </option>
-                                ))}
-                            </select>
-                            {/* Chevron */}
-                            <svg className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-secondary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                            </svg>
-                        </div>
-                    </FieldWrapper>
-                ))}
+        {/* Segmented Tabs (e.g. Schedule Tabs) */}
+        {tabs && tabs.options.length > 0 && (
+          <div className="bg-bg p-1 rounded-xl border border-divider/50 flex items-center gap-0.5 shrink-0">
+            {tabs.options.map((tab) => {
+              const isSelected =
+                tab.value === ""
+                  ? !tabs.value || tabs.value === "ALL"
+                  : tabs.value.toLowerCase() === tab.value.toLowerCase();
 
-                {extra}
+              return (
+                <button
+                  key={tab.label}
+                  type="button"
+                  onClick={() => tabs.onChange(tab.value)}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all cursor-pointer ${
+                    isSelected
+                      ? "bg-navy text-white shadow-xs font-semibold"
+                      : "text-txt-sub hover:text-txt-main"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
-                {/* Reset */}
-                {onReset && (
-                    <button
-                        type="button"
-                        onClick={onReset}
-                        className="flex items-center gap-1.5 h-10 px-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-sm font-semibold text-[var(--text-primary)] hover:border-[var(--primary)]/50 hover:bg-[var(--bg)] transition-colors cursor-pointer self-end"
-                    >
-                        <RotateCcw className="h-4 w-4" />
-                        Reset
-                    </button>
-                )}
-            </div>
+        {/* Dynamic Select Filters */}
+        {filters.map((f) => (
+          <Dropdown
+            key={f.key}
+            label={f.label}
+            value={f.value}
+            options={f.options}
+            onChange={f.onChange}
+            className={`shrink-0 ${f.widthClass ?? "w-44"}`}
+          />
+        ))}
+        {/* Date Range Inputs */}
+        {dateRange && (
+          <div className="flex items-center gap-2 shrink-0">
+            <DatePicker
+              value={dateRange.fromValue}
+              onChange={(v) => dateRange.onFromChange(v ?? "")}
+              placeholder={dateRange.fromLabel ?? "From date"}
+              className="w-40"
+            />
+            <span className="text-sm text-txt-sub font-medium">to</span>
+            <DatePicker
+              value={dateRange.toValue}
+              onChange={(v) => dateRange.onToChange(v ?? "")}
+              placeholder={dateRange.toLabel ?? "To date"}
+              className="w-40"
+            />
+          </div>
+        )}
 
-            {/* Optional date range row */}
-            {dateRange && (
-                <div className="mt-4 flex flex-wrap gap-4">
-                    <FieldWrapper label={dateRange.fromLabel ?? 'From Date'} widthClass="min-w-[180px]">
-                        <input
-                            type="date"
-                            value={dateRange.fromValue}
-                            onChange={(e) => dateRange.onFromChange(e.target.value)}
-                            className="h-10 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 text-sm text-[var(--text-primary)] focus:border-[var(--primary)] focus:outline-none transition-colors"
-                        />
-                    </FieldWrapper>
-                    <FieldWrapper label={dateRange.toLabel ?? 'To Date'} widthClass="min-w-[180px]">
-                        <input
-                            type="date"
-                            value={dateRange.toValue}
-                            onChange={(e) => dateRange.onToChange(e.target.value)}
-                            className="h-10 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 text-sm text-[var(--text-primary)] focus:border-[var(--primary)] focus:outline-none transition-colors"
-                        />
-                    </FieldWrapper>
-                </div>
-            )}
-        </div>
-    );
+        {extra}
+
+        {/* Reset */}
+        {onReset && (
+          <button
+            type="button"
+            onClick={onReset}
+            className="flex items-center gap-1.5 h-10 px-3.5 rounded-xl border border-divider bg-surface text-sm font-medium text-txt-main hover:bg-bg transition-colors cursor-pointer shrink-0"
+          >
+            <RotateCcw className="h-4 w-4 text-txt-sub" />
+            <span>Reset</span>
+          </button>
+        )}
+      </div>
+    </div>
+  );
 }

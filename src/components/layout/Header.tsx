@@ -1,7 +1,8 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { usePathname } from "next/navigation";
+import { useRouter } from "nextjs-toploader/app";
 import {
   LayoutDashboard,
   CheckSquare,
@@ -27,8 +28,6 @@ import { signOut } from "firebase/auth";
 import { auth } from "@/config/firebase";
 import { useAuth } from "@/context/AuthContext";
 import { Logo } from "../common/Logo";
-import UserProfileDialog from "../users/UserProfileDialog";
-import BusinessProfileDialog from "../business/BusinessProfileDialog";
 import { useClickOutside } from "@/hooks/useClickOutside";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -80,15 +79,14 @@ function dropdownItemClass(active: boolean) {
 
 interface NavButtonProps {
   label: string;
-  href: string;
   icon: LucideIcon;
   active: boolean;
   onClick: () => void;
 }
 
-function NavButton({ label, href, icon: Icon, active, onClick }: NavButtonProps) {
+function NavButton({ label, icon: Icon, active, onClick }: NavButtonProps) {
   return (
-    <button key={href} type="button" onClick={onClick} className={navItemClass(active)}>
+    <button type="button" onClick={onClick} className={navItemClass(active)}>
       <Icon className="w-4 h-4" />
       <span>{label}</span>
     </button>
@@ -105,7 +103,9 @@ interface PeopleDropdownProps {
 function PeopleDropdown({ pathname, onNavigate }: PeopleDropdownProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const isPeopleActive = PEOPLE_ITEMS.some((item) => pathname?.startsWith(item.href));
+  const isPeopleActive = PEOPLE_ITEMS.some((item) =>
+    pathname?.startsWith(item.href),
+  );
 
   useClickOutside([ref], () => setOpen(false));
 
@@ -157,16 +157,9 @@ function PeopleDropdown({ pathname, onNavigate }: PeopleDropdownProps) {
 interface ProfileDropdownProps {
   email: string;
   onNavigate: (href: string) => void;
-  onUserProfile: () => void;
-  onBusinessProfile: () => void;
 }
 
-function ProfileDropdown({
-  email,
-  onNavigate,
-  onUserProfile,
-  onBusinessProfile,
-}: ProfileDropdownProps) {
+function ProfileDropdown({ email, onNavigate }: ProfileDropdownProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -183,8 +176,12 @@ function ProfileDropdown({
     {
       heading: "PROFILE",
       items: [
-        { label: "User Profile", icon: User, onClick: onUserProfile },
-        { label: "Business Profile", icon: Building2, onClick: onBusinessProfile },
+        { label: "User Profile", icon: User, href: "/user-profile" },
+        {
+          label: "Business Profile",
+          icon: Building2,
+          href: "/business-profile",
+        },
       ],
     },
     {
@@ -197,17 +194,21 @@ function ProfileDropdown({
     {
       heading: "PREFERENCES",
       items: [
-        { label: "Subscription & Billing", icon: CreditCard, href: "/billing" },
+        {
+          label: "Subscription & Billing",
+          icon: CreditCard,
+          href: "/subscription",
+        },
         { label: "Notification Settings", icon: Bell, href: "/notifications" },
       ],
     },
     {
       heading: "SUPPORT",
       items: [
-        { label: "Talk With Agent", icon: Headphones, href: "/support/agent" },
-        { label: "About App", icon: Info, href: "/about" },
+        { label: "Talk With Agent", icon: Headphones, href: "/talkwithagent" },
+        { label: "About App", icon: Info, href: "/aboutapp" },
         { label: "Policies", icon: ShieldCheck, href: "/policies" },
-        { label: "Help & Support", icon: HelpCircle, href: "/help" },
+        { label: "Help & Support", icon: HelpCircle, href: "/help&support" },
       ],
     },
   ];
@@ -242,7 +243,9 @@ function ProfileDropdown({
           <div className="p-2 shadow-2xl bg-[var(--surface)] border border-[var(--border)] rounded-2xl flex flex-col gap-0.5 max-h-[380px] overflow-y-auto">
             {sections.map(({ heading, items }, idx) => (
               <div key={heading}>
-                {idx > 0 && <div className="border-t border-[var(--border)] my-1" />}
+                {idx > 0 && (
+                  <div className="border-t border-[var(--border)] my-1" />
+                )}
 
                 <div className="px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wider text-[var(--accent)]">
                   {heading}
@@ -286,12 +289,10 @@ function ProfileDropdown({
 
 export function Header() {
   const [isDark, setIsDark] = useState(false);
-  const [isUserProfileOpen, setIsUserProfileOpen] = useState(false);
-  const [isBusinessProfileOpen, setIsBusinessProfileOpen] = useState(false);
 
-  const { user } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const { user, loading } = useAuth();
 
   // Sync dark class on <html>
   const toggleTheme = () => {
@@ -316,7 +317,6 @@ export function Header() {
             <NavButton
               key={href}
               label={label}
-              href={href}
               icon={icon}
               active={!!pathname?.startsWith(href)}
               onClick={() => goTo(href)}
@@ -343,13 +343,13 @@ export function Header() {
         </button>
 
         {/* User / Login */}
-        {user ? (
-          <ProfileDropdown
-            email={user.email ?? "U"}
-            onNavigate={goTo}
-            onUserProfile={() => setIsUserProfileOpen(true)}
-            onBusinessProfile={() => setIsBusinessProfileOpen(true)}
-          />
+        {/* User / Login */}
+        {loading ? (
+          <div className="flex h-10 w-24 items-center justify-center">
+            <span className="loading loading-spinner loading-md text-[var(--primary)] dark:text-[var(--accent)]" />
+          </div>
+        ) : user ? (
+          <ProfileDropdown email={user.email ?? "U"} onNavigate={goTo} />
         ) : (
           <button
             type="button"
@@ -360,16 +360,6 @@ export function Header() {
           </button>
         )}
       </div>
-
-      {/* Modals */}
-      <UserProfileDialog
-        open={isUserProfileOpen}
-        onClose={() => setIsUserProfileOpen(false)}
-      />
-      <BusinessProfileDialog
-        open={isBusinessProfileOpen}
-        onClose={() => setIsBusinessProfileOpen(false)}
-      />
     </header>
   );
 }
