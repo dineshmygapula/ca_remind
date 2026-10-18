@@ -58,6 +58,14 @@ function computeTitle(type?: string, date?: string) {
   return `${type} – ${d}`;
 }
 
+function formatFrequency(frequency?: string): string {
+  if (!frequency) return "ONETIME";
+  const upper = frequency.toUpperCase();
+  if (upper === "ONE_TIME" || upper === "ONETIME") return "ONETIME";
+  if (upper === "HALF_YEARLY" || upper === "HALFYEARLY") return "HALF_YEARLY";
+  return upper;
+}
+
 function TaskFormContent({
   clients,
   clientsLoading,
@@ -253,30 +261,76 @@ export default function TaskFormDialog({
   const handleSubmit = async (data: TaskFormValues) => {
     const title = computeTitle(data.taskType, data.dueDate);
 
-    const dto: CreateTaskDto & UpdateTaskDto = {
-      ...data,
-      title,
-      taskName: title,
-      category: "COMPLIANCE",
-      status: "OPEN" as const,
-      remindersScheduled:
-        data.remindersEnabled && data.templateId
-          ? [
-              {
-                deliveryChannel: data.deliveryChannel,
-                daysBeforeDueDate: Number(data.daysBeforeDueDate) || 1,
-                messageTemplateId: data.templateId,
-              },
-            ]
-          : [],
-    };
+    // Compute period dates from dueDate
+    let periodLabel = "";
+    let periodStart = "";
+    let periodEnd = "";
+
+    if (data.dueDate) {
+      const d = new Date(data.dueDate);
+      if (!isNaN(d.getTime())) {
+        const year = d.getFullYear();
+        const month = d.getMonth();
+        periodLabel = d.toLocaleDateString("en-IN", {
+          month: "short",
+          year: "numeric",
+        });
+        periodStart = new Date(year, month, 1).toISOString();
+        periodEnd = new Date(year, month + 1, 0, 23, 59, 59, 999).toISOString();
+      }
+    }
+
+    const matchedDef = taskDefinitions.find(
+      (def) =>
+        String(def.taskType).trim().toUpperCase() ===
+        data.taskType.trim().toUpperCase(),
+    );
 
     await saveAction.run(
       async () => {
         if (mode === "edit" && taskId) {
-          await updateTask(businessId, taskId, dto);
+          // Backend UPDATE only accepts these 7 fields — send nothing else.
+          const updateDto: UpdateTaskDto = {
+            description: data.notes?.trim() || undefined,
+            notes: data.notes?.trim() || undefined,
+            status: "OPEN",
+            priority: data.priority,
+            dueDate: data.dueDate || undefined,
+            assignedStaffId: data.assignedStaffId?.trim() || undefined,
+          };
+          await updateTask(businessId, taskId, updateDto);
         } else {
-          await createTask(businessId, dto);
+          // CREATE accepts the exact required payload.
+          const createDto: CreateTaskDto = {
+            title,
+            taskName: title,
+            subjectId: data.subjectId,
+            dueDate: data.dueDate,
+            description: data.notes?.trim() || "",
+            notes: data.notes?.trim() || "",
+            taskType: data.taskType,
+            frequency: formatFrequency(data.frequency),
+            periodLabel,
+            taskDefinitionId: data.taskDefinitionId || matchedDef?.id || "",
+            periodStart,
+            periodEnd,
+            category: matchedDef?.category || "COMPLIANCE",
+            priority: data.priority || "MEDIUM",
+            assignedStaffId: data.assignedStaffId?.trim() || "",
+            status: "OPEN",
+            metadata: {},
+            remindersScheduled:
+              data.remindersEnabled && data.templateId
+                ? [
+                    {
+                      deliveryChannel: data.deliveryChannel,
+                      daysBeforeDueDate: Number(data.daysBeforeDueDate) || 0,
+                      messageTemplateId: data.templateId,
+                    },
+                  ]
+                : [],
+          };
+          await createTask(businessId, createDto);
         }
       },
       {

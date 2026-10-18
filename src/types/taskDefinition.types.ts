@@ -89,6 +89,7 @@ export interface TaskDefinitionListItem {
   id: string;
   name: string;
   taskType: string;
+  category?: string;
   subjectType: string;
   isActive: boolean; 
   autoCreateTasks?: boolean;
